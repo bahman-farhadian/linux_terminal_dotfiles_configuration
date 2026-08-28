@@ -23,6 +23,7 @@ linux_terminal_dotfiles_configuration/
 │   └── config         → appended to ~/.ssh/config
 ├── install.sh
 ├── tmux-diag.sh
+├── gnome-app-folders.py
 ├── hushlogin          → ~/.hushlogin
 └── thinkpad-t14-gen4-debian-13-setup.md
 ```
@@ -84,6 +85,10 @@ on. A session created with an explicit name keeps it.
 Stacked panes stay equal height when one is closed, whether with `Ctrl+b x` or
 `Ctrl+d`. The two paths fire different hooks — `after-kill-pane` and
 `pane-exited` — so both are set.
+
+`./gnome-app-folders.py` sorts the GNOME application grid into alphabetical
+folders. `--list` previews it. It is idempotent, so re-run it after installing
+anything.
 
 `./tmux-diag.sh` reports client and window sizes, every attached client, and
 whether any rows are left unpainted at the bottom. Run it in the terminal

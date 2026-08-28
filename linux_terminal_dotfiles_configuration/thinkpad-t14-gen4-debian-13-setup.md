@@ -774,3 +774,42 @@ docker run --rm hello-world
 - `--storage-opt size=` works only on `overlay2` over XFS with project quota. It is not supported on ext4, and not by the containerd snapshotter.
 - Switching the driver hides images pulled under the previous one. They are not deleted, but they live in a separate store. Pull them again if anything is missing.
 - `--rm` deletes the container when it exits, so these checks leave nothing behind.
+
+### Step 10 — Sort the application grid into folders
+
+The grid behind **Super+A** can be grouped into folders. This sorts every
+installed application into a folder named for its first letter. Run it as your
+own user, not root: the layout is a per-user setting.
+
+#### 1. See what it will do
+
+```bash
+./gnome-app-folders.py --list
+```
+
+Nothing is changed. Each application is listed under the folder it would go
+into.
+
+#### 2. Apply it
+
+```bash
+./gnome-app-folders.py
+```
+
+#### 3. Log out and log back in
+
+GNOME Shell reads the folder layout when the session starts. Under Wayland the
+shell cannot be restarted on its own, so a full log out is needed.
+
+#### 4. Check
+
+Press **Super+A**. The grid shows folders `A` to `Z`, plus `0-9` and `Other` if
+anything falls outside the alphabet.
+
+**Notes**
+
+- Re-run it after installing anything. It clears the folders it manages and rebuilds them from the applications present at that moment, so a new entry lands in the right folder and nothing else moves.
+- Applications are read from every directory the desktop uses, including flatpak exports, so flatpaks are sorted alongside everything else.
+- Entries marked `NoDisplay` or `Hidden` are skipped, which is why the count is smaller than the number of `.desktop` files on disk.
+- Sorting is by the displayed name, not the file name. `org.gnome.Nautilus.desktop` is called Files, so it lands under `F`.
+- To undo it completely: `gsettings reset org.gnome.desktop.app-folders folder-children`.
