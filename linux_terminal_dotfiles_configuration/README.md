@@ -151,6 +151,36 @@ The `$` turns red when the last command failed, and becomes `#` for root.
 
 Needs a true-colour terminal. GNOME Terminal qualifies.
 
+## Aliases
+
+| Alias | Action |
+|---|---|
+| `c` / `reload` | clear / restart the shell |
+| `t` | tmux |
+| `v` | vim |
+| `b` | btop, or htop if btop is missing |
+| `ll` / `l` / `la` | listings |
+| `DE` | keyboard: German only |
+| `EN` | keyboard: US English and Persian |
+| `kbd` | show the current input sources |
+| `pubkey` | print the first SSH public key |
+| `password` | random base64-48 string |
+| `pubip` / `privip` | external / private IP |
+| `ports` | listening TCP and UDP sockets |
+| `cpy` | pipe filter — `cmd 2>&1 \| cpy` prints and copies |
+
+`DE` and `EN` replace the GNOME input source list outright rather than adding
+to it, so only the named layouts remain. They take effect immediately, with no
+log out.
+
+**Git:** `g gs ga gaa gc gca gco gcob gb gl gd gds gp gpf gpl gpr gst gstp gstl gf grb gcp gwip`
+
+**Python:** `py pip piv va vd pipi pipr pipff jn jl`
+
+**Docker:** `d dps dpsa di dex dlogs dstop dstart dprune dc dcu dcd dcl dcr dcb`
+
+**Kubernetes:** `k kgp kgpa kgs kgn kgd kdes kdp kds kdn klogs kex kap kdel kctx kuse kns krun`
+
 ## SSH
 
 `ssh/config` is appended to `~/.ssh/config`, replacing any stale block on
