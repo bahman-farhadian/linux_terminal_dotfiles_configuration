@@ -168,7 +168,9 @@ alias kns='kubectl config set-context --current --namespace'
 alias krun='kubectl run --rm -it --image=busybox debug -- sh'
 
 # Network
-alias ports='ss -tunlp'
+# ss -p only shows the process for sockets you own, so this needs privilege to
+# name the service behind a system port.
+ports() { _asroot ss -tunlp; }
 
 # Filesystem / safety
 alias cp='cp -iv'
