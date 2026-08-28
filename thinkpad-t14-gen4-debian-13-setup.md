@@ -99,17 +99,15 @@ this goes on the kernel command line.
 sudo nano /etc/default/grub
 ```
 
-Change these three lines so they read:
+Change these two lines so they read:
 
 ```
 GRUB_TIMEOUT=10
-GRUB_CMDLINE_LINUX_DEFAULT="quiet"
 GRUB_CMDLINE_LINUX="rootflags=uquota,pquota"
 ```
 
-`GRUB_TIMEOUT` is `5` by default. `GRUB_CMDLINE_LINUX_DEFAULT` already says
-`quiet` — leave it alone. Only `GRUB_CMDLINE_LINUX` is empty and needs the new
-value.
+`GRUB_TIMEOUT` is `5` by default and `GRUB_CMDLINE_LINUX` is empty. Leave
+every other line in the file as it is.
 
 Apply it:
 
