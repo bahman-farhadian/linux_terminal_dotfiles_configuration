@@ -89,24 +89,27 @@ sudo apt full-upgrade
 sudo apt install mokutil dmidecode efibootmgr
 ```
 
-### 4. Turn on XFS project quota
+### 4. Edit GRUB: quota and boot timeout
 
 Docker can only cap a container's disk size (`--storage-opt size=`) when root
 is mounted with project quota. Root is mounted before `/etc/fstab` is read, so
-this goes on the kernel command line:
+this goes on the kernel command line.
 
 ```bash
 sudo nano /etc/default/grub
 ```
 
-Add `rootflags=uquota,pquota` inside `GRUB_CMDLINE_LINUX`:
+Change these three lines so they read:
 
 ```
+GRUB_TIMEOUT=10
+GRUB_CMDLINE_LINUX_DEFAULT="quiet"
 GRUB_CMDLINE_LINUX="rootflags=uquota,pquota"
 ```
 
-On a fresh install that line is empty. If it already has something in it, keep
-what is there and add this after a space.
+`GRUB_TIMEOUT` is `5` by default. `GRUB_CMDLINE_LINUX_DEFAULT` already says
+`quiet` — leave it alone. Only `GRUB_CMDLINE_LINUX` is empty and needs the new
+value.
 
 Apply it:
 
@@ -170,6 +173,7 @@ Compare with what you wrote down in Step 1.
 - The 3rd party CA is a different problem. It does not turn Secure Boot off — it stops the machine booting at all, with `Invalid signature detected`.
 - Hibernation does not work while Secure Boot is on. The kernel locks itself down and refuses to write the resume image, because it cannot check that the swap was not modified while the machine was off. Suspend works normally. Turning hibernation on means turning Secure Boot off.
 - `/etc/fstab` does not work for the quota. XFS cannot turn quota on at remount, and root is already mounted by then.
+- `rootflags` goes in `GRUB_CMDLINE_LINUX`, not `GRUB_CMDLINE_LINUX_DEFAULT`. The plain one applies to every menu entry, including recovery, so the quota stays on there too.
 - Docker only needs `pquota`. `uquota` is user quota and is optional.
 - The kernel reports `pquota` as `prjquota`. Same thing.
 
