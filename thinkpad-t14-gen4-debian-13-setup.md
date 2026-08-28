@@ -27,7 +27,7 @@ the **Shows as** value.
 
 | # | Partition | Size | Enter as | Shows as | Format | Mount |
 |---|-----------|------|----------|----------|--------|-------|
-| 1 | EFI | 1 GiB | `1074 MB` | 1.1 GB | FAT32, `esp` flag | `/boot/efi` |
+| 1 | EFI | 1023 MiB | `1074 MB` | 1.1 GB | FAT32, `esp` flag | `/boot/efi` |
 | 2 | Boot | 2 GiB | `2147 MB` | 2.1 GB | ext4 | `/boot` |
 | 3 | Root | 800 GiB | `858993 MB` | 859.0 GB | xfs | `/` |
 | 4 | Swap | 40 GiB | `42950 MB` | 42.9 GB | swap | — |
@@ -37,6 +37,8 @@ the **Shows as** value.
 
 - The installer counts in GB. `df -h` counts in GiB. Root shows as `859.0 GB`
   now and `800G` later. Same partition.
+- The EFI partition comes out as 1023 MiB, not 1024. The first partition loses
+  1 MiB to alignment. This does not matter.
 - For any other size: type `GiB x 1073.741824` MB, rounded.
 - Leave the 111 GiB free. Samsung suggests about 10% for over-provisioning.
   The drive uses it to keep write speed up as the disk fills.
@@ -45,28 +47,42 @@ the **Shows as** value.
   `--storage-opt size=`, which needs the `prjquota` mount option.
 - 40 GiB swap covers hibernation up to 32 GB RAM.
 
-## Step 3 — After install: repositories, packages, checks
+## Step 3 — After install: repositories, quota, checks
 
 Remove the USB stick before the first boot. If it is still plugged in, the
 machine may start the installer again.
 
 ### 1. Add contrib and non-free
 
+The installer writes the classic file, not a `.sources` file:
+
 ```bash
-sudo nano /etc/apt/sources.list.d/debian.sources
+sudo nano /etc/apt/sources.list
 ```
 
-Set every `Components:` line to:
+On every `deb` and `deb-src` line, change:
 
 ```
-Components: main contrib non-free non-free-firmware
+main non-free-firmware
+```
+
+to:
+
+```
+main contrib non-free non-free-firmware
 ```
 
 Or do it in one command:
 
 ```bash
-sudo sed -i -E 's/^Components:.*/Components: main contrib non-free non-free-firmware/' \
-  /etc/apt/sources.list.d/debian.sources
+sudo sed -i -E '/^deb(-src)? /s/ main non-free-firmware/ main contrib non-free non-free-firmware/' \
+  /etc/apt/sources.list
+```
+
+Check the result:
+
+```bash
+grep ^deb /etc/apt/sources.list
 ```
 
 ### 2. Update the system
@@ -82,105 +98,11 @@ sudo apt full-upgrade
 sudo apt install mokutil dmidecode efibootmgr
 ```
 
-### 4. Check Secure Boot
-
-```bash
-mokutil --sb-state
-dmesg | grep -i "secure boot"
-```
-
-Expect `SecureBoot enabled` and `secureboot: Secure boot enabled`.
-
-### 5. Check the machine booted through shim
-
-```bash
-sudo efibootmgr -v | grep -i shim
-```
-
-Expect `\EFI\debian\shimx64.efi`.
-
-### 6. Check the disk
-
-```bash
-lsblk
-findmnt -no FSTYPE /
-swapon --show
-```
-
-Expect `1023M`, `2G`, `800G`, `40G`, root `xfs`, and swap active.
-
-### 7. Check the BIOS version
-
-```bash
-sudo dmidecode -s bios-version
-```
-
-Compare with what you wrote down in Step 1.
-
-### 8. Reboot
-
-```bash
-sudo systemctl reboot
-```
-
-**Notes**
-
-- `efi-readvar -v PK` reports `no entries` on this machine. That is normal
-  while `Secure Boot Key State` is `Standard`. The firmware keeps its keys
-  internal.
-- If Secure Boot is off, go back to Step 1 and check the 3rd party CA.
-
-The installation is done. Configuration starts below.
-
-## Step 4 — Firmware updates
-
-### 1. Install fwupd
-
-```bash
-sudo apt install fwupd fwupd-amd64-signed
-```
-
-### 2. Refresh the firmware list
-
-```bash
-sudo fwupdmgr refresh --force
-```
-
-### 3. See what is available
-
-```bash
-sudo fwupdmgr get-devices
-sudo fwupdmgr get-updates
-```
-
-### 4. Apply
-
-```bash
-sudo fwupdmgr update
-```
-
-### 5. Check Secure Boot again
-
-```bash
-mokutil --sb-state
-```
-
-**Notes**
-
-- Keep the charger plugged in. Never power off during a firmware update.
-- Step 4 may reboot the machine more than once. This is normal.
-- A BIOS update can reset BIOS settings. If Secure Boot came back off, redo
-  Step 1.
-- `fwupd-amd64-signed` holds the signed EFI file. Without it, firmware updates
-  stop working while Secure Boot is on.
-
-## Step 5 — XFS project quota for Docker
+### 4. Turn on XFS project quota
 
 Docker can only cap a container's disk size (`--storage-opt size=`) when root
 is mounted with project quota. Root is mounted before `/etc/fstab` is read, so
-this goes on the kernel command line.
-
-### 1. Edit the GRUB defaults
+this goes on the kernel command line:
 
 ```bash
 sudo nano /etc/default/grub
@@ -192,14 +114,46 @@ Add `rootflags=uquota,pquota` inside `GRUB_CMDLINE_LINUX`:
 GRUB_CMDLINE_LINUX="rootflags=uquota,pquota"
 ```
 
-### 2. Apply and reboot
+Apply it:
 
 ```bash
 sudo update-grub
+```
+
+### 5. Reboot
+
+```bash
 sudo systemctl reboot
 ```
 
-### 3. Verify
+### 6. Check Secure Boot
+
+```bash
+mokutil --sb-state
+dmesg | grep -i "secure boot"
+```
+
+Expect `SecureBoot enabled` and `secureboot: Secure boot enabled`.
+
+### 7. Check the machine booted through shim
+
+```bash
+sudo efibootmgr -v | grep -i shim
+```
+
+Expect `\EFI\debian\shimx64.efi`.
+
+### 8. Check the disk
+
+```bash
+lsblk
+findmnt -no FSTYPE /
+swapon --show
+```
+
+Expect `1023M`, `2G`, `800G`, `40G`, root `xfs`, and swap active.
+
+### 9. Check the quota
 
 ```bash
 findmnt -no OPTIONS /
@@ -208,10 +162,23 @@ sudo xfs_quota -x -c state /
 
 Expect `prjquota` in the mount options, and project quota `ON`.
 
+### 10. Check the BIOS version
+
+```bash
+sudo dmidecode -s bios-version
+```
+
+Compare with what you wrote down in Step 1.
+
 **Notes**
 
-- `/etc/fstab` does not work for this. XFS cannot turn quota on at remount,
-  and root is already mounted by then.
+- `efi-readvar -v PK` reports `no entries` on this machine. That is normal
+  while `Secure Boot Key State` is `Standard`. The firmware keeps its keys
+  internal.
+- If Secure Boot is off, go back to Step 1 and check the 3rd party CA.
+- `/etc/fstab` does not work for the quota. XFS cannot turn quota on at
+  remount, and root is already mounted by then.
 - Docker only needs `pquota`. `uquota` is user quota and is optional.
 - The kernel reports `pquota` as `prjquota`. Same thing.
-- Do this before installing Docker.
+
+The installation is done.
