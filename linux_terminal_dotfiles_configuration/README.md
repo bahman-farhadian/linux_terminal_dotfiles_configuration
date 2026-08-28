@@ -78,12 +78,13 @@ as root configures `/root` and leaves your account untouched.
 ## Prompt
 
 ```
-bahman@Silenus ~/project main*⇡1 venv:api k8s:prod 18:49:36 UTC 15:49:36
+bahman@Silenus ~/project main*⇡1 venv:api k8s:prod
 $
 ```
 
-Plain colour, no badges and no background blocks. Only the user name changes
-colour, so root is obvious at a glance while the host name stays put.
+Plain colour, no badges and no background blocks. No clock — use `date` when
+you want one. Only the user name changes colour, so root is obvious at a glance
+while the host name stays put.
 
 | Segment | Colour | Shown when |
 |---|---|---|
@@ -94,8 +95,6 @@ colour, so root is obvious at a glance while the host name stays put.
 | branch | Peach `#fab387` | inside a git repository |
 | `venv:` | Mauve `#cba6f7` | a virtualenv is active |
 | `k8s:` | Sky `#89dceb` | `kubectl` has a current context |
-| local time | Overlay `#6c7086` | always |
-| `UTC` | Teal `#94e2d5` | always |
 
 Branch suffixes: `*` unstaged · `+` staged · `⇡N` ahead · `⇣N` behind · `{N}` stashes.
 The `$` turns red when the last command failed, and becomes `#` for root.
