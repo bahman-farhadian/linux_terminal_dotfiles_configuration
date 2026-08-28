@@ -1,20 +1,23 @@
 # ThinkPad T14 Gen 4 (Intel) — Debian 13 "trixie" Setup
 
-## Step 1 — BIOS: put Secure Boot into Setup Mode
+## Step 1 — BIOS: allow the Microsoft 3rd party CA
 
 | # | Step | How |
 |---|------|-----|
 | 1 | Enter BIOS | Power off fully, power on, tap **F1** at the Lenovo splash |
 | 2 | Note BIOS version | `Main` tab — write it down |
-| 3 | Reset to Setup Mode | `Security → Secure Boot → Reset to Setup Mode` → **Yes** |
-| 4 | Verify | Same screen: `Platform Mode` = **Setup Mode** |
-| 5 | Save and exit | **F10** → **Yes** |
+| 3 | Open Secure Boot | `Security → Secure Boot` |
+| 4 | Allow the 3rd party CA | `Allow Microsoft 3rd Party UEFI CA` = **On** |
+| 5 | Check the other lines | `Secure Boot` = **On**, `Secure Boot Mode` = **User Mode**, `Secure Boot Key State` = **Standard** |
+| 6 | Save and exit | **F10** → **Yes** |
 
 **Notes**
 
-- Step 3 deletes all Secure Boot keys. Secure Boot is now off.
-- Step 3 greyed out? Set `Secure Boot` to `Enabled` first, then retry.
-- To undo: `Restore Factory Keys` puts the stock keys back.
+- Debian's bootloader is signed by Microsoft's 3rd party UEFI CA. If this is
+  **Off**, the machine fails to boot with `Invalid signature detected`.
+- Leave `Secure Boot` **On** for the whole install. Debian handles it.
+- Do not touch `Reset to Setup Mode` or `Clear All Secure Boot Keys`. Debian
+  does not need them, and they cause the failure above.
 
 ## Step 2 — Disk partitioning
 
@@ -44,29 +47,29 @@ the **Shows as** value.
   `--storage-opt size=`, which needs the `prjquota` mount option.
 - 40 GiB swap covers hibernation up to 32 GB RAM.
 
-## Step 3 — Finish the install: Secure Boot back on
+## Step 3 — After install: check everything
 
 **Remove the USB stick before the first boot.** If it is still plugged in, the
 machine may start the installer again.
 
-| # | Step | How |
-|---|------|-----|
-| 1 | Enter BIOS | Power on, tap **F1** at the Lenovo splash |
-| 2 | Restore the keys | `Security → Secure Boot → Restore Factory Keys` → **Yes** |
-| 3 | Check the screen | `Platform Mode` = **User Mode**, `Secure Boot` = **Enabled** |
-| 4 | Save and exit | **F10** → **Yes** |
-| 5 | Log in and check | `dmesg \| grep -i "secure boot"` → `Secure boot enabled` |
-| 6 | Check again | `od -An -t u1 /sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c` → last number is `1` |
+| # | Check | Command | Expected |
+|---|-------|---------|----------|
+| 1 | Secure Boot is on | `dmesg \| grep -i "secure boot"` | `Secure boot enabled` |
+| 2 | Same, from the EFI variable | `od -An -t u1 /sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c` | last number is `1` |
+| 3 | It booted through shim | `sudo efibootmgr -v \| grep -i shim` | `\EFI\debian\shimx64.efi` |
+| 4 | Partition sizes | `lsblk` | 1G, 2G, 800G, 40G |
+| 5 | Root is XFS | `findmnt -no FSTYPE /` | `xfs` |
+| 6 | Free space is untouched | `sudo sgdisk -p /dev/nvme0n1` | ~88 GiB unallocated |
+| 7 | Swap is active | `swapon --show` | 40G partition listed |
+| 8 | BIOS version | `sudo dmidecode -s bios-version` | matches Step 1 |
 
 **Notes**
 
-- Step 1 of this guide only deleted the keys. `Secure Boot` itself stayed
-  **Enabled**, so restoring the keys makes it enforce again.
-- Debian's boot files are signed by Microsoft's key. The factory keys are all
-  you need.
-- If `Platform Mode` still says `Setup Mode`, the keys did not load. Repeat
-  step 2.
-- Steps 5 and 6 need no extra packages.
+- `efi-readvar -v PK` reports `no entries` on this machine. That is normal
+  while `Secure Boot Key State` is `Standard`. The firmware keeps its keys
+  internal and does not publish them.
+- Steps 1 to 8 need no extra packages except step 6.
+- `mokutil --sb-state` answers step 1 too, after `sudo apt install mokutil`.
 
 The installation is done. Configuration starts below.
 
