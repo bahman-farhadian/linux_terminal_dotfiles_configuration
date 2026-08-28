@@ -24,6 +24,7 @@ linux_terminal_dotfiles_configuration/
 ├── install.sh
 ├── tmux-diag.sh
 ├── gnome-app-folders.py
+├── lock-keyboard-en.sh   → ~/.local/bin/ + cron
 ├── hushlogin          → ~/.hushlogin
 └── thinkpad-t14-gen4-debian-13-setup.md
 ```
@@ -172,6 +173,11 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 `DE` and `EN` replace the GNOME input source list outright rather than adding
 to it, so only the named layouts remain. They take effect immediately, with no
 log out.
+
+`install.sh` also puts `lock-keyboard-en.sh` in `~/.local/bin` and adds a cron
+entry that runs it every 10 minutes. While the screen is locked it restores the
+English layout, so the unlock prompt is never left on a German or Persian
+keyboard. While the session is unlocked it does nothing.
 
 **Git:** `g gs ga gaa gc gca gco gcob gb gl gd gds gp gpf gpl gpr gst gstp gstl gf grb gcp gwip`
 

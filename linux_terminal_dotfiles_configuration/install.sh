@@ -138,6 +138,27 @@ fi
 _hdr "misc"
 cp_file "$REPO/hushlogin" "$HOME/.hushlogin"
 
+_hdr "cron — English keyboard on the lock screen"
+mkdir -p "$HOME/.local/bin"
+cp_file "$REPO/lock-keyboard-en.sh" "$HOME/.local/bin/lock-keyboard-en.sh"
+chmod +x "$HOME/.local/bin/lock-keyboard-en.sh"
+
+if command -v crontab >/dev/null 2>&1; then
+    _cron_line="*/10 * * * * $HOME/.local/bin/lock-keyboard-en.sh"
+    _cron_now="$(crontab -l 2>/dev/null || true)"
+    # Drop any previous entry before adding, so re-running never duplicates it
+    # and a changed path replaces the old one.
+    {
+        if [ -n "$_cron_now" ]; then
+            printf '%s\n' "$_cron_now" | grep -vF 'lock-keyboard-en.sh' || true
+        fi
+        printf '%s\n' "$_cron_line"
+    } | crontab -
+    _ok "cron: every 10 minutes"
+else
+    _warn "crontab not found — install the cron package to enable the lock screen keyboard job"
+fi
+
 _hdr "default shell → bash"
 BASH_BIN="$(command -v bash)"
 CURRENT_SHELL="$(getent passwd "$USER" 2>/dev/null | cut -d: -f7)"
