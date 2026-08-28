@@ -26,15 +26,15 @@ expect.
 |---|-----------|------|----------|--------|-------|
 | 1 | EFI | 1 GiB | `1024 MB` | FAT32, `esp` flag | `/boot/efi` |
 | 2 | Boot | 2 GiB | `2048 MB` | ext4 | `/boot` |
-| 3 | Root | 820 GiB | `839680 MB` | ext4 | `/` |
+| 3 | Root | 800 GiB | `819200 MB` | ext4 | `/` |
 | 4 | Swap | 40 GiB | `40960 MB` | swap | — |
-| 5 | Free space | ~68 GiB | leave unused | — | — |
+| 5 | Free space | ~88 GiB | leave unused | — | — |
 
 **Notes**
 
 - A "1 TB" disk is 931 GiB, not 1024. Check yours first with
   `lsblk -b -d -o NAME,SIZE` (`Ctrl+Alt+F2` for a shell).
-- The 68 GiB of free space is SSD over-provisioning. Never partition it. The
+- The 88 GiB of free space is SSD over-provisioning. Never partition it. The
   drive uses it for wear levelling, which keeps write speed up as it fills.
 - Root is ext4. It runs Docker and KVM well and can be shrunk later. XFS
   cannot be shrunk.
