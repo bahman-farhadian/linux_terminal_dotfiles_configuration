@@ -35,9 +35,6 @@ the **Shows as** value.
 
 **Notes**
 
-- Check the real disk size first with `lsblk` (`Ctrl+Alt+F2` for a shell).
-  This machine reports `953.9G`. Sold sizes are decimal and always smaller
-  than they look.
 - The installer counts in GB. `df -h` counts in GiB. Root shows as `859.0 GB`
   now and `800G` later. Same partition.
 - For any other size: type `GiB x 1073.741824` MB, rounded.
@@ -48,77 +45,173 @@ the **Shows as** value.
   `--storage-opt size=`, which needs the `prjquota` mount option.
 - 40 GiB swap covers hibernation up to 32 GB RAM.
 
-## Step 3 — After install: check everything
+## Step 3 — After install: repositories, packages, checks
 
-**Remove the USB stick before the first boot.** If it is still plugged in, the
+Remove the USB stick before the first boot. If it is still plugged in, the
 machine may start the installer again.
 
-| # | Check | Command | Expected |
-|---|-------|---------|----------|
-| 1 | Secure Boot is on | `dmesg \| grep -i "secure boot"` | `Secure boot enabled` |
-| 2 | Same, from the EFI variable | `od -An -t u1 /sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c` | last number is `1` |
-| 3 | It booted through shim | `sudo efibootmgr -v \| grep -i shim` | `\EFI\debian\shimx64.efi` |
-| 4 | Partition sizes | `lsblk` | 1G, 2G, 800G, 40G |
-| 5 | Root is XFS | `findmnt -no FSTYPE /` | `xfs` |
-| 6 | Free space is untouched | `lsblk -b -d -o SIZE /dev/nvme0n1` | 953.9G total, 843G used |
-| 7 | Swap is active | `swapon --show` | 40G partition listed |
-| 8 | BIOS version | `sudo dmidecode -s bios-version` | matches Step 1 |
+### 1. Add contrib and non-free
+
+```bash
+sudo nano /etc/apt/sources.list.d/debian.sources
+```
+
+Set every `Components:` line to:
+
+```
+Components: main contrib non-free non-free-firmware
+```
+
+Or do it in one command:
+
+```bash
+sudo sed -i -E 's/^Components:.*/Components: main contrib non-free non-free-firmware/' \
+  /etc/apt/sources.list.d/debian.sources
+```
+
+### 2. Update the system
+
+```bash
+sudo apt update
+sudo apt full-upgrade
+```
+
+### 3. Install the tools used for checking
+
+```bash
+sudo apt install mokutil dmidecode efibootmgr
+```
+
+### 4. Check Secure Boot
+
+```bash
+mokutil --sb-state
+dmesg | grep -i "secure boot"
+```
+
+Expect `SecureBoot enabled` and `secureboot: Secure boot enabled`.
+
+### 5. Check the machine booted through shim
+
+```bash
+sudo efibootmgr -v | grep -i shim
+```
+
+Expect `\EFI\debian\shimx64.efi`.
+
+### 6. Check the disk
+
+```bash
+lsblk
+findmnt -no FSTYPE /
+swapon --show
+```
+
+Expect `1023M`, `2G`, `800G`, `40G`, root `xfs`, and swap active.
+
+### 7. Check the BIOS version
+
+```bash
+sudo dmidecode -s bios-version
+```
+
+Compare with what you wrote down in Step 1.
+
+### 8. Reboot
+
+```bash
+sudo systemctl reboot
+```
 
 **Notes**
 
 - `efi-readvar -v PK` reports `no entries` on this machine. That is normal
   while `Secure Boot Key State` is `Standard`. The firmware keeps its keys
-  internal and does not publish them.
-- Steps 1 to 8 need no extra packages except step 6.
-- `mokutil --sb-state` answers step 1 too, after `sudo apt install mokutil`.
+  internal.
+- If Secure Boot is off, go back to Step 1 and check the 3rd party CA.
 
 The installation is done. Configuration starts below.
 
-## Step 4 — Repositories and firmware updates
+## Step 4 — Firmware updates
 
-| # | Step | How |
-|---|------|-----|
-| 1 | Add contrib and non-free | In `/etc/apt/sources.list.d/debian.sources`, set every `Components:` line to `main contrib non-free non-free-firmware` |
-| 2 | Check the file | `cat /etc/apt/sources.list.d/debian.sources` |
-| 3 | Update the system | `sudo apt update && sudo apt full-upgrade` |
-| 4 | Reboot | `sudo systemctl reboot` |
-| 5 | Install the updater | `sudo apt install fwupd fwupd-amd64-signed mokutil` |
-| 6 | Refresh the firmware list | `sudo fwupdmgr refresh --force` |
-| 7 | See what is available | `sudo fwupdmgr get-updates` |
-| 8 | Apply, BIOS included | `sudo fwupdmgr update` |
-| 9 | Check the new BIOS version | `hostnamectl` — compare with Step 1 |
-| 10 | Re-check Secure Boot | `mokutil --sb-state` → `SecureBoot enabled` |
+### 1. Install fwupd
+
+```bash
+sudo apt install fwupd fwupd-amd64-signed
+```
+
+### 2. Refresh the firmware list
+
+```bash
+sudo fwupdmgr refresh --force
+```
+
+### 3. See what is available
+
+```bash
+sudo fwupdmgr get-devices
+sudo fwupdmgr get-updates
+```
+
+### 4. Apply
+
+```bash
+sudo fwupdmgr update
+```
+
+### 5. Check Secure Boot again
+
+```bash
+mokutil --sb-state
+```
 
 **Notes**
 
 - Keep the charger plugged in. Never power off during a firmware update.
-- Step 8 may reboot the machine more than once. This is normal.
-- A BIOS update can reset BIOS settings. Step 10 is there to catch that. If
-  Secure Boot came back off, redo Step 3.
+- Step 4 may reboot the machine more than once. This is normal.
+- A BIOS update can reset BIOS settings. If Secure Boot came back off, redo
+  Step 1.
 - `fwupd-amd64-signed` holds the signed EFI file. Without it, firmware updates
   stop working while Secure Boot is on.
-- Step 1 as a one-liner:
-  `sudo sed -i -E 's/^Components:.*/Components: main contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources`
 
 ## Step 5 — XFS project quota for Docker
 
-Docker can only cap a container's disk size (`--storage-opt size=`) when the
-root filesystem is mounted with project quota. Root is mounted before
-`/etc/fstab` is read, so this goes on the kernel command line.
+Docker can only cap a container's disk size (`--storage-opt size=`) when root
+is mounted with project quota. Root is mounted before `/etc/fstab` is read, so
+this goes on the kernel command line.
 
-| # | Step | How |
-|---|------|-----|
-| 1 | Edit GRUB | `sudo nano /etc/default/grub` |
-| 2 | Add the flag | In `GRUB_CMDLINE_LINUX`, add `rootflags=uquota,pquota` |
-| 3 | Apply | `sudo update-grub` |
-| 4 | Reboot | `sudo systemctl reboot` |
-| 5 | Verify the mount | `findmnt -no OPTIONS /` shows `prjquota` |
-| 6 | Verify the quota | `sudo xfs_quota -x -c state /` shows project quota `ON` |
+### 1. Edit the GRUB defaults
+
+```bash
+sudo nano /etc/default/grub
+```
+
+Add `rootflags=uquota,pquota` inside `GRUB_CMDLINE_LINUX`:
+
+```
+GRUB_CMDLINE_LINUX="rootflags=uquota,pquota"
+```
+
+### 2. Apply and reboot
+
+```bash
+sudo update-grub
+sudo systemctl reboot
+```
+
+### 3. Verify
+
+```bash
+findmnt -no OPTIONS /
+sudo xfs_quota -x -c state /
+```
+
+Expect `prjquota` in the mount options, and project quota `ON`.
 
 **Notes**
 
 - `/etc/fstab` does not work for this. XFS cannot turn quota on at remount,
   and root is already mounted by then.
 - Docker only needs `pquota`. `uquota` is user quota and is optional.
-- The kernel reports `pquota` as `prjquota` in step 5. Same thing.
+- The kernel reports `pquota` as `prjquota`. Same thing.
 - Do this before installing Docker.
