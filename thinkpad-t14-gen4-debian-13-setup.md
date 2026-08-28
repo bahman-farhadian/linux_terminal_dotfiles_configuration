@@ -31,17 +31,18 @@ the **Shows as** value.
 | 2 | Boot | 2 GiB | `2147 MB` | 2.1 GB | ext4 | `/boot` |
 | 3 | Root | 800 GiB | `858993 MB` | 859.0 GB | xfs | `/` |
 | 4 | Swap | 40 GiB | `42950 MB` | 42.9 GB | swap | — |
-| 5 | Free space | ~88 GiB | leave unused | — | — | — |
+| 5 | Free space | ~111 GiB | leave unused | — | — | — |
 
 **Notes**
 
-- A "1 TB" disk is 931 GiB, not 1024. Check yours with
-  `lsblk -b -d -o NAME,SIZE` (`Ctrl+Alt+F2` for a shell).
+- Check the real disk size first with `lsblk` (`Ctrl+Alt+F2` for a shell).
+  This machine reports `953.9G`. Sold sizes are decimal and always smaller
+  than they look.
 - The installer counts in GB. `df -h` counts in GiB. Root shows as `859.0 GB`
   now and `800G` later. Same partition.
 - For any other size: type `GiB x 1073.741824` MB, rounded.
-- Leave the 88 GiB free. Samsung suggests about 10% for over-provisioning. The
-  drive uses it to keep write speed up as the disk fills.
+- Leave the 111 GiB free. Samsung suggests about 10% for over-provisioning.
+  The drive uses it to keep write speed up as the disk fills.
 - XFS handles big files well, like a 200 GiB qcow2 image.
 - Docker runs on XFS. It can also cap container size with
   `--storage-opt size=`, which needs the `prjquota` mount option.
@@ -59,7 +60,7 @@ machine may start the installer again.
 | 3 | It booted through shim | `sudo efibootmgr -v \| grep -i shim` | `\EFI\debian\shimx64.efi` |
 | 4 | Partition sizes | `lsblk` | 1G, 2G, 800G, 40G |
 | 5 | Root is XFS | `findmnt -no FSTYPE /` | `xfs` |
-| 6 | Free space is untouched | `sudo sgdisk -p /dev/nvme0n1` | ~88 GiB unallocated |
+| 6 | Free space is untouched | `lsblk -b -d -o SIZE /dev/nvme0n1` | 953.9G total, 843G used |
 | 7 | Swap is active | `swapon --show` | 40G partition listed |
 | 8 | BIOS version | `sudo dmidecode -s bios-version` | matches Step 1 |
 
@@ -98,3 +99,26 @@ The installation is done. Configuration starts below.
   stop working while Secure Boot is on.
 - Step 1 as a one-liner:
   `sudo sed -i -E 's/^Components:.*/Components: main contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources`
+
+## Step 5 — XFS project quota for Docker
+
+Docker can only cap a container's disk size (`--storage-opt size=`) when the
+root filesystem is mounted with project quota. Root is mounted before
+`/etc/fstab` is read, so this goes on the kernel command line.
+
+| # | Step | How |
+|---|------|-----|
+| 1 | Edit GRUB | `sudo nano /etc/default/grub` |
+| 2 | Add the flag | In `GRUB_CMDLINE_LINUX`, add `rootflags=uquota,pquota` |
+| 3 | Apply | `sudo update-grub` |
+| 4 | Reboot | `sudo systemctl reboot` |
+| 5 | Verify the mount | `findmnt -no OPTIONS /` shows `prjquota` |
+| 6 | Verify the quota | `sudo xfs_quota -x -c state /` shows project quota `ON` |
+
+**Notes**
+
+- `/etc/fstab` does not work for this. XFS cannot turn quota on at remount,
+  and root is already mounted by then.
+- Docker only needs `pquota`. `uquota` is user quota and is optional.
+- The kernel reports `pquota` as `prjquota` in step 5. Same thing.
+- Do this before installing Docker.
