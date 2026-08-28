@@ -152,6 +152,8 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 
 | Alias | Action |
 |---|---|
+| `update` | refresh apt sources, list what apt and flatpak would upgrade |
+| `upgrade` | upgrade apt and flatpak, then autoremove, purge and drop unused runtimes |
 | `c` / `reload` | clear / restart the shell |
 | `t` | tmux |
 | `v` | vim |
@@ -165,6 +167,10 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 | `pubip` / `privip` | external / private IP |
 | `ports` | listening TCP and UDP sockets |
 | `cpy` | pipe filter — `cmd 2>&1 \| cpy` prints and copies |
+
+`update` and `upgrade` are functions, not aliases, because they decide whether
+`sudo` is needed: as root they run the commands directly, otherwise through
+`sudo`. `update` changes nothing beyond refreshing the package lists.
 
 `DE` and `EN` replace the GNOME input source list outright rather than adding
 to it, so only the named layouts remain. They take effect immediately, with no
@@ -208,9 +214,9 @@ moved.
 program behind a single icon. Moving it to `switch-windows` gives one entry per
 window. The application switcher has to be cleared first, or it keeps the key.
 
-The three launchers are written to named paths under `custom-keybindings`
-rather than `custom0`, `custom1`, so re-running rewrites the same three entries
-and leaves any shortcuts you added by hand alone.
+Both schemas are reset to GNOME's defaults before these are applied, so the
+result never depends on what was bound previously. Anything you bound by hand
+is reset too.
 
 ## SSH
 
