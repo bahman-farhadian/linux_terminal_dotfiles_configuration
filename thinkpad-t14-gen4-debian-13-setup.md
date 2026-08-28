@@ -43,3 +43,29 @@ the **Shows as** value.
 - Docker runs on XFS. It can also cap container size with
   `--storage-opt size=`, which needs the `prjquota` mount option.
 - 40 GiB swap covers hibernation up to 32 GB RAM.
+
+## Step 3 — After install: firmware updates, then Secure Boot on
+
+| # | Step | How |
+|---|------|-----|
+| 1 | Update the system | `sudo apt update && sudo apt full-upgrade` |
+| 2 | Reboot | `sudo systemctl reboot` |
+| 3 | Install the updater | `sudo apt install fwupd fwupd-amd64-signed mokutil` |
+| 4 | Refresh the firmware list | `sudo fwupdmgr refresh --force` |
+| 5 | See what is available | `sudo fwupdmgr get-updates` |
+| 6 | Apply, BIOS included | `sudo fwupdmgr update` |
+| 7 | Check the new BIOS version | `hostnamectl` — compare with Step 1 |
+| 8 | Restore the keys | BIOS **F1** → `Security → Secure Boot → Restore Factory Keys` |
+| 9 | Turn Secure Boot on | Same screen → `Secure Boot` = **Enabled** → **F10** |
+| 10 | Verify | `mokutil --sb-state` → `SecureBoot enabled` |
+
+**Notes**
+
+- Keep the charger plugged in. Never power off during a firmware update.
+- Do the firmware update first. A BIOS update can reset BIOS settings, and
+  that would undo Secure Boot.
+- Step 6 may reboot the machine more than once. This is normal.
+- `fwupd-amd64-signed` holds the signed EFI file. Without it, firmware updates
+  stop working once Secure Boot is on.
+- Debian's boot files are already signed by Microsoft's key, so the factory
+  keys are all you need.
