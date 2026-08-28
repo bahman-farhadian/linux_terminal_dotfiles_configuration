@@ -57,6 +57,14 @@ upgrade() {
     fi
 }
 
+# Root only. The tunnel needs privileges, so this is not defined for an ordinary
+# user where it would start and then fail. The two variables are what
+# /nekoray/launcher sets before it execs the binary; -qwindowicon is a Qt option
+# and gives the window the icon shipped alongside it.
+if [ "$(id -u)" -eq 0 ] && [ -x /nekoray/nekoray ]; then
+    alias nekoray='LD_LIBRARY_PATH=/nekoray/usr/lib QT_PLUGIN_PATH=/nekoray/usr/plugins /nekoray/nekoray -qwindowicon /nekoray/nekoray.png'
+fi
+
 # Keyboard layout — replaces the GNOME input source list outright, so only the
 # named layouts remain. Takes effect immediately, no log out.
 alias DE="gsettings set org.gnome.desktop.input-sources sources \"[('xkb', 'de')]\""
