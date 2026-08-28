@@ -97,6 +97,11 @@ alias jn='jupyter notebook'
 alias jl='jupyter lab'
 alias jnb='jupyter nbconvert'
 
+# Virtualisation — virt-manager does not follow the GNOME dark preference on
+# its own, so the GTK theme is forced. --no-fork keeps it in the foreground so
+# the variable applies to the process that draws the window.
+alias virt='GTK_THEME=Adwaita:dark virt-manager --no-fork'
+
 # Docker
 alias d='docker'
 alias dps='docker ps'

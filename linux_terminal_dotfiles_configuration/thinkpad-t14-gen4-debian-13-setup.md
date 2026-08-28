@@ -569,6 +569,30 @@ virsh net-list --all
 Both must run without a permission error, and `default` must be listed and
 active.
 
+#### 10. Make virt-manager follow the dark theme
+
+virt-manager does not follow the GNOME dark preference by itself. From a
+terminal the `virt` alias handles it. For the application grid, override its
+desktop entry:
+
+```bash
+cp /usr/share/applications/virt-manager.desktop ~/.local/share/applications/
+```
+
+```bash
+vim ~/.local/share/applications/virt-manager.desktop
+```
+
+Change the `Exec=` line so it reads:
+
+```
+Exec=env GTK_THEME=Adwaita:dark virt-manager --no-fork
+```
+
+```bash
+update-desktop-database ~/.local/share/applications
+```
+
 **Notes**
 
 - There is no `qemu-kvm` package in trixie. `qemu-system-x86` is the one that provides the emulator, and KVM itself is a kernel module that is already present.
@@ -578,4 +602,5 @@ active.
 - Nested virtualization is only needed to run a hypervisor inside a guest. Ordinary guests do not use it.
 - `osinfo-db` comes from the Debian archive and is refreshed by `apt upgrade`. Do not use `osinfo-db-import --latest`; it fetches from a third-party host.
 - `/etc/security/limits.d` applies to login sessions, not to systemd services. If libvirtd itself needs a higher limit, add a `LimitNOFILE` drop-in under `/etc/systemd/system/libvirtd.service.d/`.
+- The copy in `~/.local/share/applications` takes priority over the one in `/usr/share/applications`, and survives package upgrades.
 - libvirt raises `net.ipv4.ip_forward` itself for its NAT network, but setting it here makes it explicit and survives for bridged or routed setups.
