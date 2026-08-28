@@ -412,7 +412,7 @@ flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.f
 **Notes**
 
 - Log out and back in before flatpak applications appear in GNOME Software.
-- `fonts-jetbrains-mono` installs JetBrains Mono from the Debian archive, so the download at jetbrains.com/lp/mono is not needed. Select it in `Terminal → Preferences → Profile → Text → Custom font`.
+- The terminal uses JetBrains Mono at size 14. Either `apt install -y fonts-jetbrains-mono` or download it from jetbrains.com/lp/mono, then select it under `Terminal → Preferences → Profile → Text → Custom font`.
 - Font size changes the terminal cell height. A window whose height is not an exact multiple of that leaves a thin unpainted strip under the last row, so the size is worth tuning.
 - `virt-top` reads from libvirt. Until libvirt is installed and running it shows nothing.
 
