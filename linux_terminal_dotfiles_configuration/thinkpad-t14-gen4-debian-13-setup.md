@@ -58,7 +58,7 @@ apt update
 ```
 
 ```bash
-apt install vim
+apt install -y vim
 ```
 
 Make it the default editor for `visudo` and friends:
@@ -394,7 +394,7 @@ Expect `SecureBoot enabled`.
 #### 1. Install the packages
 
 ```bash
-apt install -y bash-completion btop curl ffmpeg fonts-jetbrains-mono git gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc jq keepassxc nano network-manager-openvpn-gnome openssl openvpn3-client python3 python3.13-venv tmux tree vim virt-top vlc wget xclip
+apt install -y bash-completion bridge-utils btop curl ffmpeg git gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc jq keepassxc lshw nano network-manager-openvpn-gnome openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux tree unrar vim virt-top vlc wget xclip
 ```
 
 #### 2. Install flatpak
