@@ -266,7 +266,7 @@ apt install libpcre2-16-0 libdouble-conversion3
 #### 2. Install the GNOME theme and the Wayland plugin
 
 ```bash
-apt install qgnomeplatform-qt5 qtwayland5
+apt install -y qt6-wayland qgnomeplatform-qt6 qtwayland5 qgnomeplatform-qt5
 ```
 
 #### 3. Set the Qt environment variables
@@ -310,9 +310,9 @@ No output means nothing is missing.
 
 **Notes**
 
+- Both Qt 5 and Qt 6 are covered. `qgnomeplatform-qt5` and `qgnomeplatform-qt6` supply the GNOME theme, `qtwayland5` and `qt6-wayland` supply the Wayland platform plugin.
 - `/etc/environment` is not a shell script. Write `KEY=value`, with no `export` and no quotes.
 - `wayland;xcb` tries Wayland and falls back to X11. Plain `wayland` breaks any application whose bundled Qt has no Wayland plugin.
-- For Qt 6 applications, also install `qgnomeplatform-qt6`.
 - Set `LD_LIBRARY_PATH` to the application's own library directory first, or `ldd` reports its bundled libraries as missing too.
 - An application that exits printing nothing is usually a missing library or a missing graphical session, not a broken application.
 
