@@ -1,5 +1,10 @@
 # ThinkPad T14 Gen 4 (Intel) — Debian 13 "trixie" Setup
 
+Every step here can be run again without harm. Files are written whole rather
+than appended to, package installs skip what is present, and group membership
+is unchanged when it is already granted. The single exception is `visudo` in
+Step 3, which is a manual edit and is noted there.
+
 ## Part 1 — OS installation
 
 ### Step 1 — BIOS: allow the Microsoft 3rd party CA
@@ -90,6 +95,10 @@ username    ALL=(ALL:ALL) ALL
 
 Save and exit. `visudo` checks the syntax before writing and refuses to save a
 broken file, which is why it is used instead of editing the file directly.
+
+This is the one step that is not safe to repeat blindly: running it again adds
+a second identical line. `sudo` tolerates the duplicate, but check whether your
+user is already there before adding it.
 
 Check it:
 
