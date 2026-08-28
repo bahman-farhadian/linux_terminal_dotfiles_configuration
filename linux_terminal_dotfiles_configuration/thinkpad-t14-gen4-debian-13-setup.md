@@ -417,7 +417,7 @@ su -
 #### 2. Install the packages
 
 ```bash
-apt install -y bash-completion bridge-utils btop curl duf ethtool ffmpeg filezilla foliate git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc lshw nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip
+apt install -y bash-completion bridge-utils btop curl duf ethtool ffmpeg filezilla foliate git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc lshw nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip
 ```
 
 #### 3. Install flatpak
@@ -492,6 +492,7 @@ exec bash
 - Keep the repository. The installer needs it to re-run.
 - It also installs `lock-keyboard-en.service`, a systemd user service that switches the keyboard to English the moment the screen locks, whatever layout was active. The unlock prompt is then never stuck on a layout that cannot type your password.
 - Check it with `systemctl --user status lock-keyboard-en.service`. It must be `active (running)`.
+- It also writes `/etc/ssh/sshd_config.d/99-local.conf` so root can only reach SSH with a key, never a password. Ordinary users and port 22 are unchanged. This needs sudo, so answer `y` at the root prompt.
 - It also sets the GNOME shortcuts: `Ctrl+Alt+T` for the terminal, `Super+E` for Files, `Super+I` for Settings, and `Alt+Tab` to switch windows rather than applications.
 - `README.md` covers the prompt, the tmux keys, and what changes.
 

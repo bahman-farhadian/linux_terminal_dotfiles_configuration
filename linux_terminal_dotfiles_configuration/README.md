@@ -224,6 +224,19 @@ is reset too.
 
 ## SSH
 
+### Server
+
+`install.sh` writes `/etc/ssh/sshd_config.d/99-local.conf` with
+`PermitRootLogin prohibit-password`, so root can connect with a key but never
+with a password. Ordinary users are unchanged and the port stays at 22.
+
+It validates with `sshd -t` before reloading and restores the previous file if
+sshd rejects it, because a bad `sshd_config` locks you out of the machine. It
+also checks that `/etc/ssh/sshd_config` actually has the `Include` line for
+`sshd_config.d`, since without it a drop-in is silently ignored.
+
+### Client
+
 `ssh/config` is appended to `~/.ssh/config`, replacing any stale block on
 re-run. It sets `StrictHostKeyChecking no` and `UserKnownHostsFile /dev/null`
 for every host, which disables host key verification. Remove those two lines if
