@@ -29,24 +29,36 @@ the **Shows as** value.
 |---|-----------|------|----------|----------|--------|-------|
 | 1 | EFI | 1023 MiB | `1074 MB` | 1.1 GB | FAT32, `esp` flag | `/boot/efi` |
 | 2 | Boot | 2 GiB | `2147 MB` | 2.1 GB | ext4 | `/boot` |
-| 3 | Root | 800 GiB | `858993 MB` | 859.0 GB | xfs | `/` |
-| 4 | Swap | 40 GiB | `42950 MB` | 42.9 GB | swap | — |
-| 5 | Free space | ~111 GiB | leave unused | — | — | — |
+| 3 | Root | 888 GiB | `953483 MB` | 953.5 GB | xfs | `/` |
+
+Leave the rest of the disk unpartitioned.
+
+**SSD over-provisioning**
+
+```
+Disk          953.87 GiB
+EFI + boot      3.00 GiB
+Root          888.00 GiB
+------------------------
+Free           62.87 GiB   6.6%
+```
+
+The drive uses that free space for wear levelling, which keeps write speed up
+as the disk fills. Samsung suggests about 10%. To reach it, use a root of
+855 GiB (`918456 MB`) instead, which leaves 95.87 GiB free.
 
 **Notes**
 
-- The installer counts in GB. `df -h` counts in GiB. Root shows as `859.0 GB`
-  now and `800G` later. Same partition.
+- The installer counts in GB. `df -h` counts in GiB. Root shows as `953.5 GB`
+  now and `888G` later. Same partition.
 - The EFI partition comes out as 1023 MiB, not 1024. The first partition loses
   1 MiB to alignment. This does not matter.
 - For any other size: type `GiB x 1073.741824` MB, rounded.
-- Leave the 111 GiB free. Samsung suggests about 10% for over-provisioning.
-  The drive uses it to keep write speed up as the disk fills.
+- No swap partition. Hibernation needs swap, and hibernation does not work
+  while Secure Boot is on. See the note in Step 3.
 - XFS handles big files well, like a 200 GiB qcow2 image.
 - Docker runs on XFS. It can also cap container size with
   `--storage-opt size=`, which needs the `prjquota` mount option.
-- 40 GiB swap covers hibernation up to 32 GB RAM, if hibernation is ever
-  used. See the note in Step 3.
 
 ## Step 3 — After install: repositories, quota, checks
 
@@ -147,10 +159,9 @@ Expect `\EFI\debian\shimx64.efi`.
 ```bash
 lsblk
 findmnt -no FSTYPE /
-swapon --show
 ```
 
-Expect `1023M`, `2G`, `800G`, `40G`, root `xfs`, and swap active.
+Expect `1023M`, `2G`, `888G`, and root `xfs`.
 
 ### 9. Check the quota
 
