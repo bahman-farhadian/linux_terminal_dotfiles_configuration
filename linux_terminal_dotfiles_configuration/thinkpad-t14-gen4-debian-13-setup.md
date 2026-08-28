@@ -431,9 +431,8 @@ flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.f
 
 ### Step 7 — Bash, tmux, and SSH configuration
 
-The terminal configuration is a separate project,
-`linux_terminal_dotfiles_configuration`. It covers bash, tmux, and SSH. Its
-packages are already installed in Step 6.
+The bash, tmux, and SSH configuration is in this repository, which you already
+have. Everything it needs was installed in Step 6.
 
 #### 1. Leave the root shell
 
@@ -441,19 +440,13 @@ packages are already installed in Step 6.
 exit
 ```
 
-#### 2. Get the project
+#### 2. Run the installer
 
 ```bash
-git clone <repository-url> ~/dotfiles
+./install.sh
 ```
 
-#### 3. Run the installer
-
-```bash
-~/dotfiles/install.sh
-```
-
-#### 4. Reload the shell
+#### 3. Reload the shell
 
 ```bash
 exec bash
@@ -462,7 +455,8 @@ exec bash
 **Notes**
 
 - Run this step as your own user, never as root. The installer writes to `$HOME`, so as root it configures `/root` and leaves your account untouched.
+- Run it from the repository directory. It reads the files next to it.
 - The installer asks whether to configure `root` as well. Answer `y` to get the same prompt, aliases, and tmux settings under `su`.
 - It is idempotent. Re-running replaces the SSH block instead of duplicating it.
-- Keep `~/dotfiles` after the install. The installer reads from it, so it is needed to re-run.
-- The project's own README covers the prompt, the tmux keys, and what it changes.
+- Keep the repository after the install. The installer needs it to re-run.
+- `README.md` covers the prompt, the tmux keys, and what the configuration changes.

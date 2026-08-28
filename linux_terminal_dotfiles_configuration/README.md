@@ -4,6 +4,11 @@ Debian dotfiles for **bash**, **tmux**, and **SSH** — Catppuccin Mocha theme
 throughout. Adapted from the macOS set, with every macOS-only assumption
 removed.
 
+The repository also carries
+[thinkpad-t14-gen4-debian-13-setup.md](thinkpad-t14-gen4-debian-13-setup.md),
+the Debian 13 install and configuration guide for the machine these dotfiles
+were built on.
+
 ## Layout
 
 ```
@@ -17,7 +22,8 @@ linux_terminal_dotfiles_configuration/
 ├── ssh/
 │   └── config         → appended to ~/.ssh/config
 ├── install.sh
-└── hushlogin          → ~/.hushlogin
+├── hushlogin          → ~/.hushlogin
+└── thinkpad-t14-gen4-debian-13-setup.md
 ```
 
 ## Prerequisites
