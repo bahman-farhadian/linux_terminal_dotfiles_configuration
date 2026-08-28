@@ -44,12 +44,33 @@ the **Shows as** value.
   `--storage-opt size=`, which needs the `prjquota` mount option.
 - 40 GiB swap covers hibernation up to 32 GB RAM.
 
-## Step 3 — After install: repositories, firmware, Secure Boot
+## Step 3 — Finish the install: Secure Boot back on
 
 **Remove the USB stick before the first boot.** If it is still plugged in, the
 machine may start the installer again.
 
-Do these in order. Steps 10 and 11 must come last.
+| # | Step | How |
+|---|------|-----|
+| 1 | Enter BIOS | Power on, tap **F1** at the Lenovo splash |
+| 2 | Restore the keys | `Security → Secure Boot → Restore Factory Keys` → **Yes** |
+| 3 | Check the screen | `Platform Mode` = **User Mode**, `Secure Boot` = **Enabled** |
+| 4 | Save and exit | **F10** → **Yes** |
+| 5 | Log in and check | `dmesg \| grep -i "secure boot"` → `Secure boot enabled` |
+| 6 | Check again | `od -An -t u1 /sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c` → last number is `1` |
+
+**Notes**
+
+- Step 1 of this guide only deleted the keys. `Secure Boot` itself stayed
+  **Enabled**, so restoring the keys makes it enforce again.
+- Debian's boot files are signed by Microsoft's key. The factory keys are all
+  you need.
+- If `Platform Mode` still says `Setup Mode`, the keys did not load. Repeat
+  step 2.
+- Steps 5 and 6 need no extra packages.
+
+The installation is done. Configuration starts below.
+
+## Step 4 — Repositories and firmware updates
 
 | # | Step | How |
 |---|------|-----|
@@ -62,20 +83,15 @@ Do these in order. Steps 10 and 11 must come last.
 | 7 | See what is available | `sudo fwupdmgr get-updates` |
 | 8 | Apply, BIOS included | `sudo fwupdmgr update` |
 | 9 | Check the new BIOS version | `hostnamectl` — compare with Step 1 |
-| 10 | Restore the keys | BIOS **F1** → `Security → Secure Boot → Restore Factory Keys` → **Yes** |
-| 11 | Confirm and save | Same screen: `Secure Boot` = **Enabled** → **F10** |
-| 12 | Verify | `mokutil --sb-state` → `SecureBoot enabled` |
+| 10 | Re-check Secure Boot | `mokutil --sb-state` → `SecureBoot enabled` |
 
 **Notes**
 
 - Keep the charger plugged in. Never power off during a firmware update.
-- Do the firmware update before step 10. A BIOS update can reset BIOS settings.
 - Step 8 may reboot the machine more than once. This is normal.
+- A BIOS update can reset BIOS settings. Step 10 is there to catch that. If
+  Secure Boot came back off, redo Step 3.
+- `fwupd-amd64-signed` holds the signed EFI file. Without it, firmware updates
+  stop working while Secure Boot is on.
 - Step 1 as a one-liner:
   `sudo sed -i -E 's/^Components:.*/Components: main contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources`
-- `fwupd-amd64-signed` holds the signed EFI file. Without it, firmware updates
-  stop working once Secure Boot is on.
-- Step 1 of this guide only deleted the keys. `Secure Boot` itself stayed
-  **Enabled**, so restoring the keys makes it enforce again.
-- Debian's boot files are signed by Microsoft's key. The factory keys are all
-  you need.
