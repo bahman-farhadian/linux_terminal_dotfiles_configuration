@@ -1,29 +1,35 @@
 #!/bin/sh
-# Keep the unlock prompt on a US keyboard.
+# Put the keyboard back to English the moment the screen locks.
 #
-# Locking the screen while the German or Persian layout is active leaves the
-# password prompt on that layout, which can make the password impossible to
-# type. Run from cron every 10 minutes: while the session is locked this puts
-# the layout back to English. While it is unlocked it does nothing, so it never
-# interferes with typing in another language.
+# Locking while the German or Persian layout is active leaves the unlock prompt
+# on that layout, which can make the password impossible to type. Whatever is
+# active at the time, locking returns to English.
+#
+# This watches for the lock signal rather than polling: a poll only notices the
+# lock on its next tick, which is far too late to be useful. It runs for the
+# life of the session under systemd --user.
 
-# cron has no session bus of its own. gsettings and gdbus both need one.
 DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
 export DBUS_SESSION_BUS_ADDRESS
 
 EN_SOURCES="[('xkb', 'us'), ('xkb', 'ir')]"
 
-# Is the screen locked? No session, no answer, nothing to do.
-locked=$(gdbus call --session --dest org.gnome.ScreenSaver \
-    --object-path /org/gnome/ScreenSaver \
-    --method org.gnome.ScreenSaver.GetActive 2>/dev/null)
+set_english() {
+    [ "$(gsettings get org.gnome.desktop.input-sources sources 2>/dev/null)" = "$EN_SOURCES" ] && return
+    gsettings set org.gnome.desktop.input-sources sources "$EN_SOURCES"
+}
 
-case "$locked" in
-    *true*) ;;
-    *) exit 0 ;;
+# If the screen is already locked when this starts, act immediately.
+case "$(gdbus call --session --dest org.gnome.ScreenSaver \
+        --object-path /org/gnome/ScreenSaver \
+        --method org.gnome.ScreenSaver.GetActive 2>/dev/null)" in
+    *true*) set_english ;;
 esac
 
-# Already English: leave it alone rather than rewriting the same value.
-[ "$(gsettings get org.gnome.desktop.input-sources sources 2>/dev/null)" = "$EN_SOURCES" ] && exit 0
-
-gsettings set org.gnome.desktop.input-sources sources "$EN_SOURCES"
+# ActiveChanged carries true when the screen locks and false when it unlocks.
+gdbus monitor --session --dest org.gnome.ScreenSaver 2>/dev/null |
+while IFS= read -r line; do
+    case "$line" in
+        *ActiveChanged*true*) set_english ;;
+    esac
+done

@@ -24,7 +24,8 @@ linux_terminal_dotfiles_configuration/
 ├── install.sh
 ├── tmux-diag.sh
 ├── gnome-app-folders.py
-├── lock-keyboard-en.sh   → ~/.local/bin/ + cron
+├── lock-keyboard-en.sh   → ~/.local/bin/
+├── lock-keyboard-en.service → ~/.config/systemd/user/
 ├── hushlogin          → ~/.hushlogin
 └── thinkpad-t14-gen4-debian-13-setup.md
 ```
@@ -176,10 +177,14 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 to it, so only the named layouts remain. They take effect immediately, with no
 log out.
 
-`install.sh` also puts `lock-keyboard-en.sh` in `~/.local/bin` and adds a cron
-entry that runs it every 10 minutes. While the screen is locked it restores the
-English layout, so the unlock prompt is never left on a German or Persian
-keyboard. While the session is unlocked it does nothing.
+`install.sh` also installs `lock-keyboard-en.service`, a systemd user service
+that watches for the screen locking and switches to English the moment it
+happens, whatever layout was active. The unlock prompt is then never left on a
+keyboard that cannot type the password. It does nothing while the session is
+unlocked.
+
+It watches the lock signal rather than polling. A timer only notices the lock on
+its next tick, which is too late to be any use.
 
 **Git:** `g gs ga gaa gc gca gco gcob gb gl gd gds gp gpf gpl gpr gst gstp gstl gf grb gcp gwip`
 

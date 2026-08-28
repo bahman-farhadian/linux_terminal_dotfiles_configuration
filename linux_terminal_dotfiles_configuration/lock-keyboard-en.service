@@ -1,0 +1,13 @@
+[Unit]
+Description=Restore the English keyboard layout when the screen locks
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/lock-keyboard-en.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

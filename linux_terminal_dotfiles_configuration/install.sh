@@ -138,25 +138,30 @@ fi
 _hdr "misc"
 cp_file "$REPO/hushlogin" "$HOME/.hushlogin"
 
-_hdr "cron — English keyboard on the lock screen"
-mkdir -p "$HOME/.local/bin"
+_hdr "English keyboard on the lock screen"
+mkdir -p "$HOME/.local/bin" "$HOME/.config/systemd/user"
 cp_file "$REPO/lock-keyboard-en.sh" "$HOME/.local/bin/lock-keyboard-en.sh"
 chmod +x "$HOME/.local/bin/lock-keyboard-en.sh"
+cp_file "$REPO/lock-keyboard-en.service" "$HOME/.config/systemd/user/lock-keyboard-en.service"
 
+# Earlier versions installed this as a cron job. Polling cannot react to a lock
+# in time, so drop any leftover entry.
 if command -v crontab >/dev/null 2>&1; then
-    _cron_line="*/10 * * * * $HOME/.local/bin/lock-keyboard-en.sh"
     _cron_now="$(crontab -l 2>/dev/null || true)"
-    # Drop any previous entry before adding, so re-running never duplicates it
-    # and a changed path replaces the old one.
-    {
-        if [ -n "$_cron_now" ]; then
-            printf '%s\n' "$_cron_now" | grep -vF 'lock-keyboard-en.sh' || true
-        fi
-        printf '%s\n' "$_cron_line"
-    } | crontab -
-    _ok "cron: every 10 minutes"
+    if printf '%s\n' "$_cron_now" | grep -qF 'lock-keyboard-en.sh'; then
+        printf '%s\n' "$_cron_now" | grep -vF 'lock-keyboard-en.sh' | crontab -
+        _ok "removed the old cron entry"
+    fi
+fi
+
+if systemctl --user show-environment >/dev/null 2>&1; then
+    systemctl --user daemon-reload
+    systemctl --user enable --now lock-keyboard-en.service >/dev/null 2>&1 \
+        && _ok "lock-keyboard-en.service enabled" \
+        || _warn "could not enable lock-keyboard-en.service"
 else
-    _warn "crontab not found — install the cron package to enable the lock screen keyboard job"
+    _warn "no systemd user session here — enable it from a desktop login with:"
+    printf '  systemctl --user enable --now lock-keyboard-en.service\n'
 fi
 
 _hdr "default shell → bash"

@@ -489,8 +489,8 @@ exec bash
 - It asks whether to configure `root` as well. Answer `y` for the same prompt, aliases, and tmux settings under `su`.
 - Safe to re-run. The SSH block is replaced, not duplicated.
 - Keep the repository. The installer needs it to re-run.
-- It also installs `lock-keyboard-en.sh` and a cron entry that runs every 10 minutes. While the screen is locked it puts the keyboard back to English, so the unlock prompt is never stuck on a layout that cannot type your password. It does nothing while the session is unlocked.
-- The cron entry needs the `cron` package. `install.sh` warns instead of failing if `crontab` is missing.
+- It also installs `lock-keyboard-en.service`, a systemd user service that switches the keyboard to English the moment the screen locks, whatever layout was active. The unlock prompt is then never stuck on a layout that cannot type your password.
+- Check it with `systemctl --user status lock-keyboard-en.service`. It must be `active (running)`.
 - `README.md` covers the prompt, the tmux keys, and what changes.
 
 ### Step 8 — KVM and libvirt
