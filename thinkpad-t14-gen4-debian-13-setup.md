@@ -199,7 +199,32 @@ The installation is done.
 
 ## Part 2 — Configuration
 
-### Step 4 — Firmware updates
+### Step 4 — Runtime libraries
+
+Prebuilt applications that ship their own Qt still link against a few system
+libraries. A minimal Debian install does not include them.
+
+#### 1. Install the libraries
+
+```bash
+sudo apt install libpcre2-16-0 libdouble-conversion3
+```
+
+#### 2. Check a prebuilt binary for anything still missing
+
+```bash
+LD_LIBRARY_PATH=/path/to/app/usr/lib ldd /path/to/app/binary | grep "not found"
+```
+
+No output means nothing is missing.
+
+**Notes**
+
+- `libpcre2-16-0` provides `libpcre2-16.so.0` and `libdouble-conversion3` provides `libdouble-conversion.so.3`.
+- Set `LD_LIBRARY_PATH` to the application's own library directory first, or `ldd` reports the bundled libraries as missing too.
+- A program that exits with no message is usually a missing library or a missing graphical session, not a broken program.
+
+### Step 5 — Firmware updates
 
 Lenovo publishes firmware to LVFS, so the BIOS, embedded controller, and
 Thunderbolt can all be updated from Linux. No Windows and no USB needed.
