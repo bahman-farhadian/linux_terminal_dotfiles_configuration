@@ -10,11 +10,13 @@ set of applications, so running it again after installing something puts the
 new entry in the right folder and leaves everything else where it belongs.
 
   gnome-app-folders.py --list        show what would happen, change nothing
+  gnome-app-folders.py --apply       sort the grid into folders
+  gnome-app-folders.py --clear-dock  sort, and also empty the pinned dock
   gnome-app-folders.py --status      read back what is currently set
-  gnome-app-folders.py               apply it
-  gnome-app-folders.py --clear-dock  apply it and also empty the pinned dock
+  gnome-app-folders.py --help        this message
 
-The dock is never touched unless --clear-dock is given.
+Run with no arguments to see this. Nothing is changed without --apply or
+--clear-dock, and the dock is never touched unless --clear-dock is given.
 """
 import configparser
 import os
@@ -114,13 +116,39 @@ def gvariant(items):
     return "[" + ", ".join("'" + i.replace("'", r"\'") + "'" for i in items) + "]"
 
 
+USAGE = """Sort the GNOME application grid into alphabetical folders.
+
+  gnome-app-folders.py --list        show what would happen, change nothing
+  gnome-app-folders.py --apply       sort the grid into folders
+  gnome-app-folders.py --clear-dock  sort, and also empty the pinned dock
+  gnome-app-folders.py --status      read back what is currently set
+  gnome-app-folders.py --help        this message
+
+Nothing is changed without --apply or --clear-dock."""
+
+KNOWN = {"--list", "--apply", "--clear-dock", "--status", "--help", "-h"}
+
+
 def main():
-    if "--status" in sys.argv:
+    args = set(sys.argv[1:])
+
+    unknown = sorted(a for a in args if a not in KNOWN)
+    if unknown:
+        print(f"unknown option: {' '.join(unknown)}\n", file=sys.stderr)
+        print(USAGE, file=sys.stderr)
+        sys.exit(1)
+
+    # No arguments, or an explicit request: explain rather than act.
+    if not args or args & {"--help", "-h"}:
+        print(USAGE)
+        return
+
+    if "--status" in args:
         show_status()
         return
 
-    preview = "--list" in sys.argv
-    clear_dock = "--clear-dock" in sys.argv
+    preview = "--list" in args
+    clear_dock = "--clear-dock" in args
     apps = visible_applications()
     if not apps:
         sys.exit("no .desktop entries found — is this a desktop session?")

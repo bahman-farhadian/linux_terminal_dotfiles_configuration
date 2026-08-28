@@ -804,7 +804,7 @@ into.
 #### 2. Apply it
 
 ```bash
-./gnome-app-folders.py
+./gnome-app-folders.py --apply
 ```
 
 It prints each folder and its count as it goes, then resets
@@ -843,5 +843,6 @@ anything falls outside the alphabet.
 - Entries marked `NoDisplay` or `Hidden` are skipped, which is why the count is smaller than the number of `.desktop` files on disk.
 - Sorting is by the displayed name, not the file name. `org.gnome.Nautilus.desktop` is called Files, so it lands under `F`.
 - `--clear-dock` also unpins everything from the dock. It is off by default, so a normal run never changes the dock.
+- Nothing is changed without `--apply` or `--clear-dock`. Run it with no arguments to see the options.
 - `--status` reads the settings back. If it disagrees with `--list`, the write failed rather than the sort being wrong.
 - To undo it completely: `gsettings reset org.gnome.desktop.app-folders folder-children` followed by `gsettings reset org.gnome.shell app-picker-layout`.

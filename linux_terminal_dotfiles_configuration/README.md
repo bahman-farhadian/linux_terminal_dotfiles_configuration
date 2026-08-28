@@ -88,9 +88,10 @@ Stacked panes stay equal height when one is closed, whether with `Ctrl+b x` or
 `pane-exited` — so both are set.
 
 `./gnome-app-folders.py` sorts the GNOME application grid into alphabetical
-folders. `--list` previews it, `--status` reads back what is set. It is
-idempotent, so re-run it after installing anything. `--clear-dock` also empties
-the pinned dock; without that flag the dock is never touched.
+folders. `--list` previews, `--apply` does it, `--clear-dock` does it and also
+empties the pinned dock, `--status` reads back what is set. With no arguments
+it prints the options and changes nothing. It is idempotent, so re-run it after
+installing anything.
 
 `./tmux-diag.sh` reports client and window sizes, every attached client, and
 whether any rows are left unpainted at the bottom. Run it in the terminal
