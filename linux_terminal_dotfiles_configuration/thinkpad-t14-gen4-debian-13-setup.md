@@ -446,3 +446,136 @@ exec bash
 - Safe to re-run. The SSH block is replaced, not duplicated.
 - Keep the repository. The installer needs it to re-run.
 - `README.md` covers the prompt, the tmux keys, and what changes.
+
+### Step 8 — KVM and libvirt
+
+#### 1. Check the CPU exposes virtualization
+
+```bash
+grep -Ec '(vmx|svm)' /proc/cpuinfo
+```
+
+Expect a number above 0. This machine is Intel, so the flag is `vmx`.
+
+#### 2. Install the packages
+
+```bash
+apt install -y qemu-system-x86 qemu-utils ovmf virtinst virt-manager libvirt-daemon-system libvirt-clients libosinfo-bin osinfo-db osinfo-db-tools libguestfs-tools
+```
+
+#### 3. Start the daemon
+
+```bash
+systemctl enable --now libvirtd
+```
+
+```bash
+systemctl is-active libvirtd
+```
+
+Expect `active`.
+
+#### 4. Turn on nested virtualization
+
+```bash
+cat /sys/module/kvm_intel/parameters/nested
+```
+
+If it prints `Y` or `1`, skip the rest of this sub-step. Otherwise:
+
+```bash
+echo 'options kvm_intel nested=1' > /etc/modprobe.d/kvm-intel.conf
+```
+
+```bash
+modprobe -r kvm_intel
+```
+
+```bash
+modprobe kvm_intel
+```
+
+```bash
+cat /sys/module/kvm_intel/parameters/nested
+```
+
+Expect `Y`.
+
+#### 5. Enable IP forwarding
+
+```bash
+vim /etc/sysctl.d/99-kvm.conf
+```
+
+Put this in it:
+
+```
+net.ipv4.ip_forward = 1
+```
+
+```bash
+sysctl --system
+```
+
+```bash
+sysctl net.ipv4.ip_forward
+```
+
+Expect `net.ipv4.ip_forward = 1`.
+
+#### 6. Raise the open file limit
+
+```bash
+vim /etc/security/limits.d/99-kvm.conf
+```
+
+Put this in it:
+
+```
+*    soft    nofile    65536
+*    hard    nofile    1048576
+```
+
+#### 7. Leave the root shell
+
+```bash
+exit
+```
+
+#### 8. Add your user to the libvirt and kvm groups
+
+```bash
+sudo usermod -aG libvirt,kvm $USER
+```
+
+Log out and log back in, then check:
+
+```bash
+groups
+```
+
+Expect `libvirt` and `kvm` in the list.
+
+#### 9. Verify as your own user
+
+```bash
+virsh list --all
+```
+
+```bash
+virsh net-list --all
+```
+
+Both must run without a permission error, and `default` must be listed and
+active.
+
+**Notes**
+
+- There is no `qemu-kvm` package in trixie. `qemu-system-x86` is the one that provides the emulator, and KVM itself is a kernel module that is already present.
+- Step 8 has to run as your own user, not root. Under `sudo` as root, `$USER` is `root`, so the groups would be added to the wrong account.
+- Group membership only applies at the next login. `newgrp libvirt` works for one shell if you do not want to log out.
+- `modprobe -r kvm_intel` fails if a virtual machine is running. Shut them down first.
+- Nested virtualization is only needed to run a hypervisor inside a guest. Ordinary guests do not use it.
+- `osinfo-db` comes from the Debian archive and is refreshed by `apt upgrade`. Do not use `osinfo-db-import --latest`; it fetches from a third-party host.
+- `/etc/security/limits.d` applies to login sessions, not to systemd services. If libvirtd itself needs a higher limit, add a `LimitNOFILE` drop-in under `/etc/systemd/system/libvirtd.service.d/`.
+- libvirt raises `net.ipv4.ip_forward` itself for its NAT network, but setting it here makes it explicit and survives for bridged or routed setups.
