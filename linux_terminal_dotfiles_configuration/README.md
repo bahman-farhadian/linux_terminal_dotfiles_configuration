@@ -98,8 +98,11 @@ NO_AUTO_TMUX=1 bash
 tmux is run rather than `exec`'d, so a broken `~/.tmux.conf` leaves you at a
 working shell instead of a terminal that closes the moment it opens.
 
-The status bar is coloured text on a dark bar rather than badges, matching the
-prompt.
+The status bar is coloured text rather than badges, matching the prompt, and
+uses `bg=default` so it takes the terminal's own background. A terminal window
+whose height is not an exact multiple of the character cell leaves a strip
+below the last row; any fixed background colour on the bar shows up as a seam
+against it.
 
 ## Prompt
 
