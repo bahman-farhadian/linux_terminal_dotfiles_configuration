@@ -324,6 +324,7 @@ No output means nothing is missing.
 - `wayland;xcb` tries Wayland and falls back to X11. Plain `wayland` breaks any application whose bundled Qt has no Wayland plugin.
 - Set `LD_LIBRARY_PATH` to the application's own library directory first, or `ldd` reports its bundled libraries as missing too.
 - An application that exits printing nothing is usually a missing library or a missing graphical session, not a broken application.
+- Eclipse applications such as DBeaver are built on SWT and follow neither these Qt settings nor the GNOME dark preference. Set the theme inside the application: `Window → Preferences → User Interface → Appearance → Theme → Dark`, then restart it.
 
 ### Step 5 — Firmware updates
 
