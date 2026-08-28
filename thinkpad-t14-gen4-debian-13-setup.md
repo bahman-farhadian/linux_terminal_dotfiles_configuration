@@ -18,22 +18,24 @@
 
 ## Step 2 — Disk partitioning
 
-Choose **Manual** partitioning in the installer. Enter every size in **MiB** —
-the installer reads plain `GB` as decimal and you will not get the size you
-expect.
+Choose **Manual** partitioning in the installer. The installer counts in
+decimal: `MB` means 1,000,000 bytes. Type the exact numbers below to get the
+sizes in the Size column.
 
 | # | Partition | Size | Enter as | Format | Mount |
 |---|-----------|------|----------|--------|-------|
-| 1 | EFI | 1 GiB | `1024 MB` | FAT32, `esp` flag | `/boot/efi` |
-| 2 | Boot | 2 GiB | `2048 MB` | ext4 | `/boot` |
-| 3 | Root | 800 GiB | `819200 MB` | xfs | `/` |
-| 4 | Swap | 40 GiB | `40960 MB` | swap | — |
+| 1 | EFI | 1 GiB | `1074 MB` | FAT32, `esp` flag | `/boot/efi` |
+| 2 | Boot | 2 GiB | `2147 MB` | ext4 | `/boot` |
+| 3 | Root | 800 GiB | `858993 MB` | xfs | `/` |
+| 4 | Swap | 40 GiB | `42950 MB` | swap | — |
 | 5 | Free space | ~88 GiB | leave unused | — | — |
 
 **Notes**
 
 - A "1 TB" disk is 931 GiB, not 1024. Check yours first with
   `lsblk -b -d -o NAME,SIZE` (`Ctrl+Alt+F2` for a shell).
+- The installer also displays decimal GB. Root will show as `859.0 GB` and
+  swap as `42.9 GB`. That is correct — it is the same size.
 - Leave the 88 GiB unpartitioned. This is over-provisioning, which Samsung
   recommends at about 10% on their SSDs. The drive uses the space for wear
   levelling, which keeps write speed up as the disk fills.
