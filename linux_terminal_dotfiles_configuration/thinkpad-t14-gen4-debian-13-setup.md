@@ -579,3 +579,121 @@ active.
 - `osinfo-db` comes from the Debian archive and is refreshed by `apt upgrade`. Do not use `osinfo-db-import --latest`; it fetches from a third-party host.
 - `/etc/security/limits.d` applies to login sessions, not to systemd services. If libvirtd itself needs a higher limit, add a `LimitNOFILE` drop-in under `/etc/systemd/system/libvirtd.service.d/`.
 - libvirt raises `net.ipv4.ip_forward` itself for its NAT network, but setting it here makes it explicit and survives for bridged or routed setups.
+
+### Step 9 — Docker
+
+Docker Engine from Docker's own repository, not Debian's `docker.io`.
+
+#### 1. Install what the repository setup needs
+
+```bash
+apt install -y ca-certificates curl
+```
+
+#### 2. Create the keyring directory
+
+```bash
+install -m 0755 -d /etc/apt/keyrings
+```
+
+#### 3. Fetch Docker's signing key
+
+```bash
+curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+```
+
+```bash
+chmod a+r /etc/apt/keyrings/docker.asc
+```
+
+#### 4. Add the repository
+
+```bash
+vim /etc/apt/sources.list.d/docker.sources
+```
+
+Put this in it:
+
+```
+Types: deb
+URIs: https://download.docker.com/linux/debian
+Suites: trixie
+Components: stable
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/docker.asc
+```
+
+```bash
+apt update
+```
+
+#### 5. Install the engine
+
+```bash
+apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+#### 6. Start it
+
+```bash
+systemctl enable --now docker
+```
+
+```bash
+systemctl is-active docker
+```
+
+Expect `active`.
+
+#### 7. Check the storage driver
+
+```bash
+docker info --format '{{.Driver}}'
+```
+
+Expect `overlay2`.
+
+```bash
+docker info --format '{{.DriverStatus}}'
+```
+
+Expect `Backing Filesystem` to read `xfs`.
+
+#### 8. Check the project quota works
+
+This is the reason root is XFS with `prjquota` in Step 3. Without it Docker
+cannot cap a container's disk usage.
+
+```bash
+docker run --rm --storage-opt size=1G busybox df -h /
+```
+
+Expect a root filesystem of `1.0G`. If it fails with `--storage-opt is
+supported only for overlay over xfs with 'pquota' mount option`, the quota is
+not active — go back to Step 3 and check `findmnt -no OPTIONS /`.
+
+#### 9. Leave the root shell
+
+```bash
+exit
+```
+
+#### 10. Add your user to the docker group
+
+```bash
+sudo usermod -aG docker $USER
+```
+
+Log out and log back in, then check it works without `sudo`:
+
+```bash
+docker run --rm hello-world
+```
+
+**Notes**
+
+- Debian's `docker.io` and `podman-docker` conflict with Docker Engine. If either was installed earlier, remove it before Step 5.
+- Step 10 must run as your own user, not root. Under `sudo` as root, `$USER` is `root`, and the group would go to the wrong account.
+- Membership in the `docker` group is equivalent to root. Any member can start a container that mounts the whole filesystem. Treat it as an admin privilege, not a convenience.
+- `Suites: trixie` is written out rather than derived from `/etc/os-release`, so the file says which release it is pinned to. Change it when the machine is upgraded.
+- `--storage-opt size=` works only on `overlay2` over XFS with project quota. It is not supported on ext4.
