@@ -226,6 +226,47 @@ else
     printf '  systemctl --user enable --now lock-keyboard-en.service\n'
 fi
 
+_hdr "GNOME keyboard shortcuts"
+if command -v gsettings >/dev/null 2>&1; then
+    _kb_list=org.gnome.settings-daemon.plugins.media-keys
+    _kb_item=org.gnome.settings-daemon.plugins.media-keys.custom-keybinding
+    _kb_base=/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings
+
+    # Fixed, named paths rather than custom0/custom1, so re-running rewrites the
+    # same three entries instead of appending new ones next to a user's own.
+    _kb_add() {
+        gsettings set "$_kb_item:$_kb_base/$1/" name    "$2"
+        gsettings set "$_kb_item:$_kb_base/$1/" command "$3"
+        gsettings set "$_kb_item:$_kb_base/$1/" binding "$4"
+    }
+    _kb_add dotfiles-terminal "Terminal" "gnome-terminal"        "<Control><Alt>t"
+    _kb_add dotfiles-files    "Files"    "nautilus --new-window" "<Super>e"
+    _kb_add dotfiles-settings "Settings" "gnome-control-center"  "<Super>i"
+
+    # Keep whatever else is registered, drop our own entries, then re-add them.
+    _kb_keep=$(gsettings get "$_kb_list" custom-keybindings 2>/dev/null \
+        | tr -d '[]' | tr ',' '\n' | sed 's/^ *//; s/ *$//' \
+        | grep 'custom-keybindings' | grep -v 'dotfiles-' | paste -sd, - || true)
+    _kb_ours="'$_kb_base/dotfiles-terminal/', '$_kb_base/dotfiles-files/', '$_kb_base/dotfiles-settings/'"
+    if [ -n "$_kb_keep" ]; then
+        gsettings set "$_kb_list" custom-keybindings "[$_kb_keep, $_kb_ours]"
+    else
+        gsettings set "$_kb_list" custom-keybindings "[$_kb_ours]"
+    fi
+    _ok "Ctrl+Alt+T terminal, Super+E files, Super+I settings"
+
+    # Alt+Tab cycles windows rather than applications. The application switcher
+    # holds Alt+Tab by default, so it has to be cleared or it wins.
+    _wm=org.gnome.desktop.wm.keybindings
+    gsettings set "$_wm" switch-applications          "[]"
+    gsettings set "$_wm" switch-applications-backward "[]"
+    gsettings set "$_wm" switch-windows               "['<Alt>Tab']"
+    gsettings set "$_wm" switch-windows-backward      "['<Shift><Alt>Tab']"
+    _ok "Alt+Tab switches windows"
+else
+    _skip "gsettings not found — GNOME shortcuts"
+fi
+
 _hdr "default shell → bash"
 BASH_BIN="$(command -v bash)"
 CURRENT_SHELL="$(getent passwd "$USER" 2>/dev/null | cut -d: -f7)"

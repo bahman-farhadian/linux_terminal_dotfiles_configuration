@@ -192,6 +192,26 @@ moved.
 
 **Kubernetes:** `k kgp kgpa kgs kgn kgd kdes kdp kds kdn klogs kex kap kdel kctx kuse kns krun`
 
+## GNOME shortcuts
+
+`install.sh` sets these:
+
+| Keys | Action |
+|---|---|
+| `Ctrl+Alt+T` | GNOME Terminal |
+| `Super+E` | Files |
+| `Super+I` | Settings |
+| `Alt+Tab` | switch windows |
+| `Shift+Alt+Tab` | switch windows, backwards |
+
+`Alt+Tab` normally switches *applications*, grouping every window of one
+program behind a single icon. Moving it to `switch-windows` gives one entry per
+window. The application switcher has to be cleared first, or it keeps the key.
+
+The three launchers are written to named paths under `custom-keybindings`
+rather than `custom0`, `custom1`, so re-running rewrites the same three entries
+and leaves any shortcuts you added by hand alone.
+
 ## SSH
 
 `ssh/config` is appended to `~/.ssh/config`, replacing any stale block on

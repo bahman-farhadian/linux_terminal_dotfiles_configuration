@@ -491,6 +491,7 @@ exec bash
 - Keep the repository. The installer needs it to re-run.
 - It also installs `lock-keyboard-en.service`, a systemd user service that switches the keyboard to English the moment the screen locks, whatever layout was active. The unlock prompt is then never stuck on a layout that cannot type your password.
 - Check it with `systemctl --user status lock-keyboard-en.service`. It must be `active (running)`.
+- It also sets the GNOME shortcuts: `Ctrl+Alt+T` for the terminal, `Super+E` for Files, `Super+I` for Settings, and `Alt+Tab` to switch windows rather than applications.
 - `README.md` covers the prompt, the tmux keys, and what changes.
 
 ### Step 8 — KVM and libvirt
