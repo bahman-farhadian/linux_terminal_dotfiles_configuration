@@ -159,6 +159,7 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 | `v` | vim |
 | `b` | btop, or htop if btop is missing |
 | `ll` / `l` / `la` | listings |
+| `nekoray` | root only — starts nekoray with its icon |
 | `DE` | keyboard: German only |
 | `EN` | keyboard: US English and Persian |
 | `kbd` | show the current input sources |
@@ -167,6 +168,11 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 | `pubip` / `privip` | external / private IP |
 | `ports` | listening TCP and UDP sockets, with the process holding each |
 | `cpy` | pipe filter — `cmd 2>&1 \| cpy` prints and copies |
+
+`nekoray` is defined only when the shell is root and the binary is present, so
+it never appears for an ordinary user where it would start and then fail on the
+tunnel. It sets the same two variables `/nekoray/launcher` does and adds
+`-qwindowicon`, a Qt option, so the window carries an icon.
 
 `ports`, `update` and `upgrade` are functions, not aliases, because they decide
 whether `sudo` is needed: as root they run the commands directly, otherwise through
