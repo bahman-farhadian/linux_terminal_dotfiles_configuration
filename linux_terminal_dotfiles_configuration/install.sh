@@ -146,45 +146,58 @@ mkdir -p "$HOME/.local/bin" "$HOME/.config/systemd/user"
 # this stays idempotent.
 cat > "$HOME/.local/bin/lock-keyboard-en.sh" << 'LOCKSH'
 #!/bin/sh
-# Put the keyboard back to English the moment the screen locks.
+# Keep the keyboard on English.
 #
-# Locking while the German or Persian layout is active leaves the unlock prompt
-# on that layout, which can make the password impossible to type. Whatever is
-# active at the time, locking returns to English.
+#   watch   on screen lock, go to English whatever was active
+#   tick    every few minutes, if the layout list is already the English pair
+#           but Persian is the selected one, select English
 #
-# This watches for the lock signal rather than polling: a poll only notices the
-# lock on its next tick, which is far too late to be useful.
+# The tick deliberately does nothing while German is the layout, because German
+# is only ever active if it was chosen on purpose.
 
 DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
 export DBUS_SESSION_BUS_ADDRESS
 
+SCHEMA=org.gnome.desktop.input-sources
 EN_SOURCES="[('xkb', 'us'), ('xkb', 'ir')]"
 
-set_english() {
-    [ "$(gsettings get org.gnome.desktop.input-sources sources 2>/dev/null)" = "$EN_SOURCES" ] ||
-        gsettings set org.gnome.desktop.input-sources sources "$EN_SOURCES"
+sources_now() { gsettings get "$SCHEMA" sources 2>/dev/null; }
+current_now() { gsettings get "$SCHEMA" current 2>/dev/null; }
 
-    # Setting the list does not change which entry is selected. German drops out
-    # of the list so the selection falls back on its own, but Persian is still
-    # in it and stays active unless the index is moved to the first entry.
-    [ "$(gsettings get org.gnome.desktop.input-sources current 2>/dev/null)" = "uint32 0" ] ||
-        gsettings set org.gnome.desktop.input-sources current 0
+# On lock: force the English pair and select the first entry. Setting the list
+# alone is not enough, because Persian stays in it and stays selected.
+force_english() {
+    [ "$(sources_now)" = "$EN_SOURCES" ] || gsettings set "$SCHEMA" sources "$EN_SOURCES"
+    [ "$(current_now)" = "uint32 0" ]    || gsettings set "$SCHEMA" current 0
 }
 
-# If the screen is already locked when this starts, act immediately.
-case "$(gdbus call --session --dest org.gnome.ScreenSaver \
-        --object-path /org/gnome/ScreenSaver \
-        --method org.gnome.ScreenSaver.GetActive 2>/dev/null)" in
-    *true*) set_english ;;
-esac
+# Periodic: only when the list is already the English pair. Leaves German alone.
+select_english() {
+    [ "$(sources_now)" = "$EN_SOURCES" ] || return 0
+    [ "$(current_now)" = "uint32 0" ]    && return 0
+    gsettings set "$SCHEMA" current 0
+}
 
-# ActiveChanged carries true when the screen locks and false when it unlocks.
-gdbus monitor --session --dest org.gnome.ScreenSaver 2>/dev/null |
-while IFS= read -r line; do
-    case "$line" in
-        *ActiveChanged*true*) set_english ;;
-    esac
-done
+case "${1:-watch}" in
+    tick)
+        select_english
+        ;;
+    watch)
+        # Act at once if the screen is already locked when this starts.
+        case "$(gdbus call --session --dest org.gnome.ScreenSaver \
+                --object-path /org/gnome/ScreenSaver \
+                --method org.gnome.ScreenSaver.GetActive 2>/dev/null)" in
+            *true*) force_english ;;
+        esac
+        # ActiveChanged carries true on lock and false on unlock.
+        gdbus monitor --session --dest org.gnome.ScreenSaver 2>/dev/null |
+        while IFS= read -r line; do
+            case "$line" in
+                *ActiveChanged*true*) force_english ;;
+            esac
+        done
+        ;;
+esac
 LOCKSH
 chmod +x "$HOME/.local/bin/lock-keyboard-en.sh"
 _ok "applied: $HOME/.local/bin/lock-keyboard-en.sh"
@@ -197,14 +210,36 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/lock-keyboard-en.sh
+ExecStart=%h/.local/bin/lock-keyboard-en.sh watch
 Restart=on-failure
 RestartSec=5
 
 [Install]
 WantedBy=graphical-session.target
 LOCKUNIT
-_ok "applied: $HOME/.config/systemd/user/lock-keyboard-en.service"
+
+cat > "$HOME/.config/systemd/user/keyboard-en-tick.service" << 'TICKUNIT'
+[Unit]
+Description=Select English when the English layout pair is active
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/lock-keyboard-en.sh tick
+TICKUNIT
+
+cat > "$HOME/.config/systemd/user/keyboard-en-tick.timer" << 'TICKTIMER'
+[Unit]
+Description=Check the keyboard layout every 10 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+Unit=keyboard-en-tick.service
+
+[Install]
+WantedBy=timers.target
+TICKTIMER
+_ok "applied: lock-keyboard-en.service, keyboard-en-tick.timer"
 
 # Earlier versions installed this as a cron job. Polling cannot react to a lock
 # in time, so drop any leftover entry.
@@ -221,9 +256,12 @@ if systemctl --user show-environment >/dev/null 2>&1; then
     systemctl --user enable --now lock-keyboard-en.service >/dev/null 2>&1 \
         && _ok "lock-keyboard-en.service enabled" \
         || _warn "could not enable lock-keyboard-en.service"
+    systemctl --user enable --now keyboard-en-tick.timer >/dev/null 2>&1 \
+        && _ok "keyboard-en-tick.timer enabled" \
+        || _warn "could not enable keyboard-en-tick.timer"
 else
-    _warn "no systemd user session here — enable it from a desktop login with:"
-    printf '  systemctl --user enable --now lock-keyboard-en.service\n'
+    _warn "no systemd user session here — enable them from a desktop login with:"
+    printf '  systemctl --user enable --now lock-keyboard-en.service keyboard-en-tick.timer\n'
 fi
 
 _hdr "SSH server"
