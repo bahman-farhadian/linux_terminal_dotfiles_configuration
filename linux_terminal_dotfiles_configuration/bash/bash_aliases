@@ -33,6 +33,12 @@ pubkey() {
 alias pubkeys='ls ~/.ssh/*.pub 2>/dev/null | xargs -I{} sh -c "echo \"=== {} ===\"; cat {}"'
 alias password='openssl rand -base64 48'
 
+# Keyboard layout — replaces the GNOME input source list outright, so only the
+# named layouts remain. Takes effect immediately, no log out.
+alias DE="gsettings set org.gnome.desktop.input-sources sources \"[('xkb', 'de')]\""
+alias EN="gsettings set org.gnome.desktop.input-sources sources \"[('xkb', 'us'), ('xkb', 'ir')]\""
+alias kbd='gsettings get org.gnome.desktop.input-sources sources'
+
 # Editors
 alias nano='vim'
 alias v='vim'
