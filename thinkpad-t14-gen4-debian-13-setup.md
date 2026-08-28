@@ -199,4 +199,59 @@ The installation is done.
 
 ## Part 2 — Configuration
 
-### Step 4 — Required packages
+### Step 4 — Firmware updates
+
+Lenovo publishes firmware to LVFS, so the BIOS, embedded controller, and
+Thunderbolt can all be updated from Linux. No Windows and no USB needed.
+
+#### 1. Install fwupd
+
+```bash
+sudo apt install fwupd fwupd-amd64-signed
+```
+
+#### 2. Refresh the firmware list
+
+```bash
+sudo fwupdmgr refresh --force
+```
+
+#### 3. See what the machine has
+
+```bash
+sudo fwupdmgr get-devices
+```
+
+#### 4. See what is available
+
+```bash
+sudo fwupdmgr get-updates
+```
+
+#### 5. Apply
+
+```bash
+sudo fwupdmgr update
+```
+
+#### 6. Check the new BIOS version
+
+```bash
+sudo dmidecode -s bios-version
+```
+
+#### 7. Check Secure Boot survived
+
+```bash
+mokutil --sb-state
+```
+
+Expect `SecureBoot enabled`.
+
+**Notes**
+
+- Keep the charger plugged in. Never power off during a firmware update.
+- Step 5 may reboot the machine more than once. This is normal.
+- `fwupd-amd64-signed` holds the Debian-signed EFI file. Without it, firmware updates stop working while Secure Boot is on.
+- A BIOS update can reset BIOS settings. If step 7 says `SecureBoot disabled`, redo Step 1.
+- If step 4 reports nothing to do, the firmware is already current. This machine shipped with `N3QET52W (1.52)`, dated 2026-04-23.
