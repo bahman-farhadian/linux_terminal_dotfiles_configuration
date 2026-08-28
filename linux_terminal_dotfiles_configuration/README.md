@@ -82,8 +82,8 @@ Windows and panes count from 1. tmux has no `session-base-index` option, so a
 on. A session created with an explicit name keeps it.
 
 Stacked panes stay equal height when one is closed, whether with `Ctrl+b x` or
-`Ctrl+d`. `Ctrl+b x` realigns through the binding itself; `Ctrl+d` realigns
-through a `pane-exited` hook, because a shell exit never reaches the binding.
+`Ctrl+d`. The two paths fire different hooks — `after-kill-pane` and
+`pane-exited` — so both are set.
 
 `./tmux-diag.sh` reports client and window sizes, every attached client, and
 whether any rows are left unpainted at the bottom. Run it in the terminal
