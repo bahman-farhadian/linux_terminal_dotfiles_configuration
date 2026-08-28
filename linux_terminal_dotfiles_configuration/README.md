@@ -22,7 +22,6 @@ linux_terminal_dotfiles_configuration/
 ├── ssh/
 │   └── config         → appended to ~/.ssh/config
 ├── install.sh
-├── tmux-diag.sh
 ├── gnome-app-folders.py
 ├── hushlogin          → ~/.hushlogin
 └── thinkpad-t14-gen4-debian-13-setup.md
@@ -91,10 +90,6 @@ folders. `--list` previews, `--apply` does it, `--clear-dock` does it and also
 empties the pinned dock, `--status` reads back what is set. With no arguments
 it prints the options and changes nothing. It is idempotent, so re-run it after
 installing anything.
-
-`./tmux-diag.sh` reports client and window sizes, every attached client, and
-whether any rows are left unpainted at the bottom. Run it in the terminal
-window, not over SSH.
 
 `.bashrc` starts tmux for every interactive terminal. It attaches to the first
 detached session if there is one, so closing a terminal window and opening a
