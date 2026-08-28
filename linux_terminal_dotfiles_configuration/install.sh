@@ -226,6 +226,29 @@ else
     printf '  systemctl --user enable --now lock-keyboard-en.service\n'
 fi
 
+_hdr "tmux bash completion"
+# Debian packages no tmux completion, so it comes from upstream. Fetched to a
+# temporary file first, so a failed download cannot truncate a working copy.
+mkdir -p "$HOME/.local/share/bash-completion/completions"
+_tc_dst="$HOME/.local/share/bash-completion/completions/tmux"
+_tc_url=https://raw.githubusercontent.com/imomaliev/tmux-bash-completion/master/completions/tmux
+if command -v curl >/dev/null 2>&1; then
+    _tc_tmp=$(mktemp)
+    if curl -fsSL "$_tc_url" -o "$_tc_tmp" && [ -s "$_tc_tmp" ]; then
+        mv "$_tc_tmp" "$_tc_dst"
+        _ok "applied: $_tc_dst"
+    else
+        rm -f "$_tc_tmp"
+        if [ -r "$_tc_dst" ]; then
+            _skip "download failed — keeping the copy already installed"
+        else
+            _warn "could not fetch the tmux completion"
+        fi
+    fi
+else
+    _warn "curl not found — tmux completion skipped"
+fi
+
 _hdr "GNOME keyboard shortcuts"
 if command -v gsettings >/dev/null 2>&1; then
     # Start from GNOME's defaults, so the result never depends on what happened

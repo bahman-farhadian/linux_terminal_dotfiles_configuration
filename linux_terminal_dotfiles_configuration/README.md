@@ -165,11 +165,11 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 | `pubkey` | print the first SSH public key |
 | `password` | random base64-48 string |
 | `pubip` / `privip` | external / private IP |
-| `ports` | listening TCP and UDP sockets |
+| `ports` | listening TCP and UDP sockets, with the process holding each |
 | `cpy` | pipe filter — `cmd 2>&1 \| cpy` prints and copies |
 
-`update` and `upgrade` are functions, not aliases, because they decide whether
-`sudo` is needed: as root they run the commands directly, otherwise through
+`ports`, `update` and `upgrade` are functions, not aliases, because they decide
+whether `sudo` is needed: as root they run the commands directly, otherwise through
 `sudo`. `update` changes nothing beyond refreshing the package lists.
 
 `DE` and `EN` replace the GNOME input source list outright rather than adding
@@ -197,6 +197,10 @@ moved.
 **Docker:** `d dps dpsa di dex dlogs dstop dstart dprune dc dcu dcd dcl dcr dcb`
 
 **Kubernetes:** `k kgp kgpa kgs kgn kgd kdes kdp kds kdn klogs kex kap kdel kctx kuse kns krun`
+
+`install.sh` fetches a tmux bash completion into
+`~/.local/share/bash-completion/completions/`. Debian packages none, so tab
+completion for `tmux` and the `t` alias does not work without it.
 
 ## GNOME shortcuts
 

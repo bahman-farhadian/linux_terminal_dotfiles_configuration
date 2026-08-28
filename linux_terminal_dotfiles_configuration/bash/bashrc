@@ -166,7 +166,17 @@ ${wrapper_fn}() {
         . "$_bcd/git"
         type __git_complete &>/dev/null && __git_complete g __git_main || true
     fi
-    [ -r "$_bcd/tmux"    ] && . "$_bcd/tmux"    && complete -F _comp_cmd_tmux  t  2>/dev/null || true
+    # Debian ships no tmux completion, so install.sh fetches one into the user
+    # directory. Upstream names its function _tmux; Debian's convention would be
+    # _comp_cmd_tmux. Load whichever exists and bind the t alias to it.
+    for _tc in "$HOME/.local/share/bash-completion/completions/tmux" "$_bcd/tmux"; do
+        [ -r "$_tc" ] || continue
+        . "$_tc"
+        type _tmux          &>/dev/null && complete -F _tmux          t 2>/dev/null
+        type _comp_cmd_tmux &>/dev/null && complete -F _comp_cmd_tmux t 2>/dev/null
+        break
+    done
+    unset _tc
     [ -r "$_bcd/python3" ] && . "$_bcd/python3" && complete -F _comp_cmd_python py 2>/dev/null || true
 }
 _bash_load_completions
