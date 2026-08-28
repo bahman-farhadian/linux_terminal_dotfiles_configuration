@@ -138,7 +138,7 @@ alias kns='kubectl config set-context --current --namespace'
 alias krun='kubectl run --rm -it --image=busybox debug -- sh'
 
 # Network
-alias ports='ss -tlnp'
+alias ports='ss -tunlp'
 
 # Filesystem / safety
 alias cp='cp -iv'

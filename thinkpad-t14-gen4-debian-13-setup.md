@@ -420,13 +420,13 @@ apt install tmux vim git curl jq tree python3 openssl bash-completion xclip htop
 #### 2. Create the directories
 
 ```bash
-mkdir -p ~/linux/bash ~/linux/ssh ~/linux/tmux
+mkdir -p ~/dotfiles/bash ~/dotfiles/ssh ~/dotfiles/tmux
 ```
 
-#### 3. Create `~/linux/bash/bash_profile`
+#### 3. Create `~/dotfiles/bash/bash_profile`
 
 ```bash
-cat > ~/linux/bash/bash_profile <<'EOF'
+cat > ~/dotfiles/bash/bash_profile <<'EOF'
 # ~/.bash_profile — Linux login shell entry point
 
 if [ -f ~/.bashrc ]; then
@@ -435,10 +435,10 @@ fi
 EOF
 ```
 
-#### 4. Create `~/linux/bash/bashrc`
+#### 4. Create `~/dotfiles/bash/bashrc`
 
 ```bash
-cat > ~/linux/bash/bashrc <<'EOF'
+cat > ~/dotfiles/bash/bashrc <<'EOF'
 # ~/.bashrc (Linux)
 
 # If not running interactively, bail
@@ -691,10 +691,10 @@ bind 'set colored-completion-prefix on'
 EOF
 ```
 
-#### 5. Create `~/linux/bash/bash_aliases`
+#### 5. Create `~/dotfiles/bash/bash_aliases`
 
 ```bash
-cat > ~/linux/bash/bash_aliases <<'EOF'
+cat > ~/dotfiles/bash/bash_aliases <<'EOF'
 # aliases — sourced by .bashrc
 # Linux · DevOps + Data Engineering/Science
 
@@ -835,7 +835,7 @@ alias kns='kubectl config set-context --current --namespace'
 alias krun='kubectl run --rm -it --image=busybox debug -- sh'
 
 # Network
-alias ports='ss -tlnp'
+alias ports='ss -tunlp'
 
 # Filesystem / safety
 alias cp='cp -iv'
@@ -863,10 +863,10 @@ alias th='tree -L 2 -a -I ".git|.venv|__pycache__|node_modules|*.pyc"'
 EOF
 ```
 
-#### 6. Create `~/linux/ssh/config`
+#### 6. Create `~/dotfiles/ssh/config`
 
 ```bash
-cat > ~/linux/ssh/config <<'EOF'
+cat > ~/dotfiles/ssh/config <<'EOF'
 Host *
     StrictHostKeyChecking no
     UserKnownHostsFile /dev/null
@@ -876,10 +876,10 @@ Host *
 EOF
 ```
 
-#### 7. Create `~/linux/tmux/tmux.conf`
+#### 7. Create `~/dotfiles/tmux/tmux.conf`
 
 ```bash
-cat > ~/linux/tmux/tmux.conf <<'EOF'
+cat > ~/dotfiles/tmux/tmux.conf <<'EOF'
 # ~/.tmux.conf
 
 # Windows and panes index from 1
@@ -933,13 +933,7 @@ setw -g mode-style "bg=#45475a,fg=#cdd6f4"
 bind-key -n S-Left  previous-window
 bind-key -n S-Right next-window
 
-# Pane navigation — Alt+WASD, no prefix
-bind-key -n M-w select-pane -U
-bind-key -n M-a select-pane -L
-bind-key -n M-s select-pane -D
-bind-key -n M-d select-pane -R
-
-# Pane navigation — Ctrl+b prefix fallback (vim style + arrows)
+# Pane navigation — Ctrl+b prefix (vim style + arrows)
 bind-key h select-pane -L
 bind-key j select-pane -D
 bind-key k select-pane -U
@@ -970,15 +964,6 @@ bind-key -T copy-mode NPage  send -X page-down
 bind-key -T copy-mode Escape send -X cancel
 bind-key -T copy-mode q      send -X cancel
 
-# Layout shortcuts — Alt+1–7
-bind-key -n M-1 select-layout even-horizontal
-bind-key -n M-2 select-layout even-vertical
-bind-key -n M-3 select-layout main-horizontal
-bind-key -n M-4 select-layout main-vertical
-bind-key -n M-5 select-layout tiled
-bind-key -n M-6 next-layout
-bind-key -n M-7 previous-layout
-
 # Nested tmux (SSH → remote tmux) — F12 toggles passthrough mode
 # ON  → local tmux handles all keys normally
 # OFF → local tmux ignores all keys; everything goes to the remote tmux
@@ -996,27 +981,13 @@ bind-key -T off F12 \
     set -u status-style \;\
     set -u status-left \;\
     refresh-client -S
-
-# Forward Meta shortcuts explicitly while in passthrough mode. This lets a
-# further nested tmux receive its own Alt+W/A/S/D and Alt+1–7 bindings.
-bind-key -T off M-w send-keys M-w
-bind-key -T off M-a send-keys M-a
-bind-key -T off M-s send-keys M-s
-bind-key -T off M-d send-keys M-d
-bind-key -T off M-1 send-keys M-1
-bind-key -T off M-2 send-keys M-2
-bind-key -T off M-3 send-keys M-3
-bind-key -T off M-4 send-keys M-4
-bind-key -T off M-5 send-keys M-5
-bind-key -T off M-6 send-keys M-6
-bind-key -T off M-7 send-keys M-7
 EOF
 ```
 
-#### 8. Create `~/linux/install.sh`
+#### 8. Create `~/dotfiles/install.sh`
 
 ```bash
-cat > ~/linux/install.sh <<'EOF'
+cat > ~/dotfiles/install.sh <<'EOF'
 #!/usr/bin/env bash
 # linux/install.sh — idempotent dotfiles installer (Linux only)
 set -euo pipefail
@@ -1194,22 +1165,22 @@ printf '  Reload now: exec bash\n'
 EOF
 ```
 
-#### 9. Create `~/linux/hushlogin`
+#### 9. Create `~/dotfiles/hushlogin`
 
 ```bash
-touch ~/linux/hushlogin
+touch ~/dotfiles/hushlogin
 ```
 
 #### 10. Make the installer executable
 
 ```bash
-chmod +x ~/linux/install.sh
+chmod +x ~/dotfiles/install.sh
 ```
 
 #### 11. Run it
 
 ```bash
-~/linux/install.sh
+~/dotfiles/install.sh
 ```
 
 #### 12. Reload the shell
@@ -1224,6 +1195,7 @@ exec bash
 - The installer asks whether to configure `root` as well. Answer `y` to get the same prompt, aliases, and tmux settings under `su`.
 - The installer copies to `~/.bashrc`, `~/.bash_aliases`, `~/.bash_profile`, `~/.tmux.conf`, and `~/.hushlogin`, appends the SSH block to `~/.ssh/config`, and sets bash as the login shell.
 - It is safe to run more than once. The SSH block is replaced rather than duplicated.
-- `~/linux` is kept after the install. The installer reads from it, so keep it if you want to re-run it later.
-- The SSH block sets `StrictHostKeyChecking no` and `UserKnownHostsFile /dev/null` for every host. This turns off host key checking, so a machine impersonating a server you connect to will not be detected. Remove those two lines from `~/linux/ssh/config` before step 6 if you do not want that.
+- Keep `~/dotfiles` after the install. The installer reads from it, so it is needed to re-run.
+- There are no Alt or Option key bindings. Pane navigation is `Ctrl+b` then `h/j/k/l` or the arrow keys, and `Ctrl+b Space` cycles layouts.
+- The SSH block sets `StrictHostKeyChecking no` and `UserKnownHostsFile /dev/null` for every host. This turns off host key checking, so a machine impersonating a server you connect to will not be detected. Remove those two lines from `~/dotfiles/ssh/config` before step 10 if you do not want that.
 - The prompt needs a terminal with true colour and Unicode. GNOME Terminal has both.
