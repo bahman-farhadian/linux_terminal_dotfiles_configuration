@@ -140,9 +140,65 @@ cp_file "$REPO/hushlogin" "$HOME/.hushlogin"
 
 _hdr "English keyboard on the lock screen"
 mkdir -p "$HOME/.local/bin" "$HOME/.config/systemd/user"
-cp_file "$REPO/lock-keyboard-en.sh" "$HOME/.local/bin/lock-keyboard-en.sh"
+
+# Written here rather than kept as separate files in the repository: they are
+# generated artefacts, not dotfiles anyone edits. Rewritten on every run, so
+# this stays idempotent.
+cat > "$HOME/.local/bin/lock-keyboard-en.sh" << 'LOCKSH'
+#!/bin/sh
+# Put the keyboard back to English the moment the screen locks.
+#
+# Locking while the German or Persian layout is active leaves the unlock prompt
+# on that layout, which can make the password impossible to type. Whatever is
+# active at the time, locking returns to English.
+#
+# This watches for the lock signal rather than polling: a poll only notices the
+# lock on its next tick, which is far too late to be useful.
+
+DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
+export DBUS_SESSION_BUS_ADDRESS
+
+EN_SOURCES="[('xkb', 'us'), ('xkb', 'ir')]"
+
+set_english() {
+    [ "$(gsettings get org.gnome.desktop.input-sources sources 2>/dev/null)" = "$EN_SOURCES" ] && return
+    gsettings set org.gnome.desktop.input-sources sources "$EN_SOURCES"
+}
+
+# If the screen is already locked when this starts, act immediately.
+case "$(gdbus call --session --dest org.gnome.ScreenSaver \
+        --object-path /org/gnome/ScreenSaver \
+        --method org.gnome.ScreenSaver.GetActive 2>/dev/null)" in
+    *true*) set_english ;;
+esac
+
+# ActiveChanged carries true when the screen locks and false when it unlocks.
+gdbus monitor --session --dest org.gnome.ScreenSaver 2>/dev/null |
+while IFS= read -r line; do
+    case "$line" in
+        *ActiveChanged*true*) set_english ;;
+    esac
+done
+LOCKSH
 chmod +x "$HOME/.local/bin/lock-keyboard-en.sh"
-cp_file "$REPO/lock-keyboard-en.service" "$HOME/.config/systemd/user/lock-keyboard-en.service"
+_ok "applied: $HOME/.local/bin/lock-keyboard-en.sh"
+
+cat > "$HOME/.config/systemd/user/lock-keyboard-en.service" << 'LOCKUNIT'
+[Unit]
+Description=Restore the English keyboard layout when the screen locks
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/lock-keyboard-en.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
+LOCKUNIT
+_ok "applied: $HOME/.config/systemd/user/lock-keyboard-en.service"
 
 # Earlier versions installed this as a cron job. Polling cannot react to a lock
 # in time, so drop any leftover entry.
