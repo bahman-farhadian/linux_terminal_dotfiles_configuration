@@ -301,13 +301,28 @@ sudo fwupdmgr get-updates
 sudo fwupdmgr update
 ```
 
-#### 6. Check the new BIOS version
+#### 6. Reboot to apply
+
+```bash
+sudo systemctl reboot
+```
+
+#### 7. Check nothing is left
+
+```bash
+sudo fwupdmgr get-updates
+```
+
+Every device must appear under `Devices with no available firmware updates`.
+If anything is still listed under an update heading, repeat from step 5.
+
+#### 8. Check the new BIOS version
 
 ```bash
 sudo dmidecode -s bios-version
 ```
 
-#### 7. Check Secure Boot survived
+#### 9. Check Secure Boot survived
 
 ```bash
 mokutil --sb-state
@@ -317,8 +332,11 @@ Expect `SecureBoot enabled`.
 
 **Notes**
 
-- Keep the charger plugged in. Never power off during a firmware update.
-- Step 5 may reboot the machine more than once. This is normal.
+- Plug the charger in before step 5. On battery every device reports `Device requires AC power to be connected` and is skipped without failing, so the update looks like it worked when nothing happened.
+- Never power off during a firmware update.
+- Firmware is written during the reboot, not by `fwupdmgr update`. Steps 5 to 7 are one round. Repeat the round until step 7 comes back clean.
+- `System Firmware` is the BIOS. The other entries are the management engine, the SSD, the camera, the fingerprint reader, and the UEFI revocation list.
+- `UEFI dbx` is Microsoft's revocation list. It is a normal update, but step 9 exists to confirm the machine still boots with Secure Boot on afterwards.
 - `fwupd-amd64-signed` holds the Debian-signed EFI file. Without it, firmware updates stop working while Secure Boot is on.
-- A BIOS update can reset BIOS settings. If step 7 says `SecureBoot disabled`, redo Step 1.
+- A BIOS update can reset BIOS settings. If step 9 says `SecureBoot disabled`, redo Step 1.
 - If step 4 reports nothing to do, the firmware is already current. This machine shipped with `N3QET52W (1.52)`, dated 2026-04-23.
