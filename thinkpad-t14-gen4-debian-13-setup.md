@@ -1,6 +1,8 @@
 # ThinkPad T14 Gen 4 (Intel) — Debian 13 "trixie" Setup
 
-## Step 1 — BIOS: allow the Microsoft 3rd party CA
+## Part 1 — OS installation
+
+### Step 1 — BIOS: allow the Microsoft 3rd party CA
 
 | # | Step | How |
 |---|------|-----|
@@ -18,7 +20,7 @@
 - Do not touch `Reset to Setup Mode` or `Clear All Secure Boot Keys`. Debian does not need them, and they cause the failure above.
 - Boot the installer with **F12** and pick the USB device. This is a one-time choice and does not change the boot order.
 
-## Step 2 — Disk partitioning
+### Step 2 — Disk partitioning
 
 Choose **Manual** partitioning. The installer counts in decimal, so `MB` means
 1,000,000 bytes. Type the **Enter as** value. The installer will then display
@@ -43,9 +45,9 @@ the **Shows as** value.
 - XFS handles big files well, like a 200 GiB qcow2 image.
 - Docker runs on XFS. It can also cap container size with `--storage-opt size=`, which needs the `prjquota` mount option.
 
-## Step 3 — After install: repositories, quota, checks
+### Step 3 — After install: repositories, quota, checks
 
-### 1. Add contrib and non-free
+#### 1. Add contrib and non-free
 
 The installer writes the classic file, not a `.sources` file:
 
@@ -76,20 +78,23 @@ Check the result:
 grep ^deb /etc/apt/sources.list
 ```
 
-### 2. Update the system
+#### 2. Update the system
 
 ```bash
 sudo apt update
+```
+
+```bash
 sudo apt full-upgrade
 ```
 
-### 3. Install the tools used for checking
+#### 3. Install the tools used for checking
 
 ```bash
 sudo apt install mokutil dmidecode efibootmgr
 ```
 
-### 4. Edit GRUB: quota and boot timeout
+#### 4. Edit GRUB: quota and boot timeout
 
 Docker can only cap a container's disk size (`--storage-opt size=`) when root
 is mounted with project quota. Root is mounted before `/etc/fstab` is read, so
@@ -115,22 +120,27 @@ Apply it:
 sudo update-grub
 ```
 
-### 5. Reboot
+#### 5. Reboot
 
 ```bash
 sudo systemctl reboot
 ```
 
-### 6. Check Secure Boot
+#### 6. Check Secure Boot
 
 ```bash
 mokutil --sb-state
+```
+
+Expect `SecureBoot enabled`.
+
+```bash
 dmesg | grep -i "secure boot"
 ```
 
-Expect `SecureBoot enabled` and `secureboot: Secure boot enabled`.
+Expect `secureboot: Secure boot enabled`.
 
-### 7. Check the machine booted through shim
+#### 7. Check the machine booted through shim
 
 ```bash
 sudo efibootmgr -v | grep -i shim
@@ -138,25 +148,35 @@ sudo efibootmgr -v | grep -i shim
 
 Expect `\EFI\debian\shimx64.efi`.
 
-### 8. Check the disk
+#### 8. Check the disk
 
 ```bash
 lsblk
+```
+
+Expect `1G`, `2G`, and `888G`.
+
+```bash
 findmnt -no FSTYPE /
 ```
 
-Expect `1G`, `2G`, `888G`, and root `xfs`.
+Expect `xfs`.
 
-### 9. Check the quota
+#### 9. Check the quota
 
 ```bash
 findmnt -no OPTIONS /
+```
+
+Expect `usrquota` and `prjquota` in the list.
+
+```bash
 sudo xfs_quota -x -c state /
 ```
 
-Expect `prjquota` in the mount options, and project quota `ON`.
+Expect `Project quota state` with `Accounting: ON` and `Enforcement: ON`.
 
-### 10. Check the BIOS version
+#### 10. Check the BIOS version
 
 ```bash
 sudo dmidecode -s bios-version
@@ -176,3 +196,7 @@ Compare with what you wrote down in Step 1.
 - The kernel renames both options. `pquota` shows as `prjquota` and `uquota` shows as `usrquota`. Same things.
 
 The installation is done.
+
+## Part 2 — Configuration
+
+### Step 4 — Required packages
