@@ -10,7 +10,12 @@ esac
 # one, otherwise starts a new one, which the tmux hook names tmuxNN. Set
 # NO_AUTO_TMUX=1 to skip it. tmux is run rather than exec'd so that a broken
 # tmux config drops you at a usable shell instead of closing the terminal.
-if [ -z "$TMUX" ] && [ -z "$NO_AUTO_TMUX" ] && command -v tmux &>/dev/null; then
+#
+# Skipped over SSH. A small remote client attaching to the same session makes
+# tmux size the windows to fit both, which leaves the rows below the status bar
+# unpainted in the larger local window. Run tmux by hand on the remote side.
+if [ -z "$TMUX" ] && [ -z "$NO_AUTO_TMUX" ] && [ -z "$SSH_CONNECTION" ] \
+   && command -v tmux &>/dev/null; then
     _tmux_detached=$(tmux list-sessions -F '#{session_name} #{session_attached}' 2>/dev/null \
                      | awk '$2 == 0 { print $1; exit }')
     if [ -n "$_tmux_detached" ]; then
