@@ -13,11 +13,10 @@
 
 **Notes**
 
-- Debian's bootloader is signed by Microsoft's 3rd party UEFI CA. If this is
-  **Off**, the machine fails to boot with `Invalid signature detected`.
+- Debian's bootloader is signed by Microsoft's 3rd party UEFI CA. If this is **Off**, the machine fails to boot with `Invalid signature detected`.
 - Leave `Secure Boot` **On** for the whole install. Debian handles it.
-- Do not touch `Reset to Setup Mode` or `Clear All Secure Boot Keys`. Debian
-  does not need them, and they cause the failure above.
+- Do not touch `Reset to Setup Mode` or `Clear All Secure Boot Keys`. Debian does not need them, and they cause the failure above.
+- Boot the installer with **F12** and pick the USB device. This is a one-time choice and does not change the boot order.
 
 ## Step 2 — Disk partitioning
 
@@ -31,41 +30,20 @@ the **Shows as** value.
 | 2 | Boot | 2 GiB | `2147 MB` | 2.1 GB | ext4 | `/boot` |
 | 3 | Root | 888 GiB | `953483 MB` | 953.5 GB | xfs | `/` |
 
-Leave the rest of the disk unpartitioned.
-
-**SSD over-provisioning**
-
-```
-Disk          953.87 GiB
-EFI + boot   -   3.00 GiB
-Root         - 888.00 GiB
-------------------------
-Free           62.87 GiB   6.6%
-```
-
-The drive uses that free space for wear levelling, which keeps write speed up
-as the disk fills. Samsung suggests about 10%. To reach it, use a root of
-855 GiB (`918049 MB`) instead, which leaves 95.87 GiB free.
-
 **Notes**
 
-- The installer counts in GB. `df -h` counts in GiB. Root shows as `953.5 GB`
-  now and `888G` later. Same partition.
-- The first partition starts 1 MiB into the disk, so it ends up 1 MiB smaller
-  than asked. `1075 MB` accounts for that and gives a full 1 GiB. If yours
-  still shows `1023M`, it is harmless.
+- Leave the rest of the disk unpartitioned. That free space is SSD over-provisioning: 953.87 GiB disk, minus 3 GiB for EFI and boot, minus 888 GiB for root, leaves 62.87 GiB free, or 6.6%.
+- The drive uses that space for wear levelling, which keeps write speed up as the disk fills. Samsung suggests about 10%.
+- To reach 10%, use a root of 855 GiB (`918049 MB`) instead. That leaves 95.87 GiB free, or 10.1%.
+- The installer counts in GB. `df -h` counts in GiB. Root shows as `953.5 GB` now and `888G` later. Same partition.
+- The first partition starts 1 MiB into the disk, so it ends up 1 MiB smaller than asked. `1075 MB` accounts for that and gives a full 1 GiB. If yours still shows `1023M`, it is harmless.
 - For any other size: type `GiB x 1073.741824` MB, rounded.
-- No swap partition. Hibernation needs swap, and hibernation does not work
-  while Secure Boot is on. See the note in Step 3.
+- No swap partition. Hibernation needs swap, and hibernation does not work while Secure Boot is on. See the note in Step 3.
 - The installer warns that no swap space is selected. Continue anyway.
 - XFS handles big files well, like a 200 GiB qcow2 image.
-- Docker runs on XFS. It can also cap container size with
-  `--storage-opt size=`, which needs the `prjquota` mount option.
+- Docker runs on XFS. It can also cap container size with `--storage-opt size=`, which needs the `prjquota` mount option.
 
 ## Step 3 — After install: repositories, quota, checks
-
-Remove the USB stick before the first boot. If it is still plugged in, the
-machine may start the installer again.
 
 ### 1. Add contrib and non-free
 
@@ -187,19 +165,11 @@ Compare with what you wrote down in Step 1.
 
 **Notes**
 
-- `efi-readvar -v PK` (package `efitools`) reports `no entries` on this machine. That is normal
-  while `Secure Boot Key State` is `Standard`. The firmware keeps its keys
-  internal.
-- If step 6 says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the
-  BIOS. Turn it back on under `Security → Secure Boot`.
-- The 3rd party CA is a different problem. It does not turn Secure Boot off —
-  it stops the machine booting at all, with `Invalid signature detected`.
-- Hibernation does not work while Secure Boot is on. The kernel locks itself
-  down and refuses to write the resume image, because it cannot check that the
-  swap was not modified while the machine was off. Suspend works normally.
-  Turning hibernation on means turning Secure Boot off.
-- `/etc/fstab` does not work for the quota. XFS cannot turn quota on at
-  remount, and root is already mounted by then.
+- `efi-readvar -v PK` (package `efitools`) reports `no entries` on this machine. That is normal while `Secure Boot Key State` is `Standard`. The firmware keeps its keys internal.
+- If step 6 says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the BIOS. Turn it back on under `Security → Secure Boot`.
+- The 3rd party CA is a different problem. It does not turn Secure Boot off — it stops the machine booting at all, with `Invalid signature detected`.
+- Hibernation does not work while Secure Boot is on. The kernel locks itself down and refuses to write the resume image, because it cannot check that the swap was not modified while the machine was off. Suspend works normally. Turning hibernation on means turning Secure Boot off.
+- `/etc/fstab` does not work for the quota. XFS cannot turn quota on at remount, and root is already mounted by then.
 - Docker only needs `pquota`. `uquota` is user quota and is optional.
 - The kernel reports `pquota` as `prjquota`. Same thing.
 
