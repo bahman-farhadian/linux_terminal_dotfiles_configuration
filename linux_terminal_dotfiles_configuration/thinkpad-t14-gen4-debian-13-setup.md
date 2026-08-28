@@ -417,7 +417,7 @@ su -
 #### 2. Install the packages
 
 ```bash
-apt install -y bash-completion bridge-utils btop curl duf ffmpeg filezilla foliate git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc jq keepassxc lshw nano network-manager-openvpn-gnome obs-studio openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux tree unrar vim virt-top vlc wget xclip
+apt install -y bash-completion bridge-utils btop curl duf ethtool ffmpeg filezilla foliate git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc lshw nano network-manager-openvpn-gnome nmap obs-studio openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip
 ```
 
 #### 3. Install flatpak
@@ -847,3 +847,64 @@ anything falls outside the alphabet.
 - Nothing is changed without `--apply` or `--clear-dock`. Run it with no arguments to see the options.
 - `--status` reads the settings back. If it disagrees with `--list`, the write failed rather than the sort being wrong.
 - To undo it completely: `gsettings reset org.gnome.desktop.app-folders folder-children` followed by `gsettings reset org.gnome.shell app-picker-layout`.
+
+### Step 11 — Laptop lid
+
+Closing the lid must not suspend the machine. The display goes off because the
+lid is shut; nothing else should happen.
+
+#### 1. Become root
+
+```bash
+su -
+```
+
+#### 2. Create the override
+
+```bash
+mkdir -p /etc/systemd/logind.conf.d
+```
+
+```bash
+vim /etc/systemd/logind.conf.d/99-lid.conf
+```
+
+Put this in it:
+
+```
+[Login]
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+HandleLidSwitchDocked=ignore
+```
+
+#### 3. Reboot
+
+```bash
+systemctl reboot
+```
+
+#### 4. Check the setting took
+
+```bash
+systemd-analyze cat-config systemd/logind.conf | grep -i handlelidswitch
+```
+
+All three must read `ignore`.
+
+#### 5. Check the behaviour
+
+Close the lid, wait a minute, open it again.
+
+```bash
+uptime
+```
+
+The uptime must have kept counting, with no resume in between.
+
+**Notes**
+
+- A drop-in under `/etc/systemd/logind.conf.d/` is used rather than editing `/etc/systemd/logind.conf`, so a package upgrade cannot overwrite it.
+- The three settings cover the three cases logind separates: on battery, on external power, and docked. Setting only the first leaves the machine suspending whenever it is plugged in.
+- Reboot rather than `systemctl restart systemd-logind`. Restarting it can end the graphical session.
+- GNOME delegates the lid to logind, so `ignore` stops the suspend. GNOME's own blank and lock timeouts still apply and are set in Settings.
