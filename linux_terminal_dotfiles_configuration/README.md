@@ -95,6 +95,17 @@ bar unpainted in the larger local window. Run `tmux` by hand on the remote
 side. `window-size largest` is set as a second line of defence, so a shared
 session follows the biggest client rather than the most recent one.
 
+When you do want tmux over SSH, give it its own session rather than joining the
+desktop one:
+
+```bash
+tmux new-session -A -s remote
+```
+
+Two clients on one session make tmux hold the window at the larger client's
+size, so the smaller one sees a cropped view, and the larger one can be left
+with an unpainted band between the pane and the status bar.
+
 To open a terminal without tmux:
 
 ```bash
