@@ -47,7 +47,31 @@ the **Shows as** value.
 
 ### Step 3 — After install: repositories, quota, checks
 
-#### 1. Add your user to sudoers
+#### 1. Become root
+
+Everything in this step is run as root.
+
+```bash
+su -
+```
+
+#### 2. Install vim
+
+```bash
+apt update
+```
+
+```bash
+apt install vim
+```
+
+Make it the default editor for `visudo` and friends:
+
+```bash
+update-alternatives --config editor
+```
+
+#### 3. Add your user to sudoers
 
 The installer only grants `sudo` when the root password is left empty. If you
 set a root password, the user has none.
@@ -77,23 +101,7 @@ Check it:
 sudo -l -U username
 ```
 
-#### 2. Install vim
-
-```bash
-apt update
-```
-
-```bash
-apt install vim
-```
-
-Make it the default editor for `visudo` and friends:
-
-```bash
-update-alternatives --config editor
-```
-
-#### 3. Add contrib and non-free
+#### 4. Add contrib and non-free
 
 The installer writes the classic file, not a `.sources` file:
 
@@ -124,7 +132,7 @@ Check the result:
 grep ^deb /etc/apt/sources.list
 ```
 
-#### 4. Update the system
+#### 5. Update the system
 
 ```bash
 apt update
@@ -134,13 +142,13 @@ apt update
 apt full-upgrade
 ```
 
-#### 5. Install the tools used for checking
+#### 6. Install the tools used for checking
 
 ```bash
 apt install mokutil dmidecode efibootmgr
 ```
 
-#### 6. Edit GRUB: quota and boot timeout
+#### 7. Edit GRUB: quota and boot timeout
 
 Docker can only cap a container's disk size (`--storage-opt size=`) when root
 is mounted with project quota. Root is mounted before `/etc/fstab` is read, so
@@ -166,13 +174,19 @@ Apply it:
 update-grub
 ```
 
-#### 7. Reboot
+#### 8. Reboot
 
 ```bash
 systemctl reboot
 ```
 
-#### 8. Check Secure Boot
+Log back in and become root again before the checks:
+
+```bash
+su -
+```
+
+#### 9. Check Secure Boot
 
 ```bash
 mokutil --sb-state
@@ -186,7 +200,7 @@ dmesg | grep -i "secure boot"
 
 Expect `secureboot: Secure boot enabled`.
 
-#### 9. Check the machine booted through shim
+#### 10. Check the machine booted through shim
 
 ```bash
 efibootmgr -v | grep -i shim
@@ -194,7 +208,7 @@ efibootmgr -v | grep -i shim
 
 Expect `\EFI\debian\shimx64.efi`.
 
-#### 10. Check the disk
+#### 11. Check the disk
 
 ```bash
 lsblk
@@ -208,7 +222,7 @@ findmnt -no FSTYPE /
 
 Expect `xfs`.
 
-#### 11. Check the quota
+#### 12. Check the quota
 
 ```bash
 findmnt -no OPTIONS /
@@ -222,7 +236,7 @@ xfs_quota -x -c state /
 
 Expect `Project quota state` with `Accounting: ON` and `Enforcement: ON`.
 
-#### 12. Check the BIOS version
+#### 13. Check the BIOS version
 
 ```bash
 dmidecode -s bios-version
@@ -233,7 +247,7 @@ Compare with what you wrote down in Step 1.
 **Notes**
 
 - `efi-readvar -v PK` (package `efitools`) reports `no entries` on this machine. That is normal while `Secure Boot Key State` is `Standard`. The firmware keeps its keys internal.
-- If step 8 says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the BIOS. Turn it back on under `Security → Secure Boot`.
+- If step 9 says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the BIOS. Turn it back on under `Security → Secure Boot`.
 - The 3rd party CA is a different problem. It does not turn Secure Boot off — it stops the machine booting at all, with `Invalid signature detected`.
 - Hibernation does not work while Secure Boot is on. The kernel locks itself down and refuses to write the resume image, because it cannot check that the swap was not modified while the machine was off. Suspend works normally. Turning hibernation on means turning Secure Boot off.
 - `/etc/fstab` does not work for the quota. XFS cannot turn quota on at remount, and root is already mounted by then.
