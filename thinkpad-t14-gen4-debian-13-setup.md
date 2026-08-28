@@ -45,7 +45,8 @@ the **Shows as** value.
 - XFS handles big files well, like a 200 GiB qcow2 image.
 - Docker runs on XFS. It can also cap container size with
   `--storage-opt size=`, which needs the `prjquota` mount option.
-- 40 GiB swap covers hibernation up to 32 GB RAM.
+- 40 GiB swap covers hibernation up to 32 GB RAM, if hibernation is ever
+  used. See the note in Step 3.
 
 ## Step 3 — After install: repositories, quota, checks
 
@@ -60,24 +61,22 @@ The installer writes the classic file, not a `.sources` file:
 sudo nano /etc/apt/sources.list
 ```
 
-On every `deb` and `deb-src` line, change:
+Make the file read exactly this:
 
 ```
-main non-free-firmware
+deb http://deb.debian.org/debian/ trixie main contrib non-free non-free-firmware
+deb-src http://deb.debian.org/debian/ trixie main contrib non-free non-free-firmware
+
+deb http://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
+deb-src http://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
+
+deb http://deb.debian.org/debian/ trixie-updates main contrib non-free non-free-firmware
+deb-src http://deb.debian.org/debian/ trixie-updates main contrib non-free non-free-firmware
 ```
 
-to:
-
-```
-main contrib non-free non-free-firmware
-```
-
-Or do it in one command:
-
-```bash
-sudo sed -i -E '/^deb(-src)? /s/ main non-free-firmware/ main contrib non-free non-free-firmware/' \
-  /etc/apt/sources.list
-```
+Only `contrib` and `non-free` are new. Keep the suite name — `trixie`,
+`trixie-security`, `trixie-updates` — between the URL and the components. If
+you drop it, `apt update` fails with a 404 on the Release file.
 
 Check the result:
 
@@ -176,6 +175,10 @@ Compare with what you wrote down in Step 1.
   while `Secure Boot Key State` is `Standard`. The firmware keeps its keys
   internal.
 - If Secure Boot is off, go back to Step 1 and check the 3rd party CA.
+- Hibernation does not work while Secure Boot is on. The kernel locks itself
+  down and refuses to write the resume image, because it cannot check that the
+  swap was not modified while the machine was off. Suspend works normally.
+  Turning hibernation on means turning Secure Boot off.
 - `/etc/fstab` does not work for the quota. XFS cannot turn quota on at
   remount, and root is already mounted by then.
 - Docker only needs `pquota`. `uquota` is user quota and is optional.
