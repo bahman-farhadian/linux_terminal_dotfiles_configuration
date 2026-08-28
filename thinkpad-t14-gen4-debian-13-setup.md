@@ -45,7 +45,7 @@ Free           62.87 GiB   6.6%
 
 The drive uses that free space for wear levelling, which keeps write speed up
 as the disk fills. Samsung suggests about 10%. To reach it, use a root of
-855 GiB (`918456 MB`) instead, which leaves 95.87 GiB free.
+855 GiB (`918049 MB`) instead, which leaves 95.87 GiB free.
 
 **Notes**
 
