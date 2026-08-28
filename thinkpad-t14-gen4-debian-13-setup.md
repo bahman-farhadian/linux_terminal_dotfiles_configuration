@@ -47,7 +47,33 @@ the **Shows as** value.
 
 ### Step 3 — After install: repositories, quota, checks
 
-#### 1. Add contrib and non-free
+#### 1. Add your user to sudo
+
+The installer only puts the first user in the `sudo` group when the root
+password is left empty. If you set a root password, the user has no `sudo` and
+every command below fails.
+
+```bash
+su -
+```
+
+```bash
+usermod -aG sudo bahman
+```
+
+```bash
+exit
+```
+
+Log out and log back in, then check:
+
+```bash
+groups
+```
+
+Expect `sudo` in the list.
+
+#### 2. Add contrib and non-free
 
 The installer writes the classic file, not a `.sources` file:
 
@@ -78,7 +104,7 @@ Check the result:
 grep ^deb /etc/apt/sources.list
 ```
 
-#### 2. Update the system
+#### 3. Update the system
 
 ```bash
 sudo apt update
@@ -88,13 +114,13 @@ sudo apt update
 sudo apt full-upgrade
 ```
 
-#### 3. Install the tools used for checking
+#### 4. Install the tools used for checking
 
 ```bash
 sudo apt install mokutil dmidecode efibootmgr
 ```
 
-#### 4. Edit GRUB: quota and boot timeout
+#### 5. Edit GRUB: quota and boot timeout
 
 Docker can only cap a container's disk size (`--storage-opt size=`) when root
 is mounted with project quota. Root is mounted before `/etc/fstab` is read, so
@@ -120,13 +146,13 @@ Apply it:
 sudo update-grub
 ```
 
-#### 5. Reboot
+#### 6. Reboot
 
 ```bash
 sudo systemctl reboot
 ```
 
-#### 6. Check Secure Boot
+#### 7. Check Secure Boot
 
 ```bash
 mokutil --sb-state
@@ -140,7 +166,7 @@ dmesg | grep -i "secure boot"
 
 Expect `secureboot: Secure boot enabled`.
 
-#### 7. Check the machine booted through shim
+#### 8. Check the machine booted through shim
 
 ```bash
 sudo efibootmgr -v | grep -i shim
@@ -148,7 +174,7 @@ sudo efibootmgr -v | grep -i shim
 
 Expect `\EFI\debian\shimx64.efi`.
 
-#### 8. Check the disk
+#### 9. Check the disk
 
 ```bash
 lsblk
@@ -162,7 +188,7 @@ findmnt -no FSTYPE /
 
 Expect `xfs`.
 
-#### 9. Check the quota
+#### 10. Check the quota
 
 ```bash
 findmnt -no OPTIONS /
@@ -176,7 +202,7 @@ sudo xfs_quota -x -c state /
 
 Expect `Project quota state` with `Accounting: ON` and `Enforcement: ON`.
 
-#### 10. Check the BIOS version
+#### 11. Check the BIOS version
 
 ```bash
 sudo dmidecode -s bios-version
@@ -187,7 +213,7 @@ Compare with what you wrote down in Step 1.
 **Notes**
 
 - `efi-readvar -v PK` (package `efitools`) reports `no entries` on this machine. That is normal while `Secure Boot Key State` is `Standard`. The firmware keeps its keys internal.
-- If step 6 says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the BIOS. Turn it back on under `Security → Secure Boot`.
+- If step 7 says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the BIOS. Turn it back on under `Security → Secure Boot`.
 - The 3rd party CA is a different problem. It does not turn Secure Boot off — it stops the machine booting at all, with `Invalid signature detected`.
 - Hibernation does not work while Secure Boot is on. The kernel locks itself down and refuses to write the resume image, because it cannot check that the swap was not modified while the machine was off. Suspend works normally. Turning hibernation on means turning Secure Boot off.
 - `/etc/fstab` does not work for the quota. XFS cannot turn quota on at remount, and root is already mounted by then.
@@ -341,3 +367,826 @@ Expect `SecureBoot enabled`.
 - `fwupd-amd64-signed` holds the Debian-signed EFI file. Without it, firmware updates stop working while Secure Boot is on.
 - A BIOS update can reset BIOS settings. If step 9 says `SecureBoot disabled`, redo Step 1.
 - If step 4 reports nothing to do, the firmware is already current. This machine shipped with `N3QET52W (1.52)`, dated 2026-04-23.
+
+## Part 3 — Terminal configuration
+
+### Step 6 — Bash, tmux, and SSH configuration
+
+Everything is written from scratch. Nothing is cloned or downloaded.
+
+#### 1. Install what the configuration needs
+
+```bash
+sudo apt install tmux vim git curl jq tree python3 openssl bash-completion xclip htop
+```
+
+#### 2. Create the directories
+
+```bash
+mkdir -p ~/linux/bash ~/linux/ssh ~/linux/tmux
+```
+
+#### 3. Create `~/linux/bash/bash_profile`
+
+```bash
+cat > ~/linux/bash/bash_profile <<'EOF'
+# ~/.bash_profile — Linux login shell entry point
+
+if [ -f ~/.bashrc ]; then
+    . ~/.bashrc
+fi
+EOF
+```
+
+#### 4. Create `~/linux/bash/bashrc`
+
+```bash
+cat > ~/linux/bash/bashrc <<'EOF'
+# ~/.bashrc (Linux)
+
+# If not running interactively, bail
+case $- in
+    *i*) ;;
+      *) return;;
+esac
+
+# History — full deduplication (ignoredups + erasedups)
+HISTCONTROL=ignoredups:erasedups
+HISTSIZE=100000
+HISTFILESIZE=200000
+shopt -s histappend
+shopt -s checkwinsize
+
+# PATH extras
+export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
+
+# Editor
+export EDITOR=vim
+export VISUAL=vim
+
+# Prevent venv from overwriting our custom prompt
+export VIRTUAL_ENV_DISABLE_PROMPT=1
+
+# Catppuccin Mocha — badge backgrounds = accent blended 30% into Base #1e1e2e
+_OVERLAY='108;112;134'
+_TEXT='205;214;244'
+_GREEN='166;227;161'
+_GREEN_BG='71;89;80'
+_RED='243;139;168'
+_RED_BG='94;63;83'
+_BLUE='137;180;250'
+_BLUE_BG='62;75;107'
+_MAUVE='203;166;247'
+_MAUVE_BG='82;71;106'
+_PEACH='250;179;135'
+_PEACH_BG='96;75;73'
+_LAVENDER='180;190;254'
+_LAVENDER_BG='75;78;108'
+_TEAL='148;226;213'
+_TEAL_BG='65;89;96'
+_SKY='137;220;235'
+_SKY_BG='62;87;103'
+_OVERLAY_BG='53;55;72'
+_RST='\[\e[0m\]'
+
+# ▶ is standard Unicode (U+25B6) — no Nerd Font needed, renders in any modern terminal.
+_SEP='▶'
+_BRANCH=''
+
+_set_prompt() {
+    local exit_code=$?
+    local sym sym_col local_time utc_time kctx kctx_bg
+    local git_branch git_bg git_text user_bg user_fg venv_name
+    local git_dirty git_ab git_stash ab_counts ahead behind stash_count
+    local line1 prev_bg i
+    local -a seg_bg seg_fg seg_text
+
+    local_time=$(date '+%Y-%m-%d %H:%M:%S')
+    utc_time=$(date -u '+%Y-%m-%d %H:%M:%S')
+
+    if git -C "$PWD" rev-parse --is-inside-work-tree &>/dev/null; then
+        git_branch=$(git -C "$PWD" symbolic-ref --quiet --short HEAD 2>/dev/null || git -C "$PWD" rev-parse --short HEAD 2>/dev/null)
+        git_bg="$_PEACH_BG"
+
+        git_dirty=""
+        git -C "$PWD" diff --quiet 2>/dev/null || git_dirty+="*"
+        git -C "$PWD" diff --staged --quiet 2>/dev/null || git_dirty+="+"
+
+        git_ab=""
+        ab_counts=$(git -C "$PWD" rev-list --left-right --count "HEAD...@{upstream}" 2>/dev/null | awk '{print $1, $2}')
+        if [ -n "$ab_counts" ]; then
+            ahead="${ab_counts%% *}"
+            behind="${ab_counts##* }"
+            [ "$ahead" -gt 0 ] && git_ab+=" ⇡${ahead}"
+            [ "$behind" -gt 0 ] && git_ab+=" ⇣${behind}"
+        fi
+
+        git_stash=""
+        stash_count=$(git -C "$PWD" stash list 2>/dev/null | wc -l | awk '{print $1}')
+        [ "$stash_count" -gt 0 ] && git_stash=" {${stash_count}}"
+
+        git_text="${_BRANCH:+${_BRANCH} }${git_branch}${git_dirty}${git_ab}${git_stash}"
+    else
+        git_bg="$_OVERLAY_BG"
+        git_text="not git repo"
+    fi
+
+    if [ "$(id -u)" -eq 0 ]; then
+        sym='#'
+        user_bg="$_RED_BG"
+        user_fg="$_RED"
+    else
+        sym='$'
+        user_bg="$_GREEN_BG"
+        user_fg="$_GREEN"
+    fi
+
+    if command -v kubectl &>/dev/null; then
+        kctx=$(kubectl config current-context 2>/dev/null)
+        if [ -n "$kctx" ]; then
+            kctx_bg="$_SKY_BG"
+        else
+            kctx="disconnected"
+            kctx_bg="$_RED_BG"
+        fi
+    else
+        kctx="disconnected"
+        kctx_bg="$_RED_BG"
+    fi
+
+    if [ $exit_code -eq 0 ]; then
+        sym_col="$_GREEN"
+    else
+        sym_col="$_RED"
+    fi
+
+    seg_bg=() seg_fg=() seg_text=()
+
+    if [ -n "$VIRTUAL_ENV" ]; then
+        venv_name="${VIRTUAL_ENV_PROMPT:-$(basename "$VIRTUAL_ENV")}"
+        seg_bg+=("$_MAUVE_BG");   seg_fg+=("$_TEXT"); seg_text+=(" venv:${venv_name} ")
+    else
+        seg_bg+=("$_OVERLAY_BG"); seg_fg+=("$_TEXT"); seg_text+=(" venv:inactive ")
+    fi
+    seg_bg+=("$user_bg");      seg_fg+=("$_TEXT");   seg_text+=(" \u@\h ")
+    seg_bg+=("$kctx_bg");      seg_fg+=("$_TEXT");   seg_text+=(" k8s:${kctx} ")
+    seg_bg+=("$git_bg");       seg_fg+=("$_TEXT");    seg_text+=(" ${git_text} ")
+    seg_bg+=("$_BLUE_BG");     seg_fg+=("$_TEXT");     seg_text+=(" \w ")
+    seg_bg+=("$_LAVENDER_BG"); seg_fg+=("$_TEXT"); seg_text+=(" Local ${local_time} ")
+    seg_bg+=("$_TEAL_BG");     seg_fg+=("$_TEXT");     seg_text+=(" UTC ${utc_time} ")
+
+    line1="\[\e[38;2;${_OVERLAY}m\]─${_RST} \[\e[38;2;${user_fg}m\][bash]${_RST} "
+
+    prev_bg=""
+    for i in "${!seg_bg[@]}"; do
+        if [ -n "$prev_bg" ]; then
+            line1+="\[\e[48;2;${seg_bg[$i]}m\]\[\e[38;2;${prev_bg}m\]${_SEP}"
+        else
+            line1+="\[\e[48;2;${seg_bg[$i]}m\]"
+        fi
+        line1+="\[\e[38;2;${seg_fg[$i]}m\]${seg_text[$i]}"
+        prev_bg="${seg_bg[$i]}"
+    done
+    line1+="\[\e[49m\]\[\e[38;2;${prev_bg}m\]${_SEP}${_RST}"
+
+    PS1="${line1}\n\[\e[38;2;${sym_col}m\]${sym}${_RST} "
+}
+PROMPT_COMMAND='_set_prompt'
+
+# ls colours — Linux uses --color=auto and LS_COLORS (set by dircolors)
+alias ls='ls --color=auto'
+command -v dircolors &>/dev/null && eval "$(dircolors -b)"
+
+# bash-completion — package name varies by distro:
+#   Debian/Ubuntu: bash-completion   Fedora/RHEL: bash-completion
+_bc=""
+for _p in /usr/share/bash-completion/bash_completion \
+           /etc/bash_completion; do
+    [ -r "$_p" ] && { _bc="$_p"; break; }
+done
+[ -n "$_bc" ] && . "$_bc"
+unset _bc _p
+
+# Strip tab-separated descriptions from COMPREPLY (cobra/kubectl/docker output)
+_strip_comp_descriptions() {
+    local i
+    for i in "${!COMPREPLY[@]}"; do
+        COMPREPLY[$i]="${COMPREPLY[$i]%%$'\t'*}"
+    done
+}
+
+# CLI tool completions
+_bash_load_completions() {
+    type _get_comp_words_by_ref &>/dev/null || return 0
+
+    local tool output comp_fn wrapper_fn
+    for tool in kubectl helm flux kind k3d docker; do
+        if command -v "$tool" &>/dev/null; then
+            output=$("$tool" completion bash 2>/dev/null)
+            if [ -n "$output" ]; then
+                eval "$output"
+                comp_fn=$(complete -p "$tool" 2>/dev/null | sed -n 's/.*-F \([^ ]*\).*/\1/p')
+                if [ -n "$comp_fn" ]; then
+                    wrapper_fn="_nodesc_${tool}"
+                    eval "
+${wrapper_fn}() {
+    { ${comp_fn} \"\$@\"; } > /dev/null
+    _strip_comp_descriptions
+}
+"
+                    complete -F "$wrapper_fn" "$tool"
+                fi
+            fi
+        fi
+    done
+    command -v kubectl &>/dev/null && complete -o default -F __start_kubectl k
+    type _nodesc_docker &>/dev/null && complete -F _nodesc_docker d || true
+
+    local _bcd="/usr/share/bash-completion/completions"
+    if [ -r "$_bcd/git" ]; then
+        . "$_bcd/git"
+        type __git_complete &>/dev/null && __git_complete g __git_main || true
+    fi
+    [ -r "$_bcd/tmux"    ] && . "$_bcd/tmux"    && complete -F _comp_cmd_tmux  t  2>/dev/null || true
+    [ -r "$_bcd/python3" ] && . "$_bcd/python3" && complete -F _comp_cmd_python py 2>/dev/null || true
+}
+_bash_load_completions
+unset -f _bash_load_completions
+
+# Ollama completion
+if command -v ollama &>/dev/null; then
+    _ollama_bash() {
+        local cur prev
+        COMPREPLY=()
+        cur="${COMP_WORDS[COMP_CWORD]}"
+        prev="${COMP_WORDS[COMP_CWORD-1]}"
+        local subcmds="serve create show run pull push list ps cp rm help"
+        if [ "$COMP_CWORD" -eq 1 ]; then
+            COMPREPLY=($(compgen -W "$subcmds" -- "$cur"))
+            return
+        fi
+        case "$prev" in
+            run|show|cp|rm|push)
+                local models
+                models=$(ollama list 2>/dev/null | awk 'NR>1 {print $1}')
+                COMPREPLY=($(compgen -W "$models" -- "$cur"))
+                ;;
+        esac
+    }
+    complete -F _ollama_bash ollama
+fi
+
+# Aliases
+if [ -f ~/.bash_aliases ]; then
+    . ~/.bash_aliases
+fi
+
+# tmux shortcut
+alias t='tmux'
+
+# readline — set AFTER all completion loading so nothing can override these
+bind 'TAB: menu-complete'
+bind '"\e[Z": menu-complete-backward'
+bind 'set completion-ignore-case on'
+bind 'set mark-symlinked-directories on'
+bind 'set colored-stats on'
+bind 'set colored-completion-prefix on'
+EOF
+```
+
+#### 5. Create `~/linux/bash/bash_aliases`
+
+```bash
+cat > ~/linux/bash/bash_aliases <<'EOF'
+# aliases — sourced by .bashrc
+# Linux · DevOps + Data Engineering/Science
+
+# Navigation
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias ~='cd ~'
+
+# Listing — ls --color=auto is set in bashrc; extend it here
+alias ll='ls -AlhiF'
+alias l='ls -A'
+alias la='ls -A'
+
+# General
+alias c='clear'
+command -v btop &>/dev/null && alias b='btop' || { command -v htop &>/dev/null && alias b='htop'; }
+alias reload='exec $SHELL -l'
+alias path='echo $PATH | tr ":" "\n"'
+alias pubip='curl -s https://ipwho.is/ | jq .'
+alias privip="hostname -I | awk '{print \$1}'"
+pubkey() {
+    local key
+    for key in ~/.ssh/id_ed25519.pub ~/.ssh/id_ecdsa.pub ~/.ssh/id_rsa.pub; do
+        [ -f "$key" ] || continue
+        cat "$key"
+        echo "[key: $(basename "$key")]" >&2
+        return
+    done
+    echo "No public key found (~/.ssh/id_ed25519.pub, id_ecdsa.pub, id_rsa.pub)" >&2
+    return 1
+}
+alias pubkeys='ls ~/.ssh/*.pub 2>/dev/null | xargs -I{} sh -c "echo \"=== {} ===\"; cat {}"'
+alias password='openssl rand -base64 48'
+
+# Editors
+alias nano='vim'
+alias v='vim'
+
+# Pipe filter — prints output and copies to clipboard if xclip is available;
+# on headless servers without X11/xclip it just prints (tee with no sink).
+cpy() {
+    if command -v xclip &>/dev/null && [ -n "$DISPLAY" ]; then
+        tee >(xclip -selection clipboard)
+    else
+        tee
+    fi
+}
+
+# Git
+alias g='git'
+alias gs='git status'
+alias ga='git add'
+alias gaa='git add --all'
+alias gc='git commit -m'
+alias gca='git commit --amend --no-edit'
+alias gco='git checkout'
+alias gcob='git checkout -b'
+alias gb='git branch'
+alias gba='git branch -a'
+alias gbd='git branch -d'
+alias gbD='git branch -D'
+alias gl='git log --oneline --graph --decorate --all'
+alias gll='git log --stat'
+alias gd='git diff'
+alias gds='git diff --staged'
+alias gp='git push'
+alias gpf='git push --force-with-lease'
+alias gpl='git pull'
+alias gpr='git pull --rebase'
+alias gst='git stash'
+alias gstp='git stash pop'
+alias gstl='git stash list'
+alias gf='git fetch --all --prune'
+alias grb='git rebase'
+alias grbi='git rebase -i'
+alias gcp='git cherry-pick'
+alias gtag='git tag'
+alias gclean='git clean -fd'
+alias gwip='git add -A && git commit -m "wip: checkpoint"'
+
+# Python / venv
+alias py='python3'
+alias pip='pip3'
+alias piv='python3 -m venv .venv'
+alias va='source .venv/bin/activate'
+alias vd='deactivate'
+alias pipi='pip3 install'
+alias pipu='pip3 install --upgrade'
+alias pipf='pip3 freeze'
+alias pipff='pip3 freeze > requirements.txt'
+alias pipr='pip3 install -r requirements.txt'
+alias pipuu='pip3 list --outdated | awk "NR>2 {print \$1}" | xargs pip3 install --upgrade'
+
+# Jupyter
+alias jn='jupyter notebook'
+alias jl='jupyter lab'
+alias jnb='jupyter nbconvert'
+
+# Docker
+alias d='docker'
+alias dps='docker ps'
+alias dpsa='docker ps -a'
+alias di='docker images'
+alias drm='docker rm'
+alias drmi='docker rmi'
+alias drmf='docker rm -f'
+alias dex='docker exec -it'
+alias dlogs='docker logs -f'
+alias dstop='docker stop'
+alias dstart='docker start'
+alias dprune='docker system prune -af --volumes'
+alias dc='docker compose'
+alias dcu='docker compose up -d'
+alias dcd='docker compose down'
+alias dcl='docker compose logs -f'
+alias dcr='docker compose restart'
+alias dcb='docker compose build'
+
+# Kubernetes
+alias k='kubectl'
+alias kgp='kubectl get pods'
+alias kgpa='kubectl get pods --all-namespaces'
+alias kgs='kubectl get services'
+alias kgn='kubectl get nodes'
+alias kgd='kubectl get deployments'
+alias kdes='kubectl describe'
+alias kdp='kubectl describe pod'
+alias kds='kubectl describe service'
+alias kdn='kubectl describe node'
+alias klogs='kubectl logs -f'
+alias kex='kubectl exec -it'
+alias kap='kubectl apply -f'
+alias kdel='kubectl delete -f'
+alias kctx='kubectl config get-contexts'
+alias kuse='kubectl config use-context'
+alias kns='kubectl config set-context --current --namespace'
+alias krun='kubectl run --rm -it --image=busybox debug -- sh'
+
+# Network
+alias ports='ss -tlnp'
+
+# Filesystem / safety
+alias cp='cp -iv'
+alias mv='mv -iv'
+alias mkdir='mkdir -pv'
+alias df='df -h'
+alias du='du -sh'
+alias dud='du -sh -- *'
+
+# Directory stack
+alias pd='pushd'
+alias pp='popd'
+alias ds='dirs -v'
+
+# Find
+alias fd='find . -type d -name'
+alias ff='find . -type f -name'
+
+# Size and tree
+alias dsize='du -sh -- */ | sort -h'
+alias count='ls -1 | wc -l'
+alias t2='tree -L 2'
+alias t3='tree -L 3'
+alias th='tree -L 2 -a -I ".git|.venv|__pycache__|node_modules|*.pyc"'
+EOF
+```
+
+#### 6. Create `~/linux/ssh/config`
+
+```bash
+cat > ~/linux/ssh/config <<'EOF'
+Host *
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    IdentityFile ~/.ssh/id_ed25519
+    AddKeysToAgent 5m
+    Port 22
+EOF
+```
+
+#### 7. Create `~/linux/tmux/tmux.conf`
+
+```bash
+cat > ~/linux/tmux/tmux.conf <<'EOF'
+# ~/.tmux.conf
+
+# Windows and panes index from 1
+set -g base-index 1
+setw -g pane-base-index 1
+
+# Large scrollback (1 MiB lines)
+set -g history-limit 1048576
+
+# No mouse
+set -g mouse off
+
+# Status bar — Catppuccin Mocha
+set -g status-style          "bg=#181825,fg=#a6adc8"
+set -g status-position       bottom
+set -g status-interval       5
+set -g status-left-length    30
+set -g status-right-length   40
+
+# Session name badge
+set -g status-left  "#[bg=#4e4364,fg=#cdd6f4,bold] #S #[bg=#181825,fg=#4e4364] "
+
+# Right: hostname only — prompt already shows time
+set -g status-right "#[fg=#89b4fa] #H "
+
+# Inactive window tab
+setw -g window-status-style          "bg=#181825,fg=#7f849c"
+setw -g window-status-format         " #I:#W "
+
+# Active window tab — shows Z in Red when pane is zoomed
+setw -g window-status-current-style  "bg=#43554a,fg=#cdd6f4,bold"
+setw -g window-status-current-format " #I:#W#{?window_zoomed_flag, #[fg=#f38ba8]Z#[fg=#cdd6f4],} "
+
+# No gap between window tabs
+setw -g window-status-separator ""
+
+# Pane borders
+set -g pane-border-style        "fg=#313244"
+set -g pane-active-border-style "fg=#cba6f7"
+
+# Command/message bar — exactly match the Mantle status-bar background and
+# fill its entire width, so confirmation prompts (for example Ctrl+b x) are
+# a full-width lower bar rather than a small overlay.
+set -g message-style         "bg=#181825,fg=#f9e2af,bold,fill=#181825,width=100%,align=left"
+set -g message-command-style "bg=#181825,fg=#89b4fa,bold,fill=#181825,width=100%,align=left"
+
+# Copy mode highlight
+setw -g mode-style "bg=#45475a,fg=#cdd6f4"
+
+# Window navigation — Shift+Left/Right, no prefix
+bind-key -n S-Left  previous-window
+bind-key -n S-Right next-window
+
+# Pane navigation — Alt+WASD, no prefix
+bind-key -n M-w select-pane -U
+bind-key -n M-a select-pane -L
+bind-key -n M-s select-pane -D
+bind-key -n M-d select-pane -R
+
+# Pane navigation — Ctrl+b prefix fallback (vim style + arrows)
+bind-key h select-pane -L
+bind-key j select-pane -D
+bind-key k select-pane -U
+bind-key l select-pane -R
+bind-key Left  select-pane -L
+bind-key Right select-pane -R
+bind-key Up    select-pane -U
+bind-key Down  select-pane -D
+
+# Pane creation — Ctrl+b " creates a stacked pane, then equalizes all pane
+# heights in the window. This keeps repeated horizontal splits aligned.
+bind-key '"' split-window -v \; select-layout even-vertical
+
+# Pane removal — keep the remaining stacked panes at equal heights after a
+# confirmed Ctrl+b x action.
+bind-key x confirm-before -p "kill-pane #P? (y/n)" "kill-pane \; select-layout even-vertical"
+
+# Synchronize all panes — borders turn Red while sync is on
+bind-key @ if -F '#{pane_synchronized}' \
+    'setw synchronize-panes off; set-window-option pane-border-style "fg=#313244"; set-window-option pane-active-border-style "fg=#cba6f7"' \
+    'setw synchronize-panes on; set-window-option pane-border-style "fg=#f38ba8"; set-window-option pane-active-border-style "fg=#f38ba8"'
+
+# Scrollback — PgUp/PgDown enters copy-mode
+bind-key -n PPage copy-mode -u
+bind-key    PPage copy-mode -u
+bind-key -T copy-mode PPage  send -X page-up
+bind-key -T copy-mode NPage  send -X page-down
+bind-key -T copy-mode Escape send -X cancel
+bind-key -T copy-mode q      send -X cancel
+
+# Layout shortcuts — Alt+1–7
+bind-key -n M-1 select-layout even-horizontal
+bind-key -n M-2 select-layout even-vertical
+bind-key -n M-3 select-layout main-horizontal
+bind-key -n M-4 select-layout main-vertical
+bind-key -n M-5 select-layout tiled
+bind-key -n M-6 next-layout
+bind-key -n M-7 previous-layout
+
+# Nested tmux (SSH → remote tmux) — F12 toggles passthrough mode
+# ON  → local tmux handles all keys normally
+# OFF → local tmux ignores all keys; everything goes to the remote tmux
+#       status bar dims to grey so you always know which mode you're in
+bind-key -n F12 \
+    set prefix None \;\
+    set key-table off \;\
+    set status-style "bg=#181825,fg=#585b70" \;\
+    set status-left "#[fg=#585b70] #S [passthrough]  " \;\
+    refresh-client -S
+
+bind-key -T off F12 \
+    set -u prefix \;\
+    set -u key-table \;\
+    set -u status-style \;\
+    set -u status-left \;\
+    refresh-client -S
+
+# Forward Meta shortcuts explicitly while in passthrough mode. This lets a
+# further nested tmux receive its own Alt+W/A/S/D and Alt+1–7 bindings.
+bind-key -T off M-w send-keys M-w
+bind-key -T off M-a send-keys M-a
+bind-key -T off M-s send-keys M-s
+bind-key -T off M-d send-keys M-d
+bind-key -T off M-1 send-keys M-1
+bind-key -T off M-2 send-keys M-2
+bind-key -T off M-3 send-keys M-3
+bind-key -T off M-4 send-keys M-4
+bind-key -T off M-5 send-keys M-5
+bind-key -T off M-6 send-keys M-6
+bind-key -T off M-7 send-keys M-7
+EOF
+```
+
+#### 8. Create `~/linux/install.sh`
+
+```bash
+cat > ~/linux/install.sh <<'EOF'
+#!/usr/bin/env bash
+# linux/install.sh — idempotent dotfiles installer (Linux only)
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[ "$(uname -s)" = "Linux" ] || { echo "Linux only." >&2; exit 1; }
+
+_ok()   { printf '\033[32m✔ %s\033[0m\n' "$*"; }
+_warn() { printf '\033[33m⚠ %s\033[0m\n' "$*"; }
+_skip() { printf '\033[90m⊘ %s\033[0m\n' "$*"; }
+_hdr()  { printf '\n%s\n' "$*"; }
+
+cp_file() { mkdir -p "$(dirname "$2")"; cp "$1" "$2"; _ok "applied: $2"; }
+sudo_cp() { sudo mkdir -p "$(dirname "$2")"; sudo cp "$1" "$2"; _ok "applied (root): $2"; }
+
+# Detect package manager (Debian/Ubuntu or Red Hat/Fedora only)
+_pkg_cmd() {
+    local pkgs="$1"
+    if command -v apt-get &>/dev/null; then
+        echo "sudo apt-get install -y $pkgs"
+    elif command -v dnf &>/dev/null; then
+        echo "sudo dnf install -y $pkgs"
+    elif command -v yum &>/dev/null; then
+        echo "sudo yum install -y $pkgs"
+    else
+        _warn "unsupported distro — install manually: $pkgs"
+        echo ""
+    fi
+}
+
+_check_prereqs() {
+    _hdr "prerequisites"
+    local missing=() cmd
+
+    for cmd in bash tmux vim git curl jq tree python3 openssl; do
+        command -v "$cmd" &>/dev/null || missing+=("$cmd")
+    done
+
+    local bc_ok=false
+    { [ -r /usr/share/bash-completion/bash_completion ] || \
+      [ -r /etc/bash_completion ]; } && bc_ok=true
+
+    if [ ${#missing[@]} -eq 0 ] && $bc_ok; then
+        _ok "all required packages present"
+        return
+    fi
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        _warn "missing: ${missing[*]}"
+        local cmd; cmd="$(_pkg_cmd "${missing[*]}")"
+        [ -n "$cmd" ] && printf '  Run: %s\n' "$cmd"
+    fi
+    if ! $bc_ok; then
+        _warn "bash-completion not found (Tab completions will not load)"
+        local cmd; cmd="$(_pkg_cmd "bash-completion")"
+        [ -n "$cmd" ] && printf '  Run: %s\n' "$cmd"
+    fi
+}
+
+_check_prereqs
+
+printf '\nConfigure root user as well? [y/N]: '
+read -r _ans
+HAS_SUDO=false
+if [[ "$_ans" =~ ^[Yy] ]]; then
+    if sudo -v; then HAS_SUDO=true; _ok "sudo granted"
+    else _warn "sudo failed — root skipped"
+    fi
+else
+    _skip "root configuration"
+fi
+
+_hdr "bash"
+cp_file "$REPO/bash/bash_profile" "$HOME/.bash_profile"
+cp_file "$REPO/bash/bashrc"       "$HOME/.bashrc"
+cp_file "$REPO/bash/bash_aliases" "$HOME/.bash_aliases"
+if [ "$HAS_SUDO" = true ]; then
+    sudo_cp "$REPO/bash/bash_profile" /root/.bash_profile
+    sudo_cp "$REPO/bash/bashrc"       /root/.bashrc
+    sudo_cp "$REPO/bash/bash_aliases" /root/.bash_aliases
+fi
+
+_hdr "tmux"
+cp_file "$REPO/tmux/tmux.conf" "$HOME/.tmux.conf"
+[ "$HAS_SUDO" = true ] && sudo_cp "$REPO/tmux/tmux.conf" /root/.tmux.conf || true
+
+_hdr "ssh"
+_upsert_ssh() {
+    local config="$1"
+    grep -qF 'AddKeysToAgent 5m' "$config" 2>/dev/null && return 0
+    if grep -qF 'StrictHostKeyChecking no' "$config" 2>/dev/null; then
+        if command -v python3 &>/dev/null; then
+            local py
+            py=$(mktemp)
+            cat > "$py" << 'PYEOF'
+import sys, re
+path = sys.argv[1]
+try: text = open(path).read()
+except FileNotFoundError: text = ''
+text = re.sub(r'\nHost \*\n(?:[ \t][^\n]*\n?)*', '', '\n' + text).strip()
+open(path, 'w').write(text + '\n' if text else '')
+PYEOF
+            python3 "$py" "$config"
+            rm -f "$py"
+        else
+            _warn "python3 not found — skipping SSH dedup (stale Host * block left in place)"
+        fi
+    fi
+    printf '\n' >> "$config"
+    cat "$REPO/ssh/config" >> "$config"
+    return 1
+}
+
+mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+touch "$HOME/.ssh/config" && chmod 600 "$HOME/.ssh/config"
+if _upsert_ssh "$HOME/.ssh/config"; then
+    _ok "SSH already present in ~/.ssh/config"
+else
+    chmod 600 "$HOME/.ssh/config"
+    _ok "SSH applied to ~/.ssh/config"
+fi
+
+if [ "$HAS_SUDO" = true ]; then
+    sudo mkdir -p /root/.ssh && sudo chmod 700 /root/.ssh
+    _rtmp=$(mktemp)
+    sudo cat /root/.ssh/config 2>/dev/null > "$_rtmp" || true
+    chmod 600 "$_rtmp"
+    if _upsert_ssh "$_rtmp"; then
+        _ok "SSH already present in /root/.ssh/config"
+    else
+        sudo cp "$_rtmp" /root/.ssh/config
+        sudo chmod 600 /root/.ssh/config
+        _ok "SSH applied to /root/.ssh/config"
+    fi
+    rm -f "$_rtmp"
+fi
+
+_hdr "misc"
+cp_file "$REPO/hushlogin" "$HOME/.hushlogin"
+
+_hdr "default shell → bash"
+BASH_BIN="$(command -v bash)"
+if [ -z "$BASH_BIN" ]; then
+    _warn "bash not found in PATH — install it first"
+else
+    # chsh requires the shell to be listed in /etc/shells
+    if ! grep -qxF "$BASH_BIN" /etc/shells 2>/dev/null; then
+        if [ "$HAS_SUDO" = true ]; then
+            echo "$BASH_BIN" | sudo tee -a /etc/shells > /dev/null
+            _ok "registered $BASH_BIN in /etc/shells"
+        else
+            _warn "$BASH_BIN not in /etc/shells — chsh may fail (add it with sudo)"
+        fi
+    fi
+    if chsh -s "$BASH_BIN" "$USER" 2>/dev/null; then
+        _ok "$USER: shell → $BASH_BIN"
+    elif command -v usermod &>/dev/null && [ "$HAS_SUDO" = true ]; then
+        sudo usermod -s "$BASH_BIN" "$USER"
+        _ok "$USER: shell → $BASH_BIN (via usermod)"
+    else
+        _warn "Could not set default shell — run manually: chsh -s $BASH_BIN"
+    fi
+    if [ "$HAS_SUDO" = true ]; then
+        if chsh -s "$BASH_BIN" root 2>/dev/null || \
+           { command -v usermod &>/dev/null && sudo usermod -s "$BASH_BIN" root; }; then
+            _ok "root: shell → $BASH_BIN"
+        else
+            _warn "Could not set root shell"
+        fi
+    fi
+fi
+
+printf '\n\033[32m✔ Done.\033[0m Log out and back in for the shell change to take effect.\n'
+printf '  Reload now: exec bash\n'
+EOF
+```
+
+#### 9. Create `~/linux/hushlogin`
+
+```bash
+touch ~/linux/hushlogin
+```
+
+#### 10. Make the installer executable
+
+```bash
+chmod +x ~/linux/install.sh
+```
+
+#### 11. Run it
+
+```bash
+~/linux/install.sh
+```
+
+#### 12. Reload the shell
+
+```bash
+exec bash
+```
+
+**Notes**
+
+- The `<<'EOF'` quoting matters. With the quotes the shell writes the file literally. Without them it would expand every `$` and backtick and destroy the prompt code.
+- The installer asks whether to configure `root` as well. Answer `y` to get the same prompt, aliases, and tmux settings under `su`.
+- The installer copies to `~/.bashrc`, `~/.bash_aliases`, `~/.bash_profile`, `~/.tmux.conf`, and `~/.hushlogin`, appends the SSH block to `~/.ssh/config`, and sets bash as the login shell.
+- It is safe to run more than once. The SSH block is replaced rather than duplicated.
+- `~/linux` is kept after the install. The installer reads from it, so keep it if you want to re-run it later.
+- The SSH block sets `StrictHostKeyChecking no` and `UserKnownHostsFile /dev/null` for every host. This turns off host key checking, so a machine impersonating a server you connect to will not be detected. Remove those two lines from `~/linux/ssh/config` before step 6 if you do not want that.
+- The prompt needs a terminal with true colour and Unicode. GNOME Terminal has both.

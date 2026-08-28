@@ -1,0 +1,249 @@
+# ~/.bashrc (Linux)
+
+# If not running interactively, bail
+case $- in
+    *i*) ;;
+      *) return;;
+esac
+
+# History — full deduplication (ignoredups + erasedups)
+HISTCONTROL=ignoredups:erasedups
+HISTSIZE=100000
+HISTFILESIZE=200000
+shopt -s histappend
+shopt -s checkwinsize
+
+# PATH extras
+export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
+
+# Editor
+export EDITOR=vim
+export VISUAL=vim
+
+# Prevent venv from overwriting our custom prompt
+export VIRTUAL_ENV_DISABLE_PROMPT=1
+
+# Catppuccin Mocha — badge backgrounds = accent blended 30% into Base #1e1e2e
+_OVERLAY='108;112;134'
+_TEXT='205;214;244'
+_GREEN='166;227;161'
+_GREEN_BG='71;89;80'
+_RED='243;139;168'
+_RED_BG='94;63;83'
+_BLUE='137;180;250'
+_BLUE_BG='62;75;107'
+_MAUVE='203;166;247'
+_MAUVE_BG='82;71;106'
+_PEACH='250;179;135'
+_PEACH_BG='96;75;73'
+_LAVENDER='180;190;254'
+_LAVENDER_BG='75;78;108'
+_TEAL='148;226;213'
+_TEAL_BG='65;89;96'
+_SKY='137;220;235'
+_SKY_BG='62;87;103'
+_OVERLAY_BG='53;55;72'
+_RST='\[\e[0m\]'
+
+# ▶ is standard Unicode (U+25B6) — no Nerd Font needed, renders in any modern terminal.
+_SEP='▶'
+_BRANCH=''
+
+_set_prompt() {
+    local exit_code=$?
+    local sym sym_col local_time utc_time kctx kctx_bg
+    local git_branch git_bg git_text user_bg user_fg venv_name
+    local git_dirty git_ab git_stash ab_counts ahead behind stash_count
+    local line1 prev_bg i
+    local -a seg_bg seg_fg seg_text
+
+    local_time=$(date '+%Y-%m-%d %H:%M:%S')
+    utc_time=$(date -u '+%Y-%m-%d %H:%M:%S')
+
+    if git -C "$PWD" rev-parse --is-inside-work-tree &>/dev/null; then
+        git_branch=$(git -C "$PWD" symbolic-ref --quiet --short HEAD 2>/dev/null || git -C "$PWD" rev-parse --short HEAD 2>/dev/null)
+        git_bg="$_PEACH_BG"
+
+        git_dirty=""
+        git -C "$PWD" diff --quiet 2>/dev/null || git_dirty+="*"
+        git -C "$PWD" diff --staged --quiet 2>/dev/null || git_dirty+="+"
+
+        git_ab=""
+        ab_counts=$(git -C "$PWD" rev-list --left-right --count "HEAD...@{upstream}" 2>/dev/null | awk '{print $1, $2}')
+        if [ -n "$ab_counts" ]; then
+            ahead="${ab_counts%% *}"
+            behind="${ab_counts##* }"
+            [ "$ahead" -gt 0 ] && git_ab+=" ⇡${ahead}"
+            [ "$behind" -gt 0 ] && git_ab+=" ⇣${behind}"
+        fi
+
+        git_stash=""
+        stash_count=$(git -C "$PWD" stash list 2>/dev/null | wc -l | awk '{print $1}')
+        [ "$stash_count" -gt 0 ] && git_stash=" {${stash_count}}"
+
+        git_text="${_BRANCH:+${_BRANCH} }${git_branch}${git_dirty}${git_ab}${git_stash}"
+    else
+        git_bg="$_OVERLAY_BG"
+        git_text="not git repo"
+    fi
+
+    if [ "$(id -u)" -eq 0 ]; then
+        sym='#'
+        user_bg="$_RED_BG"
+        user_fg="$_RED"
+    else
+        sym='$'
+        user_bg="$_GREEN_BG"
+        user_fg="$_GREEN"
+    fi
+
+    if command -v kubectl &>/dev/null; then
+        kctx=$(kubectl config current-context 2>/dev/null)
+        if [ -n "$kctx" ]; then
+            kctx_bg="$_SKY_BG"
+        else
+            kctx="disconnected"
+            kctx_bg="$_RED_BG"
+        fi
+    else
+        kctx="disconnected"
+        kctx_bg="$_RED_BG"
+    fi
+
+    if [ $exit_code -eq 0 ]; then
+        sym_col="$_GREEN"
+    else
+        sym_col="$_RED"
+    fi
+
+    seg_bg=() seg_fg=() seg_text=()
+
+    if [ -n "$VIRTUAL_ENV" ]; then
+        venv_name="${VIRTUAL_ENV_PROMPT:-$(basename "$VIRTUAL_ENV")}"
+        seg_bg+=("$_MAUVE_BG");   seg_fg+=("$_TEXT"); seg_text+=(" venv:${venv_name} ")
+    else
+        seg_bg+=("$_OVERLAY_BG"); seg_fg+=("$_TEXT"); seg_text+=(" venv:inactive ")
+    fi
+    seg_bg+=("$user_bg");      seg_fg+=("$_TEXT");   seg_text+=(" \u@\h ")
+    seg_bg+=("$kctx_bg");      seg_fg+=("$_TEXT");   seg_text+=(" k8s:${kctx} ")
+    seg_bg+=("$git_bg");       seg_fg+=("$_TEXT");    seg_text+=(" ${git_text} ")
+    seg_bg+=("$_BLUE_BG");     seg_fg+=("$_TEXT");     seg_text+=(" \w ")
+    seg_bg+=("$_LAVENDER_BG"); seg_fg+=("$_TEXT"); seg_text+=(" Local ${local_time} ")
+    seg_bg+=("$_TEAL_BG");     seg_fg+=("$_TEXT");     seg_text+=(" UTC ${utc_time} ")
+
+    line1="\[\e[38;2;${_OVERLAY}m\]─${_RST} \[\e[38;2;${user_fg}m\][bash]${_RST} "
+
+    prev_bg=""
+    for i in "${!seg_bg[@]}"; do
+        if [ -n "$prev_bg" ]; then
+            line1+="\[\e[48;2;${seg_bg[$i]}m\]\[\e[38;2;${prev_bg}m\]${_SEP}"
+        else
+            line1+="\[\e[48;2;${seg_bg[$i]}m\]"
+        fi
+        line1+="\[\e[38;2;${seg_fg[$i]}m\]${seg_text[$i]}"
+        prev_bg="${seg_bg[$i]}"
+    done
+    line1+="\[\e[49m\]\[\e[38;2;${prev_bg}m\]${_SEP}${_RST}"
+
+    PS1="${line1}\n\[\e[38;2;${sym_col}m\]${sym}${_RST} "
+}
+PROMPT_COMMAND='_set_prompt'
+
+# ls colours — Linux uses --color=auto and LS_COLORS (set by dircolors)
+alias ls='ls --color=auto'
+command -v dircolors &>/dev/null && eval "$(dircolors -b)"
+
+# bash-completion — package name varies by distro:
+#   Debian/Ubuntu: bash-completion   Fedora/RHEL: bash-completion
+_bc=""
+for _p in /usr/share/bash-completion/bash_completion \
+           /etc/bash_completion; do
+    [ -r "$_p" ] && { _bc="$_p"; break; }
+done
+[ -n "$_bc" ] && . "$_bc"
+unset _bc _p
+
+# Strip tab-separated descriptions from COMPREPLY (cobra/kubectl/docker output)
+_strip_comp_descriptions() {
+    local i
+    for i in "${!COMPREPLY[@]}"; do
+        COMPREPLY[$i]="${COMPREPLY[$i]%%$'\t'*}"
+    done
+}
+
+# CLI tool completions
+_bash_load_completions() {
+    type _get_comp_words_by_ref &>/dev/null || return 0
+
+    local tool output comp_fn wrapper_fn
+    for tool in kubectl helm flux kind k3d docker; do
+        if command -v "$tool" &>/dev/null; then
+            output=$("$tool" completion bash 2>/dev/null)
+            if [ -n "$output" ]; then
+                eval "$output"
+                comp_fn=$(complete -p "$tool" 2>/dev/null | sed -n 's/.*-F \([^ ]*\).*/\1/p')
+                if [ -n "$comp_fn" ]; then
+                    wrapper_fn="_nodesc_${tool}"
+                    eval "
+${wrapper_fn}() {
+    { ${comp_fn} \"\$@\"; } > /dev/null
+    _strip_comp_descriptions
+}
+"
+                    complete -F "$wrapper_fn" "$tool"
+                fi
+            fi
+        fi
+    done
+    command -v kubectl &>/dev/null && complete -o default -F __start_kubectl k
+    type _nodesc_docker &>/dev/null && complete -F _nodesc_docker d || true
+
+    local _bcd="/usr/share/bash-completion/completions"
+    if [ -r "$_bcd/git" ]; then
+        . "$_bcd/git"
+        type __git_complete &>/dev/null && __git_complete g __git_main || true
+    fi
+    [ -r "$_bcd/tmux"    ] && . "$_bcd/tmux"    && complete -F _comp_cmd_tmux  t  2>/dev/null || true
+    [ -r "$_bcd/python3" ] && . "$_bcd/python3" && complete -F _comp_cmd_python py 2>/dev/null || true
+}
+_bash_load_completions
+unset -f _bash_load_completions
+
+# Ollama completion
+if command -v ollama &>/dev/null; then
+    _ollama_bash() {
+        local cur prev
+        COMPREPLY=()
+        cur="${COMP_WORDS[COMP_CWORD]}"
+        prev="${COMP_WORDS[COMP_CWORD-1]}"
+        local subcmds="serve create show run pull push list ps cp rm help"
+        if [ "$COMP_CWORD" -eq 1 ]; then
+            COMPREPLY=($(compgen -W "$subcmds" -- "$cur"))
+            return
+        fi
+        case "$prev" in
+            run|show|cp|rm|push)
+                local models
+                models=$(ollama list 2>/dev/null | awk 'NR>1 {print $1}')
+                COMPREPLY=($(compgen -W "$models" -- "$cur"))
+                ;;
+        esac
+    }
+    complete -F _ollama_bash ollama
+fi
+
+# Aliases
+if [ -f ~/.bash_aliases ]; then
+    . ~/.bash_aliases
+fi
+
+# tmux shortcut
+alias t='tmux'
+
+# readline — set AFTER all completion loading so nothing can override these
+bind 'TAB: menu-complete'
+bind '"\e[Z": menu-complete-backward'
+bind 'set completion-ignore-case on'
+bind 'set mark-symlinked-directories on'
+bind 'set colored-stats on'
+bind 'set colored-completion-prefix on'
