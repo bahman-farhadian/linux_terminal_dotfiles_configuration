@@ -407,7 +407,7 @@ Expect `SecureBoot enabled`.
 #### 1. Install the packages
 
 ```bash
-apt install -y bash-completion btop curl ffmpeg git gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc jq keepassxc nano network-manager-openvpn-gnome openssl openvpn3-client python3 python3.13-venv tmux tree vim vlc wget xclip
+apt install -y bash-completion btop curl ffmpeg git gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc jq keepassxc nano network-manager-openvpn-gnome openssl openvpn3-client python3 python3.13-venv tmux tree vim virt-top vlc wget xclip
 ```
 
 #### 2. Install flatpak
@@ -428,6 +428,7 @@ flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.f
 - `gnome-shell-extension-manager` is the Extension Manager application. `gnome-shell-extensions` is the set of official extensions it can enable.
 - `plasma-discover-backend-flatpak` is the KDE software centre backend. On GNOME nothing uses it and it pulls in KDE libraries. Drop it unless you also run Plasma.
 - Log out and back in before flatpak applications appear in GNOME Software.
+- `virt-top` reads from libvirt. Until a libvirt daemon is installed and running it starts and shows nothing.
 
 ### Step 7 — Bash, tmux, and SSH configuration
 

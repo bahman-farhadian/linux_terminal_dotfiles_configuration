@@ -6,6 +6,21 @@ case $- in
       *) return;;
 esac
 
+# Start tmux automatically. Attaches to the first detached session if there is
+# one, otherwise starts a new one, which the tmux hook names tmuxNN. Set
+# NO_AUTO_TMUX=1 to skip it. tmux is run rather than exec'd so that a broken
+# tmux config drops you at a usable shell instead of closing the terminal.
+if [ -z "$TMUX" ] && [ -z "$NO_AUTO_TMUX" ] && command -v tmux &>/dev/null; then
+    _tmux_detached=$(tmux list-sessions -F '#{session_name} #{session_attached}' 2>/dev/null \
+                     | awk '$2 == 0 { print $1; exit }')
+    if [ -n "$_tmux_detached" ]; then
+        tmux attach-session -t "$_tmux_detached" && exit
+    else
+        tmux new-session && exit
+    fi
+    unset _tmux_detached
+fi
+
 # History — full deduplication (ignoredups + erasedups)
 HISTCONTROL=ignoredups:erasedups
 HISTSIZE=100000

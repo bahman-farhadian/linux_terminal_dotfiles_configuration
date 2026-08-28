@@ -83,6 +83,21 @@ on. A session created with an explicit name keeps it.
 Stacked panes stay equal height when one is closed, whether with `Ctrl+b x` or
 `Ctrl+d`.
 
+`.bashrc` starts tmux for every interactive terminal. It attaches to the first
+detached session if there is one, so closing a terminal window and opening a
+new one puts you back where you were. With no detached session it starts a new
+one. Opening several terminals therefore gives you `tmux01`, `tmux02`, and so
+on rather than mirrored views of one session.
+
+To open a terminal without tmux:
+
+```bash
+NO_AUTO_TMUX=1 bash
+```
+
+tmux is run rather than `exec`'d, so a broken `~/.tmux.conf` leaves you at a
+working shell instead of a terminal that closes the moment it opens.
+
 The status bar is coloured text on a dark bar rather than badges, matching the
 prompt.
 
