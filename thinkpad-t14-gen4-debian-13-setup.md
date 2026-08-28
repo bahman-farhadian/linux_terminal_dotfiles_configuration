@@ -402,36 +402,58 @@ Expect `SecureBoot enabled`.
 - A BIOS update can reset BIOS settings. If step 9 says `SecureBoot disabled`, redo Step 1.
 - If step 4 reports nothing to do, the firmware is already current. This machine shipped with `N3QET52W (1.52)`, dated 2026-04-23.
 
-### Step 6 — Bash, tmux, and SSH configuration
+### Step 6 — Packages
 
-The terminal configuration is a separate project,
-`linux_terminal_dotfiles_configuration`. It covers bash, tmux, and SSH.
-
-#### 1. Install what it needs
+#### 1. Install the packages
 
 ```bash
-apt install tmux vim git curl jq tree python3 openssl bash-completion xclip htop
+apt install -y bash-completion curl ffmpeg git gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc jq keepassxc nano network-manager-openvpn-gnome openssl openvpn3-client python3 tmux tree vim vlc wget xclip
 ```
 
-#### 2. Leave the root shell
+#### 2. Install flatpak
+
+```bash
+apt install -y flatpak gnome-software-plugin-flatpak plasma-discover-backend-flatpak
+```
+
+#### 3. Add the flathub remote
+
+```bash
+flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+```
+
+**Notes**
+
+- The package is `openvpn3-client`. There is no package called `openvpn3`.
+- `gnome-shell-extension-manager` is the Extension Manager application. `gnome-shell-extensions` is the set of official extensions it can enable.
+- `plasma-discover-backend-flatpak` is the KDE software centre backend. On GNOME nothing uses it and it pulls in KDE libraries. Drop it unless you also run Plasma.
+- Log out and back in before flatpak applications appear in GNOME Software.
+
+### Step 7 — Bash, tmux, and SSH configuration
+
+The terminal configuration is a separate project,
+`linux_terminal_dotfiles_configuration`. It covers bash, tmux, and SSH. Its
+packages are already installed in Step 6.
+
+#### 1. Leave the root shell
 
 ```bash
 exit
 ```
 
-#### 3. Get the project
+#### 2. Get the project
 
 ```bash
 git clone <repository-url> ~/dotfiles
 ```
 
-#### 4. Run the installer
+#### 3. Run the installer
 
 ```bash
 ~/dotfiles/install.sh
 ```
 
-#### 5. Reload the shell
+#### 4. Reload the shell
 
 ```bash
 exec bash
@@ -439,7 +461,7 @@ exec bash
 
 **Notes**
 
-- Step 1 needs root. Steps 3 to 5 must run as your own user. The installer writes to `$HOME`, so running it as root configures `/root` and leaves your account untouched.
+- Run this step as your own user, never as root. The installer writes to `$HOME`, so as root it configures `/root` and leaves your account untouched.
 - The installer asks whether to configure `root` as well. Answer `y` to get the same prompt, aliases, and tmux settings under `su`.
 - It is idempotent. Re-running replaces the SSH block instead of duplicating it.
 - Keep `~/dotfiles` after the install. The installer reads from it, so it is needed to re-run.
