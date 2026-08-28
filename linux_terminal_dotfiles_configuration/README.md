@@ -78,21 +78,24 @@ as root configures `/root` and leaves your account untouched.
 ## Prompt
 
 ```
-bahman@Silenus ~/project main*⇡1 venv:api k8s:prod 14:23:05
+bahman@Silenus ~/project main*⇡1 venv:api k8s:prod 18:49:36 UTC 15:49:36
 $
 ```
 
-Plain colour, no badges and no background blocks. Every segment after the path
-is conditional and is simply absent when it has nothing to report.
+Plain colour, no badges and no background blocks. Only the user name changes
+colour, so root is obvious at a glance while the host name stays put.
 
 | Segment | Colour | Shown when |
 |---|---|---|
-| `user@host` | green, red for root | always |
-| path | blue | always |
-| branch | peach | inside a git repository |
-| `venv:` | mauve | a virtualenv is active |
-| `k8s:` | sky | `kubectl` has a current context |
-| time | grey | always |
+| user | Green `#a6e3a1`, Red `#f38ba8` for root | always |
+| `@` | Overlay `#6c7086` | always |
+| host | Lavender `#b4befe` | always |
+| path | Blue `#89b4fa` | always |
+| branch | Peach `#fab387` | inside a git repository |
+| `venv:` | Mauve `#cba6f7` | a virtualenv is active |
+| `k8s:` | Sky `#89dceb` | `kubectl` has a current context |
+| local time | Overlay `#6c7086` | always |
+| `UTC` | Teal `#94e2d5` | always |
 
 Branch suffixes: `*` unstaged · `+` staged · `⇡N` ahead · `⇣N` behind · `{N}` stashes.
 The `$` turns red when the last command failed, and becomes `#` for root.

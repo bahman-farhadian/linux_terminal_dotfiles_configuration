@@ -26,18 +26,21 @@ export VIRTUAL_ENV_DISABLE_PROMPT=1
 # Catppuccin Mocha — foreground colours only, no badges
 _C_GREEN='\[\e[38;2;166;227;161m\]'
 _C_RED='\[\e[38;2;243;139;168m\]'
+_C_LAVENDER='\[\e[38;2;180;190;254m\]'
 _C_BLUE='\[\e[38;2;137;180;250m\]'
 _C_PEACH='\[\e[38;2;250;179;135m\]'
 _C_MAUVE='\[\e[38;2;203;166;247m\]'
 _C_SKY='\[\e[38;2;137;220;235m\]'
+_C_TEAL='\[\e[38;2;148;226;213m\]'
 _C_GREY='\[\e[38;2;108;112;134m\]'
 _C_RST='\[\e[0m\]'
 
-# Every segment is conditional. Outside a git repository, with no virtualenv
-# active, and with no kubectl context, the line is just user, path, and time.
+# The user name carries the privilege colour: green normally, red for root.
+# The host name keeps its own colour so it never moves. Every segment between
+# the path and the clocks is conditional and absent when it has nothing to say.
 _set_prompt() {
     local exit_code=$?
-    local line sym sym_col user_col
+    local line sym sym_col user_col utc
     local branch marks counts ahead behind stash kctx
 
     if [ "$(id -u)" -eq 0 ]; then
@@ -46,7 +49,7 @@ _set_prompt() {
         user_col="$_C_GREEN"; sym='$'
     fi
 
-    line="${user_col}\u@\h${_C_RST} ${_C_BLUE}\w${_C_RST}"
+    line="${user_col}\u${_C_GREY}@${_C_LAVENDER}\h${_C_RST} ${_C_BLUE}\w${_C_RST}"
 
     if git -C "$PWD" rev-parse --is-inside-work-tree &>/dev/null; then
         branch=$(git -C "$PWD" symbolic-ref --quiet --short HEAD 2>/dev/null \
@@ -74,7 +77,8 @@ _set_prompt() {
         [ -n "$kctx" ] && line+=" ${_C_SKY}k8s:${kctx}${_C_RST}"
     fi
 
-    line+=" ${_C_GREY}\t${_C_RST}"
+    utc=$(date -u '+%H:%M:%S')
+    line+=" ${_C_GREY}\t${_C_RST} ${_C_TEAL}UTC ${utc}${_C_RST}"
 
     if [ "$exit_code" -eq 0 ]; then sym_col="$_C_GREEN"; else sym_col="$_C_RED"; fi
     PS1="${line}\n${sym_col}${sym}${_C_RST} "
