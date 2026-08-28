@@ -9,11 +9,13 @@ Idempotent: it clears the folders it manages and rebuilds them from the current
 set of applications, so running it again after installing something puts the
 new entry in the right folder and leaves everything else where it belongs.
 
-  gnome-app-folders.py --list    show what would happen, change nothing
-  gnome-app-folders.py           apply it
+  gnome-app-folders.py --list      show what would happen, change nothing
+  gnome-app-folders.py --status    read back what is currently set
+  gnome-app-folders.py             apply it
 """
 import configparser
 import os
+import re
 import subprocess
 import sys
 
@@ -69,7 +71,35 @@ def bucket(name):
 
 
 def gsettings(*args):
-    subprocess.run(["gsettings", *args], check=True)
+    result = subprocess.run(["gsettings", *args], capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"  ! gsettings {' '.join(args)}\n    {result.stderr.strip()}", file=sys.stderr)
+    return result
+
+
+def gsettings_get(*args):
+    return subprocess.run(["gsettings", "get", *args],
+                          capture_output=True, text=True).stdout.strip()
+
+
+def current_folders():
+    """Folder ids currently registered. Handles the '@as []' empty form."""
+    return re.findall(r"'([^']*)'", gsettings_get(SCHEMA, "folder-children"))
+
+
+def show_status():
+    folders = current_folders()
+    if not folders:
+        print("no folders are configured")
+        return
+    total = 0
+    for folder in folders:
+        apps = re.findall(r"'([^']*)'",
+                          gsettings_get(f"{FOLDER_SCHEMA}:{FOLDER_PATH}/{folder}/", "apps"))
+        total += len(apps)
+        print(f"  {folder:<6} {len(apps):>3} apps")
+    print(f"\n{len(folders)} folders, {total} applications")
+    print(f"app-picker-layout: {gsettings_get('org.gnome.shell', 'app-picker-layout')[:60]}")
 
 
 def gvariant(items):
@@ -77,6 +107,10 @@ def gvariant(items):
 
 
 def main():
+    if "--status" in sys.argv:
+        show_status()
+        return
+
     preview = "--list" in sys.argv
     apps = visible_applications()
     if not apps:
@@ -97,19 +131,27 @@ def main():
         print(f"\n{len(apps)} applications in {len(order)} folders")
         return
 
-    existing = subprocess.run(["gsettings", "get", SCHEMA, "folder-children"],
-                              capture_output=True, text=True).stdout.strip()
-    for old in existing.strip("[]").replace("'", "").split(","):
-        old = old.strip()
-        if old:
-            gsettings("reset-recursively", f"{FOLDER_SCHEMA}:{FOLDER_PATH}/{old}/")
+    existing = current_folders()
+    print(f"clearing {len(existing)} existing folder(s): {' '.join(existing) or 'none'}")
+    for old in existing:
+        gsettings("reset-recursively", f"{FOLDER_SCHEMA}:{FOLDER_PATH}/{old}/")
+    gsettings("reset", SCHEMA, "folder-children")
 
     for key in order:
         path = f"{FOLDER_SCHEMA}:{FOLDER_PATH}/{key}/"
         gsettings("set", path, "name", key)
         gsettings("set", path, "apps", gvariant([d for _, d in folders[key]]))
+        print(f"  {key:<6} {len(folders[key]):>3} apps")
     gsettings("set", SCHEMA, "folder-children", gvariant(order))
-    print(f"{len(apps)} applications sorted into {len(order)} folders: {' '.join(order)}")
+
+    # GNOME Shell stores its own arrangement of the grid. While that exists it
+    # overrides the folder layout, so the folders appear to have no effect even
+    # after a log out. Clearing it makes the shell rebuild from app-folders.
+    print("resetting org.gnome.shell app-picker-layout")
+    gsettings("reset", "org.gnome.shell", "app-picker-layout")
+
+    print(f"\n{len(apps)} applications sorted into {len(order)} folders: {' '.join(order)}")
+    print("log out and back in for GNOME Shell to rebuild the grid")
 
 
 if __name__ == "__main__":

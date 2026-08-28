@@ -796,20 +796,34 @@ into.
 ./gnome-app-folders.py
 ```
 
-#### 3. Log out and log back in
+It prints each folder and its count as it goes, then resets
+`org.gnome.shell app-picker-layout`.
+
+#### 3. Read back what was written
+
+```bash
+./gnome-app-folders.py --status
+```
+
+This reads the settings, not the source files, so it shows what GNOME will
+actually use.
+
+#### 4. Log out and log back in
 
 GNOME Shell reads the folder layout when the session starts. Under Wayland the
 shell cannot be restarted on its own, so a full log out is needed.
 
-#### 4. Check
+#### 5. Check
 
 Press **Super+A**. The grid shows folders `A` to `Z`, plus `0-9` and `Other` if
 anything falls outside the alphabet.
 
 **Notes**
 
+- GNOME Shell keeps its own arrangement of the grid in `org.gnome.shell app-picker-layout`. While that exists it overrides the folder layout, so folders appear to do nothing even after a log out. The script resets it, which is what makes the change take.
 - Re-run it after installing anything. It clears the folders it manages and rebuilds them from the applications present at that moment, so a new entry lands in the right folder and nothing else moves.
 - Applications are read from every directory the desktop uses, including flatpak exports, so flatpaks are sorted alongside everything else.
 - Entries marked `NoDisplay` or `Hidden` are skipped, which is why the count is smaller than the number of `.desktop` files on disk.
 - Sorting is by the displayed name, not the file name. `org.gnome.Nautilus.desktop` is called Files, so it lands under `F`.
-- To undo it completely: `gsettings reset org.gnome.desktop.app-folders folder-children`.
+- `--status` reads the settings back. If it disagrees with `--list`, the write failed rather than the sort being wrong.
+- To undo it completely: `gsettings reset org.gnome.desktop.app-folders folder-children` followed by `gsettings reset org.gnome.shell app-picker-layout`.
