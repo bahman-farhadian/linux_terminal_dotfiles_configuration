@@ -38,6 +38,6 @@ expect.
   recommends at about 10% on their SSDs. The drive uses the space for wear
   levelling, which keeps write speed up as the disk fills.
 - Root is XFS. It handles very large files well, such as a 200 GiB qcow2 VM
-  image. XFS cannot be shrunk, so size it correctly now.
+  image. Docker runs on it too.
 - 40 GiB swap covers hibernation up to 32 GB RAM. Below that, RAM size plus a
   few GiB is enough.
