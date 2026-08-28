@@ -44,28 +44,38 @@ the **Shows as** value.
   `--storage-opt size=`, which needs the `prjquota` mount option.
 - 40 GiB swap covers hibernation up to 32 GB RAM.
 
-## Step 3 — After install: firmware updates, then Secure Boot on
+## Step 3 — After install: repositories, firmware, Secure Boot
+
+**Remove the USB stick before the first boot.** If it is still plugged in, the
+machine may start the installer again.
+
+Do these in order. Steps 10 and 11 must come last.
 
 | # | Step | How |
 |---|------|-----|
-| 1 | Update the system | `sudo apt update && sudo apt full-upgrade` |
-| 2 | Reboot | `sudo systemctl reboot` |
-| 3 | Install the updater | `sudo apt install fwupd fwupd-amd64-signed mokutil` |
-| 4 | Refresh the firmware list | `sudo fwupdmgr refresh --force` |
-| 5 | See what is available | `sudo fwupdmgr get-updates` |
-| 6 | Apply, BIOS included | `sudo fwupdmgr update` |
-| 7 | Check the new BIOS version | `hostnamectl` — compare with Step 1 |
-| 8 | Restore the keys | BIOS **F1** → `Security → Secure Boot → Restore Factory Keys` |
-| 9 | Turn Secure Boot on | Same screen → `Secure Boot` = **Enabled** → **F10** |
-| 10 | Verify | `mokutil --sb-state` → `SecureBoot enabled` |
+| 1 | Add contrib and non-free | In `/etc/apt/sources.list.d/debian.sources`, set every `Components:` line to `main contrib non-free non-free-firmware` |
+| 2 | Check the file | `cat /etc/apt/sources.list.d/debian.sources` |
+| 3 | Update the system | `sudo apt update && sudo apt full-upgrade` |
+| 4 | Reboot | `sudo systemctl reboot` |
+| 5 | Install the updater | `sudo apt install fwupd fwupd-amd64-signed mokutil` |
+| 6 | Refresh the firmware list | `sudo fwupdmgr refresh --force` |
+| 7 | See what is available | `sudo fwupdmgr get-updates` |
+| 8 | Apply, BIOS included | `sudo fwupdmgr update` |
+| 9 | Check the new BIOS version | `hostnamectl` — compare with Step 1 |
+| 10 | Restore the keys | BIOS **F1** → `Security → Secure Boot → Restore Factory Keys` → **Yes** |
+| 11 | Confirm and save | Same screen: `Secure Boot` = **Enabled** → **F10** |
+| 12 | Verify | `mokutil --sb-state` → `SecureBoot enabled` |
 
 **Notes**
 
 - Keep the charger plugged in. Never power off during a firmware update.
-- Do the firmware update first. A BIOS update can reset BIOS settings, and
-  that would undo Secure Boot.
-- Step 6 may reboot the machine more than once. This is normal.
+- Do the firmware update before step 10. A BIOS update can reset BIOS settings.
+- Step 8 may reboot the machine more than once. This is normal.
+- Step 1 as a one-liner:
+  `sudo sed -i -E 's/^Components:.*/Components: main contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources`
 - `fwupd-amd64-signed` holds the signed EFI file. Without it, firmware updates
   stop working once Secure Boot is on.
-- Debian's boot files are already signed by Microsoft's key, so the factory
-  keys are all you need.
+- Step 1 of this guide only deleted the keys. `Secure Boot` itself stayed
+  **Enabled**, so restoring the keys makes it enforce again.
+- Debian's boot files are signed by Microsoft's key. The factory keys are all
+  you need.
