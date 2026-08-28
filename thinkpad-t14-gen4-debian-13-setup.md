@@ -27,7 +27,7 @@ the **Shows as** value.
 
 | # | Partition | Size | Enter as | Shows as | Format | Mount |
 |---|-----------|------|----------|----------|--------|-------|
-| 1 | EFI | 1 GiB | `1075 MB` | 1.1 GB | FAT32, `esp` flag | `/boot/efi` |
+| 1 | EFI | 1 GiB | `1075 MB` | 1.1 GB | EFI System Partition | `/boot/efi` |
 | 2 | Boot | 2 GiB | `2147 MB` | 2.1 GB | ext4 | `/boot` |
 | 3 | Root | 888 GiB | `953483 MB` | 953.5 GB | xfs | `/` |
 
@@ -37,8 +37,8 @@ Leave the rest of the disk unpartitioned.
 
 ```
 Disk          953.87 GiB
-Root          888.00 GiB
-EFI + boot      3.00 GiB
+EFI + boot   -   3.00 GiB
+Root         - 888.00 GiB
 ------------------------
 Free           62.87 GiB   6.6%
 ```
@@ -57,6 +57,7 @@ as the disk fills. Samsung suggests about 10%. To reach it, use a root of
 - For any other size: type `GiB x 1073.741824` MB, rounded.
 - No swap partition. Hibernation needs swap, and hibernation does not work
   while Secure Boot is on. See the note in Step 3.
+- The installer warns that no swap space is selected. Continue anyway.
 - XFS handles big files well, like a 200 GiB qcow2 image.
 - Docker runs on XFS. It can also cap container size with
   `--storage-opt size=`, which needs the `prjquota` mount option.
@@ -126,6 +127,9 @@ Add `rootflags=uquota,pquota` inside `GRUB_CMDLINE_LINUX`:
 GRUB_CMDLINE_LINUX="rootflags=uquota,pquota"
 ```
 
+On a fresh install that line is empty. If it already has something in it, keep
+what is there and add this after a space.
+
 Apply it:
 
 ```bash
@@ -183,10 +187,13 @@ Compare with what you wrote down in Step 1.
 
 **Notes**
 
-- `efi-readvar -v PK` reports `no entries` on this machine. That is normal
+- `efi-readvar -v PK` (package `efitools`) reports `no entries` on this machine. That is normal
   while `Secure Boot Key State` is `Standard`. The firmware keeps its keys
   internal.
-- If Secure Boot is off, go back to Step 1 and check the 3rd party CA.
+- If step 6 says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the
+  BIOS. Turn it back on under `Security → Secure Boot`.
+- The 3rd party CA is a different problem. It does not turn Secure Boot off —
+  it stops the machine booting at all, with `Invalid signature detected`.
 - Hibernation does not work while Secure Boot is on. The kernel locks itself
   down and refuses to write the resume image, because it cannot check that the
   swap was not modified while the machine was off. Suspend works normally.
