@@ -75,15 +75,20 @@ as root configures `/root` and leaves your account untouched.
 | `q` / `Esc` | Exit copy-mode |
 | `F12` | Toggle nested-tmux passthrough |
 
+Windows, panes, and sessions all count from 1. tmux has no `session-base-index`
+option, so a `session-created` hook renames the first session from `0` to `1`.
+
+The status bar is coloured text on a dark bar rather than badges, matching the
+prompt.
+
 ## Prompt
 
 ```
-bahman@Silenus ~/project main*⇡1 venv:api k8s:prod
-$
+bahman@Silenus ~/project main*⇡1 venv:api k8s:prod $
 ```
 
-Plain colour, no badges and no background blocks. No clock — use `date` when
-you want one. Only the user name changes colour, so root is obvious at a glance
+One line, plain colour, no badges and no background blocks. No clock — use
+`date` when you want one. Only the user name changes colour, so root is obvious at a glance
 while the host name stays put.
 
 | Segment | Colour | Shown when |
