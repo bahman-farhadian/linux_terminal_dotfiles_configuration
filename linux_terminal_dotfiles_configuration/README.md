@@ -190,6 +190,104 @@ whether `sudo` is needed: as root they run the commands directly, otherwise thro
 to it, so only the named layouts remain. They take effect immediately, with no
 log out.
 
+`install.sh` writes `~/.local/bin/lock-keyboard-en.sh` and runs it two ways.
+
+`lock-keyboard-en.service` watches for the screen locking and, whatever layout
+was active, switches to English. German is dropped from the list; Persian stays
+in the list but is deselected. Already English does nothing.
+
+`keyboard-en-tick.timer` runs every 10 minutes whether the screen is locked or
+not. It acts only when the layout list is already the English pair and Persian
+is the selected one, and then selects English. It leaves German alone, since
+German is only active if it was chosen deliberately.
+
+| State | On lock | Every 10 min |
+|---|---|---|
+| German | switch to English | nothing |
+| Persian | select English | select English |
+| English | nothing | nothing |
+
+Both are per-user: the settings, the services and the session bus all belong to
+your login, so none of it applies to a root shell.
+
+To open a terminal without tmux:
+
+```bash
+NO_AUTO_TMUX=1 bash
+```
+
+tmux is run rather than `exec`'d, so a broken `~/.tmux.conf` leaves you at a
+working shell instead of a terminal that closes the moment it opens.
+
+The status bar is coloured text rather than badges, matching the prompt, and
+uses `bg=default` so it takes the terminal's own background. A terminal window
+whose height is not an exact multiple of the character cell leaves a strip
+below the last row; any fixed background colour on the bar shows up as a seam
+against it.
+
+## Prompt
+
+```
+bahman @ Silenus ~/project main*⇡1 venv:api k8s:prod $
+```
+
+One line, plain colour, no badges and no background blocks. No clock — use
+`date` when you want one. Only the user name changes colour, so root is obvious at a glance
+while the host name stays put.
+
+| Segment | Colour | Shown when |
+|---|---|---|
+| user | Green `#a6e3a1`, Red `#f38ba8` for root | always |
+| `@` | Overlay0 `#6c7086` | always |
+| host | Yellow `#f9e2af` | always |
+| path | Blue `#89b4fa` | always |
+| branch | Peach `#fab387` | inside a git repository |
+| `venv:` | Mauve `#cba6f7` | a virtualenv is active |
+| `k8s:` | Sky `#89dceb` | `kubectl` has a current context |
+
+Branch suffixes carry their own colour: `*` unstaged is Red, `+` staged is
+Green, `⇡N` ahead and `⇣N` behind are Sky, `{N}` stashes is Flamingo.
+The `$` turns red when the last command failed, and becomes `#` for root.
+
+Needs a true-colour terminal. GNOME Terminal qualifies.
+
+## Aliases
+
+| Alias | Action |
+|---|---|
+| `update` | refresh apt sources, list what apt and flatpak would upgrade |
+| `upgrade` | upgrade apt and flatpak, then autoremove, purge and drop unused runtimes |
+| `c` / `reload` | clear / restart the shell |
+| `t` | tmux |
+| `v` | vim |
+| `b` | btop, or htop if btop is missing |
+| `ll` / `l` / `la` | listings |
+| `nekoray` | root only — starts nekoray with its icon |
+| `DE` | keyboard: German only |
+| `EN` | keyboard: US English and Persian |
+| `kbd` | show the current input sources |
+| `pubkey` | print the first SSH public key |
+| `password` | random base64-48 string |
+| `pubip` / `privip` | external / private IP |
+| `ports` | listening TCP and UDP sockets, with the process holding each |
+| `cpy` | pipe filter — `cmd 2>&1 \| cpy` prints and copies |
+
+`nekoray` is defined only when the shell is root and the binary is present, so
+it never appears for an ordinary user where it would start and then fail on the
+tunnel. It runs from `/nekoray`, because the binary loads `geoip.dat`,
+`geosite.dat` and `config/` by relative path, and backgrounds itself the way the
+bundled launcher does. It passes no icon: the application sets an
+empty one itself after Qt reads the command line, so `_NET_WM_ICON` is empty
+whatever is given. Only a `.desktop` file can supply an icon for it.
+
+`ports`, `update` and `upgrade` are functions, not aliases, because they decide
+whether `sudo` is needed: as root they run the commands directly, otherwise through
+`sudo`. `update` changes nothing beyond refreshing the package lists.
+
+`DE` and `EN` replace the GNOME input source list outright rather than adding
+to it, so only the named layouts remain. They take effect immediately, with no
+log out.
+
 `install.sh` also writes `~/.local/bin/lock-keyboard-en.sh` and a matching
 systemd user service that watches for the screen locking and switches to English the moment it
 happens, whatever layout was active. The unlock prompt is then never left on a
