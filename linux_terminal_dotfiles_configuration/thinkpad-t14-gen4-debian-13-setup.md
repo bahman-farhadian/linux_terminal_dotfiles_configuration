@@ -412,7 +412,6 @@ flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.f
 **Notes**
 
 - Log out and back in before flatpak applications appear in GNOME Software.
-- Do not install `plasma-discover-backend-flatpak`. It depends on `plasma-discover`, so it drags the KDE software centre and the KDE Frameworks stack onto a GNOME system. `gnome-software-plugin-flatpak` is the GNOME equivalent.
 - `virt-top` reads from libvirt. Until libvirt is installed and running it shows nothing.
 
 ### Step 7 — Bash, tmux, and SSH configuration
