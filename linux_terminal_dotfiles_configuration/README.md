@@ -69,14 +69,19 @@ as root configures `/root` and leaves your account untouched.
 | `Ctrl+b` + arrows | Pane focus |
 | `Ctrl+b` + `"` | Stacked pane, heights equalized |
 | `Ctrl+b` + `x` | Close pane, heights equalized |
+| `Ctrl+d` | Exit the shell, heights equalized |
 | `Ctrl+b` + `Space` | Cycle layouts |
 | `Ctrl+b` + `@` | Toggle synchronize-panes — borders turn red |
 | `PgUp` / `PgDn` | Enter / scroll copy-mode |
 | `q` / `Esc` | Exit copy-mode |
 | `F12` | Toggle nested-tmux passthrough |
 
-Windows, panes, and sessions all count from 1. tmux has no `session-base-index`
-option, so a `session-created` hook renames the first session from `0` to `1`.
+Windows and panes count from 1. tmux has no `session-base-index` option, so a
+`session-created` hook renames unnamed sessions to `tmux01`, `tmux02`, and so
+on. A session created with an explicit name keeps it.
+
+Stacked panes stay equal height when one is closed, whether with `Ctrl+b x` or
+`Ctrl+d`.
 
 The status bar is coloured text on a dark bar rather than badges, matching the
 prompt.

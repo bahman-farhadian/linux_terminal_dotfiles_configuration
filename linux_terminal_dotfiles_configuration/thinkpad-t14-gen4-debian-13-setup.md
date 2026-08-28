@@ -407,7 +407,7 @@ Expect `SecureBoot enabled`.
 #### 1. Install the packages
 
 ```bash
-apt install -y bash-completion curl ffmpeg git gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc jq keepassxc nano network-manager-openvpn-gnome openssl openvpn3-client python3 tmux tree vim vlc wget xclip
+apt install -y bash-completion btop curl ffmpeg git gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc jq keepassxc nano network-manager-openvpn-gnome openssl openvpn3-client python3 python3.13-venv tmux tree vim vlc wget xclip
 ```
 
 #### 2. Install flatpak
