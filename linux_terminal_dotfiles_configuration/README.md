@@ -95,22 +95,11 @@ new one puts you back where you were. With no detached session it starts a new
 one. Opening several terminals therefore gives you `tmux01`, `tmux02`, and so
 on rather than mirrored views of one session.
 
-It is skipped over SSH. A small remote client attaching to the same session
-makes tmux size the windows to fit both, which leaves the rows below the status
-bar unpainted in the larger local window. Run `tmux` by hand on the remote
-side. `window-size largest` is set as a second line of defence, so a shared
-session follows the biggest client rather than the most recent one.
-
-When you do want tmux over SSH, give it its own session rather than joining the
-desktop one:
-
-```bash
-tmux new-session -A -s remote
-```
-
-Two clients on one session make tmux hold the window at the larger client's
-size, so the smaller one sees a cropped view, and the larger one can be left
-with an unpainted band between the pane and the status bar.
+Over SSH it attaches to a session named `ssh` instead, creating it if needed,
+and a local shell never picks that session up. Each session then follows its
+own terminal size. Sharing one session between a remote and a local client
+makes tmux size the windows for both, which crops the smaller one and leaves an
+unpainted band in the larger.
 
 To open a terminal without tmux:
 

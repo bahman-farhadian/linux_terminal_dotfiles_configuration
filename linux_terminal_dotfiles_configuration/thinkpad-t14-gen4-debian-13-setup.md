@@ -394,7 +394,7 @@ Expect `SecureBoot enabled`.
 #### 1. Install the packages
 
 ```bash
-apt install -y bash-completion btop curl ffmpeg git gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc jq keepassxc nano network-manager-openvpn-gnome openssl openvpn3-client python3 python3.13-venv tmux tree vim virt-top vlc wget xclip
+apt install -y bash-completion btop curl ffmpeg fonts-jetbrains-mono git gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc jq keepassxc nano network-manager-openvpn-gnome openssl openvpn3-client python3 python3.13-venv tmux tree vim virt-top vlc wget xclip
 ```
 
 #### 2. Install flatpak
@@ -412,6 +412,8 @@ flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.f
 **Notes**
 
 - Log out and back in before flatpak applications appear in GNOME Software.
+- `fonts-jetbrains-mono` installs JetBrains Mono from the Debian archive, so the download at jetbrains.com/lp/mono is not needed. Select it in `Terminal → Preferences → Profile → Text → Custom font`.
+- Font size changes the terminal cell height. A window whose height is not an exact multiple of that leaves a thin unpainted strip under the last row, so the size is worth tuning.
 - `virt-top` reads from libvirt. Until libvirt is installed and running it shows nothing.
 
 ### Step 7 — Bash, tmux, and SSH configuration
