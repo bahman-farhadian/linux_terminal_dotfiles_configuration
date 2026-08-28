@@ -67,11 +67,15 @@ if [ "$(id -u)" -eq 0 ] && [ -x /nekoray/nekoray ]; then
         # config/ by relative path, which is why the launcher execs ./nekoray.
         # Backgrounded and detached so it behaves like the launcher and does not
         # hold the terminal.
+        #
+        # No -qwindowicon here: the application calls setWindowIcon() with an
+        # empty icon after Qt has read the command line, so _NET_WM_ICON comes
+        # out empty whatever is passed. Only a .desktop file can give it an icon.
         (
             cd /nekoray || return
             LD_LIBRARY_PATH=/nekoray/usr/lib \
             QT_PLUGIN_PATH=/nekoray/usr/plugins \
-            setsid ./nekoray -qwindowicon /nekoray/nekoray.png >/dev/null 2>&1 &
+            setsid ./nekoray >/dev/null 2>&1 &
         )
     }
 fi

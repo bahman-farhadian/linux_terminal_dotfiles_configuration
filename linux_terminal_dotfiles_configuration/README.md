@@ -178,8 +178,9 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 it never appears for an ordinary user where it would start and then fail on the
 tunnel. It runs from `/nekoray`, because the binary loads `geoip.dat`,
 `geosite.dat` and `config/` by relative path, and backgrounds itself the way the
-bundled launcher does. `-qwindowicon` is a Qt option and gives the window an
-icon.
+bundled launcher does. It passes no icon: the application sets an
+empty one itself after Qt reads the command line, so `_NET_WM_ICON` is empty
+whatever is given. Only a `.desktop` file can supply an icon for it.
 
 `ports`, `update` and `upgrade` are functions, not aliases, because they decide
 whether `sudo` is needed: as root they run the commands directly, otherwise through
