@@ -161,8 +161,14 @@ export DBUS_SESSION_BUS_ADDRESS
 EN_SOURCES="[('xkb', 'us'), ('xkb', 'ir')]"
 
 set_english() {
-    [ "$(gsettings get org.gnome.desktop.input-sources sources 2>/dev/null)" = "$EN_SOURCES" ] && return
-    gsettings set org.gnome.desktop.input-sources sources "$EN_SOURCES"
+    [ "$(gsettings get org.gnome.desktop.input-sources sources 2>/dev/null)" = "$EN_SOURCES" ] ||
+        gsettings set org.gnome.desktop.input-sources sources "$EN_SOURCES"
+
+    # Setting the list does not change which entry is selected. German drops out
+    # of the list so the selection falls back on its own, but Persian is still
+    # in it and stays active unless the index is moved to the first entry.
+    [ "$(gsettings get org.gnome.desktop.input-sources current 2>/dev/null)" = "uint32 0" ] ||
+        gsettings set org.gnome.desktop.input-sources current 0
 }
 
 # If the screen is already locked when this starts, act immediately.

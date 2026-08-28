@@ -184,6 +184,11 @@ unlocked.
 It watches the lock signal rather than polling. A timer only notices the lock on
 its next tick, which is too late to be any use.
 
+It sets both the input source list and the selected index. Setting the list
+alone is not enough: German disappears from it and the selection falls back on
+its own, but Persian stays in the list and stays active unless the index is
+moved.
+
 **Git:** `g gs ga gaa gc gca gco gcob gb gl gd gds gp gpf gpl gpr gst gstp gstl gf grb gcp gwip`
 
 **Python:** `py pip piv va vd pipi pipr pipff jn jl`
