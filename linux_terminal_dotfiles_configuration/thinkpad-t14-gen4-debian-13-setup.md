@@ -417,7 +417,7 @@ su -
 #### 2. Install the packages
 
 ```bash
-apt install -y bash-completion bridge-utils btop curl duf ethtool ffmpeg filezilla foliate git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc lshw nano network-manager-openvpn-gnome nmap obs-studio openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip
+apt install -y bash-completion bridge-utils btop curl duf ethtool ffmpeg filezilla foliate git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc lshw nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip
 ```
 
 #### 3. Install flatpak
@@ -458,6 +458,7 @@ flatpak install -y flathub org.telegram.desktop com.belmoussaoui.Obfuscate md.ob
 - The terminal uses JetBrains Mono at size 14. Either `apt install -y fonts-jetbrains-mono` or download it from jetbrains.com/lp/mono, then select it under `Terminal → Preferences → Profile → Text → Custom font`.
 - Font size changes the terminal cell height. A window whose height is not an exact multiple of that leaves a thin unpainted strip under the last row, so the size is worth tuning.
 - `gnome-firmware` is the graphical front end for the `fwupd` work in Step 5. It shows the same devices and updates as `fwupdmgr`.
+- `net-tools` provides `netstat`, `ifconfig` and `route`. They are superseded by `ss` and `ip` from `iproute2`, which is already installed, but the old names are still what most documentation uses.
 - `virt-top` reads from libvirt. Until libvirt is installed and running it shows nothing.
 
 ### Step 7 — Bash, tmux, and SSH configuration
@@ -908,3 +909,35 @@ The uptime must have kept counting, with no resume in between.
 - The three settings cover the three cases logind separates: on battery, on external power, and docked. Setting only the first leaves the machine suspending whenever it is plugged in.
 - Reboot rather than `systemctl restart systemd-logind`. Restarting it can end the graphical session.
 - GNOME delegates the lid to logind, so `ignore` stops the suspend. GNOME's own blank and lock timeouts still apply and are set in Settings.
+
+### Step 12 — Visual Studio Code extensions
+
+A suggested set, not a requirement. Visual Studio Code is not in the Debian
+archive and is not installed by this guide, so `code` must already be on the
+machine.
+
+#### 1. Check the CLI is available
+
+```bash
+code --version
+```
+
+#### 2. Install the extensions
+
+```bash
+code --install-extension anthropic.claude-code --install-extension inferrinizzard.prettier-sql-vscode --install-extension mechatroner.rainbow-csv --install-extension mongodb.mongodb-vscode --install-extension ms-azuretools.vscode-containers --install-extension ms-azuretools.vscode-docker --install-extension ms-kubernetes-tools.vscode-kubernetes-tools --install-extension ms-python.autopep8 --install-extension ms-python.debugpy --install-extension ms-python.flake8 --install-extension ms-python.pylint --install-extension ms-python.python --install-extension ms-python.vscode-pylance --install-extension ms-python.vscode-python-envs --install-extension ms-toolsai.datawrangler --install-extension ms-toolsai.jupyter --install-extension ms-toolsai.jupyter-keymap --install-extension ms-toolsai.jupyter-renderers --install-extension ms-toolsai.vscode-jupyter-cell-tags --install-extension ms-toolsai.vscode-jupyter-slideshow --install-extension ms-vscode-remote.remote-containers --install-extension ms-vscode-remote.remote-ssh --install-extension ms-vscode-remote.remote-ssh-edit --install-extension ms-vscode.makefile-tools --install-extension ms-vscode.remote-explorer --install-extension openai.chatgpt --install-extension redhat.vscode-xml --install-extension redhat.vscode-yaml
+```
+
+#### 3. Check what is installed
+
+```bash
+code --list-extensions
+```
+
+**Notes**
+
+- Run this as your own user. Extensions install into `~/.vscode/extensions`, so as root they land in `/root` and your account does not get them.
+- `--install-extension` may be repeated, so all of them go in one command. Extensions already present are left alone, which makes this safe to re-run.
+- To capture the set from a machine you have already configured: `code --list-extensions | sed 's/^/code --install-extension /'`.
+- Pin versions with `code --list-extensions --show-versions` if the list needs to be reproducible rather than current.
+
