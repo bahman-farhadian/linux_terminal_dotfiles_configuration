@@ -313,8 +313,8 @@ sudo systemctl reboot
 sudo fwupdmgr get-updates
 ```
 
-Every device must appear under `Devices with no available firmware updates`.
-If anything is still listed under an update heading, repeat from step 5.
+The last line must read `No updates available`. If it does not, repeat from
+step 5.
 
 #### 8. Check the new BIOS version
 
@@ -336,6 +336,7 @@ Expect `SecureBoot enabled`.
 - Never power off during a firmware update.
 - Firmware is written during the reboot, not by `fwupdmgr update`. Steps 5 to 7 are one round. Repeat the round until step 7 comes back clean.
 - `System Firmware` is the BIOS. The other entries are the management engine, the SSD, the camera, the fingerprint reader, and the UEFI revocation list.
+- Two headings mean the same thing. `Devices with no available firmware updates` and `Devices with the latest available firmware version` are both fine. Only the last line decides.
 - `UEFI dbx` is Microsoft's revocation list. It is a normal update, but step 9 exists to confirm the machine still boots with Secure Boot on afterwards.
 - `fwupd-amd64-signed` holds the Debian-signed EFI file. Without it, firmware updates stop working while Secure Boot is on.
 - A BIOS update can reset BIOS settings. If step 9 says `SecureBoot disabled`, redo Step 1.
