@@ -97,6 +97,11 @@ new one puts you back where you were. With no detached session it starts a new
 one. Opening several terminals therefore gives you `tmux01`, `tmux02`, and so
 on rather than mirrored views of one session.
 
+`window-size` is set to `smallest`, so the session fits the smallest attached
+client and a larger one fills the leftover area with dots. The tmux default,
+`latest`, resizes the session every time you use a different client, which makes
+the pane sizes move around as you switch between the terminal and SSH.
+
 Over SSH it attaches to a session named `ssh` instead, creating it if needed,
 and a local shell never picks that session up. Each session then follows its
 own terminal size. Sharing one session between a remote and a local client
@@ -171,8 +176,10 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 
 `nekoray` is defined only when the shell is root and the binary is present, so
 it never appears for an ordinary user where it would start and then fail on the
-tunnel. It sets the same two variables `/nekoray/launcher` does and adds
-`-qwindowicon`, a Qt option, so the window carries an icon.
+tunnel. It runs from `/nekoray`, because the binary loads `geoip.dat`,
+`geosite.dat` and `config/` by relative path, and backgrounds itself the way the
+bundled launcher does. `-qwindowicon` is a Qt option and gives the window an
+icon.
 
 `ports`, `update` and `upgrade` are functions, not aliases, because they decide
 whether `sudo` is needed: as root they run the commands directly, otherwise through

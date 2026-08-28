@@ -62,7 +62,18 @@ upgrade() {
 # /nekoray/launcher sets before it execs the binary; -qwindowicon is a Qt option
 # and gives the window the icon shipped alongside it.
 if [ "$(id -u)" -eq 0 ] && [ -x /nekoray/nekoray ]; then
-    alias nekoray='LD_LIBRARY_PATH=/nekoray/usr/lib QT_PLUGIN_PATH=/nekoray/usr/plugins /nekoray/nekoray -qwindowicon /nekoray/nekoray.png'
+    nekoray() {
+        # Must run from /nekoray: the binary loads geoip.dat, geosite.dat and
+        # config/ by relative path, which is why the launcher execs ./nekoray.
+        # Backgrounded and detached so it behaves like the launcher and does not
+        # hold the terminal.
+        (
+            cd /nekoray || return
+            LD_LIBRARY_PATH=/nekoray/usr/lib \
+            QT_PLUGIN_PATH=/nekoray/usr/plugins \
+            setsid ./nekoray -qwindowicon /nekoray/nekoray.png >/dev/null 2>&1 &
+        )
+    }
 fi
 
 # Keyboard layout — replaces the GNOME input source list outright, so only the
