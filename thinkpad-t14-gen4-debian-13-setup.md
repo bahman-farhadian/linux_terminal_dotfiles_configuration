@@ -10,23 +10,13 @@
 | 4 | Verify | Same screen: `Platform Mode` = **Setup Mode** |
 | 5 | Save and exit | **F10** → **Yes** |
 
-### Notes
+**Notes**
 
-**What step 3 does.** It erases the Platform Key (PK) and the KEK, `db`, and
-`dbx` key databases. With no PK present, the firmware stops enforcing Secure
-Boot and allows the key variables to be written from the operating system.
-That is what makes it possible to enroll your own keys in a later step.
-
-**This is a temporary state.** Setup Mode means Secure Boot is not enforcing
-and anything can write to the key store. Do not leave the machine like this.
-
-**If step 3 is greyed out.** Check that `Secure Boot` is set to `Enabled` on
-the same screen — on some BIOS versions the key operations are only selectable
-while it is on. I have not confirmed this for this specific model.
-
-**To abort and go back to stock.** `Security → Secure Boot → Restore Factory
-Keys` reinstalls the Lenovo and Microsoft keys and returns the machine to its
-shipped configuration.
-
-**Menu wording.** Labels vary between BIOS versions. Everything in this step is
-on the `Security → Secure Boot` screen.
+- Step 3 deletes all Secure Boot keys. With no keys, the firmware stops
+  checking, so you can add your own later.
+- Secure Boot is off in Setup Mode. Do not stay here — a later step fixes it.
+- Step 3 greyed out? Set `Secure Boot` to `Enabled` first. Not confirmed on
+  this model.
+- To undo: `Restore Factory Keys` puts the stock keys back.
+- Labels differ between BIOS versions. Everything is on the same
+  `Security → Secure Boot` screen.
