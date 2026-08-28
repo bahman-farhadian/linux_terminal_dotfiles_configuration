@@ -423,9 +423,17 @@ apt install -y flatpak gnome-software-plugin-flatpak
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 ```
 
+#### 5. Install the flatpak applications
+
+```bash
+flatpak install -y flathub org.telegram.desktop com.belmoussaoui.Obfuscate md.obsidian.Obsidian io.gitlab.adhami3310.Impression
+```
+
 **Notes**
 
 - Log out and back in before flatpak applications appear in GNOME Software.
+- The four flatpaks are Telegram, Obfuscate for redacting screenshots, Obsidian for notes, and Impression for writing bootable USB images.
+- `flatpak install` takes several application IDs at once, and `-y` stops it asking to confirm each one. Installed as root, they are available to every user.
 - The terminal uses JetBrains Mono at size 14. Either `apt install -y fonts-jetbrains-mono` or download it from jetbrains.com/lp/mono, then select it under `Terminal → Preferences → Profile → Text → Custom font`.
 - Font size changes the terminal cell height. A window whose height is not an exact multiple of that leaves a thin unpainted strip under the last row, so the size is worth tuning.
 - `gnome-firmware` is the graphical front end for the `fwupd` work in Step 5. It shows the same devices and updates as `fwupdmgr`.
