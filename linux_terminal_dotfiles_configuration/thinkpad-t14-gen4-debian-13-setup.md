@@ -808,7 +808,13 @@ into.
 ```
 
 It prints each folder and its count as it goes, then resets
-`org.gnome.shell app-picker-layout`.
+`org.gnome.shell app-picker-layout`. The dock is left alone.
+
+To empty the pinned dock at the same time:
+
+```bash
+./gnome-app-folders.py --clear-dock
+```
 
 #### 3. Read back what was written
 
@@ -836,5 +842,6 @@ anything falls outside the alphabet.
 - Applications are read from every directory the desktop uses, including flatpak exports, so flatpaks are sorted alongside everything else.
 - Entries marked `NoDisplay` or `Hidden` are skipped, which is why the count is smaller than the number of `.desktop` files on disk.
 - Sorting is by the displayed name, not the file name. `org.gnome.Nautilus.desktop` is called Files, so it lands under `F`.
+- `--clear-dock` also unpins everything from the dock. It is off by default, so a normal run never changes the dock.
 - `--status` reads the settings back. If it disagrees with `--list`, the write failed rather than the sort being wrong.
 - To undo it completely: `gsettings reset org.gnome.desktop.app-folders folder-children` followed by `gsettings reset org.gnome.shell app-picker-layout`.

@@ -9,9 +9,12 @@ Idempotent: it clears the folders it manages and rebuilds them from the current
 set of applications, so running it again after installing something puts the
 new entry in the right folder and leaves everything else where it belongs.
 
-  gnome-app-folders.py --list      show what would happen, change nothing
-  gnome-app-folders.py --status    read back what is currently set
-  gnome-app-folders.py             apply it
+  gnome-app-folders.py --list        show what would happen, change nothing
+  gnome-app-folders.py --status      read back what is currently set
+  gnome-app-folders.py               apply it
+  gnome-app-folders.py --clear-dock  apply it and also empty the pinned dock
+
+The dock is never touched unless --clear-dock is given.
 """
 import configparser
 import os
@@ -22,6 +25,7 @@ import sys
 SCHEMA = "org.gnome.desktop.app-folders"
 FOLDER_SCHEMA = "org.gnome.desktop.app-folders.folder"
 FOLDER_PATH = "/org/gnome/desktop/app-folders/folders"
+SHELL_SCHEMA = "org.gnome.shell"
 
 
 def application_dirs():
@@ -99,7 +103,11 @@ def show_status():
         total += len(apps)
         print(f"  {folder:<6} {len(apps):>3} apps")
     print(f"\n{len(folders)} folders, {total} applications")
-    print(f"app-picker-layout: {gsettings_get('org.gnome.shell', 'app-picker-layout')[:60]}")
+    print(f"app-picker-layout: {gsettings_get(SHELL_SCHEMA, 'app-picker-layout')[:60]}")
+    pinned = re.findall(r"'([^']*)'", gsettings_get(SHELL_SCHEMA, "favorite-apps"))
+    print(f"pinned to the dock: {len(pinned)}")
+    for app in pinned:
+        print(f"  {app}")
 
 
 def gvariant(items):
@@ -112,6 +120,7 @@ def main():
         return
 
     preview = "--list" in sys.argv
+    clear_dock = "--clear-dock" in sys.argv
     apps = visible_applications()
     if not apps:
         sys.exit("no .desktop entries found — is this a desktop session?")
@@ -129,6 +138,11 @@ def main():
             for name, desktop_id in folders[key]:
                 print(f"  {name}  ({desktop_id})")
         print(f"\n{len(apps)} applications in {len(order)} folders")
+        if clear_dock:
+            pinned = re.findall(r"'([^']*)'", gsettings_get(SHELL_SCHEMA, "favorite-apps"))
+            print(f"would also unpin {len(pinned)} application(s) from the dock")
+        else:
+            print("the dock would be left alone (pass --clear-dock to empty it)")
         return
 
     existing = current_folders()
@@ -149,6 +163,12 @@ def main():
     # after a log out. Clearing it makes the shell rebuild from app-folders.
     print("resetting org.gnome.shell app-picker-layout")
     gsettings("reset", "org.gnome.shell", "app-picker-layout")
+
+    # The dock is a separate setting and is deliberately left alone unless asked.
+    if clear_dock:
+        pinned = re.findall(r"'([^']*)'", gsettings_get(SHELL_SCHEMA, "favorite-apps"))
+        print(f"unpinning {len(pinned)} application(s) from the dock")
+        gsettings("set", SHELL_SCHEMA, "favorite-apps", "[]")
 
     print(f"\n{len(apps)} applications sorted into {len(order)} folders: {' '.join(order)}")
     print("log out and back in for GNOME Shell to rebuild the grid")
