@@ -417,7 +417,7 @@ su -
 #### 2. Install the packages
 
 ```bash
-apt install -y bash-completion bridge-utils btop curl duf ethtool ffmpeg filezilla foliate git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc lshw nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip
+apt install -y bash-completion bridge-utils btop curl default-jre duf ethtool ffmpeg filezilla foliate git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc lshw nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip
 ```
 
 #### 3. Install flatpak
@@ -458,6 +458,7 @@ flatpak install -y flathub org.telegram.desktop com.belmoussaoui.Obfuscate md.ob
 - The terminal uses JetBrains Mono at size 14. Either `apt install -y fonts-jetbrains-mono` or download it from jetbrains.com/lp/mono, then select it under `Terminal → Preferences → Profile → Text → Custom font`.
 - Font size changes the terminal cell height. A window whose height is not an exact multiple of that leaves a thin unpainted strip under the last row, so the size is worth tuning.
 - `gnome-firmware` is the graphical front end for the `fwupd` work in Step 5. It shows the same devices and updates as `fwupdmgr`.
+- `default-jre` runs `.jar` files with `java -jar`. It pulls OpenJDK 21. The headless variant is not used because a jar that opens a window fails at runtime under it rather than at install time.
 - `net-tools` provides `netstat`, `ifconfig` and `route`. They are superseded by `ss` and `ip` from `iproute2`, which is already installed, but the old names are still what most documentation uses.
 - `virt-top` reads from libvirt. Until libvirt is installed and running it shows nothing.
 
