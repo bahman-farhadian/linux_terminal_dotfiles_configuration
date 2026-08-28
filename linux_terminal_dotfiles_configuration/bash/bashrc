@@ -14,7 +14,11 @@ esac
 # a local client makes tmux size the windows for both, which crops the smaller
 # and leaves an unpainted band in the larger. Separate sessions each follow
 # their own terminal.
-if [ -z "$TMUX" ] && [ -z "$NO_AUTO_TMUX" ] && command -v tmux &>/dev/null; then
+# sudo -i and su - scrub the environment, so $TMUX is gone even though the
+# shell is still inside a tmux pane. $TERM survives and reads tmux-256color
+# there, so it is the reliable test for "already multiplexed".
+case "$TERM" in tmux*|screen*) _in_mux=1 ;; *) _in_mux="" ;; esac
+if [ -z "$TMUX" ] && [ -z "$_in_mux" ] && [ -z "$NO_AUTO_TMUX" ] && command -v tmux &>/dev/null; then
     if [ -n "$SSH_CONNECTION" ]; then
         tmux new-session -A -s ssh && exit
     else
@@ -28,6 +32,7 @@ if [ -z "$TMUX" ] && [ -z "$NO_AUTO_TMUX" ] && command -v tmux &>/dev/null; then
         unset _tmux_detached
     fi
 fi
+unset _in_mux
 
 # History — full deduplication (ignoredups + erasedups)
 HISTCONTROL=ignoredups:erasedups
@@ -54,6 +59,7 @@ _C_BLUE='\[\e[38;2;137;180;250m\]'
 _C_PEACH='\[\e[38;2;250;179;135m\]'
 _C_MAUVE='\[\e[38;2;203;166;247m\]'
 _C_SKY='\[\e[38;2;137;220;235m\]'
+_C_FLAMINGO='\[\e[38;2;242;205;205m\]'
 _C_GREY='\[\e[38;2;108;112;134m\]'
 _C_RST='\[\e[0m\]'
 
@@ -79,17 +85,17 @@ _set_prompt() {
         branch=$(git -C "$PWD" symbolic-ref --quiet --short HEAD 2>/dev/null \
                  || git -C "$PWD" rev-parse --short HEAD 2>/dev/null)
         marks=""
-        git -C "$PWD" diff --quiet 2>/dev/null          || marks+="*"
-        git -C "$PWD" diff --staged --quiet 2>/dev/null || marks+="+"
+        git -C "$PWD" diff --quiet 2>/dev/null          || marks+="${_C_RED}*"
+        git -C "$PWD" diff --staged --quiet 2>/dev/null || marks+="${_C_GREEN}+"
         counts=$(git -C "$PWD" rev-list --left-right --count "HEAD...@{upstream}" 2>/dev/null)
         if [ -n "$counts" ]; then
             ahead=${counts%%[!0-9]*}
             behind=${counts##*[!0-9]}
-            [ "${ahead:-0}" -gt 0 ]  && marks+="⇡${ahead}"
-            [ "${behind:-0}" -gt 0 ] && marks+="⇣${behind}"
+            [ "${ahead:-0}" -gt 0 ]  && marks+="${_C_SKY}⇡${ahead}"
+            [ "${behind:-0}" -gt 0 ] && marks+="${_C_SKY}⇣${behind}"
         fi
         stash=$(git -C "$PWD" stash list 2>/dev/null | wc -l | tr -d '[:space:]')
-        [ "${stash:-0}" -gt 0 ] && marks+="{${stash}}"
+        [ "${stash:-0}" -gt 0 ] && marks+="${_C_FLAMINGO}{${stash}}"
         line+=" ${_C_PEACH}${branch}${marks}${_C_RST}"
     fi
 

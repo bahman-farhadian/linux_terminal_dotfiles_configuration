@@ -101,6 +101,10 @@ own terminal size. Sharing one session between a remote and a local client
 makes tmux size the windows for both, which crops the smaller one and leaves an
 unpainted band in the larger.
 
+It also skips when `$TERM` is already `tmux-*` or `screen-*`. `sudo -i` and
+`su -` scrub `$TMUX` but keep `$TERM`, so without that check they would start a
+second tmux inside the pane you are already in.
+
 To open a terminal without tmux:
 
 ```bash
@@ -136,7 +140,8 @@ while the host name stays put.
 | `venv:` | Mauve `#cba6f7` | a virtualenv is active |
 | `k8s:` | Sky `#89dceb` | `kubectl` has a current context |
 
-Branch suffixes: `*` unstaged · `+` staged · `⇡N` ahead · `⇣N` behind · `{N}` stashes.
+Branch suffixes carry their own colour: `*` unstaged is Red, `+` staged is
+Green, `⇡N` ahead and `⇣N` behind are Sky, `{N}` stashes is Flamingo.
 The `$` turns red when the last command failed, and becomes `#` for root.
 
 Needs a true-colour terminal. GNOME Terminal qualifies.
