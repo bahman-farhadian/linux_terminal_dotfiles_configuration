@@ -645,32 +645,56 @@ systemctl is-active docker
 
 Expect `active`.
 
-#### 7. Check the storage driver
+#### 7. Switch to the overlay2 storage driver
+
+Docker now defaults to the containerd snapshotter, which reports itself as
+`overlayfs` and does not implement `--storage-opt size=`. It accepts the flag
+and ignores it, so a container silently gets the whole disk. The classic
+`overlay2` driver is the one that honours the XFS project quota from Step 3.
+
+```bash
+vim /etc/docker/daemon.json
+```
+
+Put this in it:
+
+```
+{
+  "features": {
+    "containerd-snapshotter": false
+  }
+}
+```
+
+```bash
+systemctl restart docker
+```
 
 ```bash
 docker info --format '{{.Driver}}'
 ```
 
-Expect `overlay2`.
+Expect `overlay2`. If it still says `overlayfs`, the quota will not be
+enforced.
 
 ```bash
 docker info --format '{{.DriverStatus}}'
 ```
 
-Expect `Backing Filesystem` to read `xfs`.
+Expect `Backing Filesystem` to read `xfs` and `Supports d_type` to read `true`.
 
-#### 8. Check the project quota works
+#### 8. Prove the quota is enforced
 
-This is the reason root is XFS with `prjquota` in Step 3. Without it Docker
-cannot cap a container's disk usage.
+Reporting the right size is not proof. Fill the container past its limit and
+watch it stop:
 
 ```bash
-docker run --rm --storage-opt size=1G busybox df -h /
+docker run --rm --storage-opt size=1G busybox sh -c 'df -h / | tail -1; dd if=/dev/zero of=/big bs=1M count=1200'
 ```
 
-Expect a root filesystem of `1.0G`. If it fails with `--storage-opt is
-supported only for overlay over xfs with 'pquota' mount option`, the quota is
-not active — go back to Step 3 and check `findmnt -no OPTIONS /`.
+Expect `df` to report about `1.0G`, and `dd` to stop early with
+`No space left on device`. If `dd` writes all 1200 MiB, the limit is not
+active.
 
 #### 9. Leave the root shell
 
@@ -696,4 +720,6 @@ docker run --rm hello-world
 - Step 10 must run as your own user, not root. Under `sudo` as root, `$USER` is `root`, and the group would go to the wrong account.
 - Membership in the `docker` group is equivalent to root. Any member can start a container that mounts the whole filesystem. Treat it as an admin privilege, not a convenience.
 - `Suites: trixie` is written out rather than derived from `/etc/os-release`, so the file says which release it is pinned to. Change it when the machine is upgraded.
-- `--storage-opt size=` works only on `overlay2` over XFS with project quota. It is not supported on ext4.
+- `--storage-opt size=` works only on `overlay2` over XFS with project quota. It is not supported on ext4, and not by the containerd snapshotter.
+- Switching the driver hides images pulled under the previous one. They are not deleted, but they live in a separate store. Pull them again if anything is missing.
+- `--rm` deletes the container when it exits, so these checks leave nothing behind.
