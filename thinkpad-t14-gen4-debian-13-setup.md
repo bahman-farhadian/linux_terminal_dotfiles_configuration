@@ -173,6 +173,6 @@ Compare with what you wrote down in Step 1.
 - `/etc/fstab` does not work for the quota. XFS cannot turn quota on at remount, and root is already mounted by then.
 - `rootflags` goes in `GRUB_CMDLINE_LINUX`, not `GRUB_CMDLINE_LINUX_DEFAULT`. The plain one applies to every menu entry, including recovery, so the quota stays on there too.
 - Docker only needs `pquota`. `uquota` is user quota and is optional.
-- The kernel reports `pquota` as `prjquota`. Same thing.
+- The kernel renames both options. `pquota` shows as `prjquota` and `uquota` shows as `usrquota`. Same things.
 
 The installation is done.
