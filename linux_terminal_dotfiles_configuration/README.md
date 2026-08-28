@@ -119,7 +119,7 @@ against it.
 ## Prompt
 
 ```
-bahman@Silenus ~/project main*⇡1 venv:api k8s:prod $
+bahman @ Silenus ~/project main*⇡1 venv:api k8s:prod $
 ```
 
 One line, plain colour, no badges and no background blocks. No clock — use
@@ -129,8 +129,8 @@ while the host name stays put.
 | Segment | Colour | Shown when |
 |---|---|---|
 | user | Green `#a6e3a1`, Red `#f38ba8` for root | always |
-| `@` | Overlay `#6c7086` | always |
-| host | Lavender `#b4befe` | always |
+| `@` | Overlay0 `#6c7086` | always |
+| host | Yellow `#f9e2af` | always |
 | path | Blue `#89b4fa` | always |
 | branch | Peach `#fab387` | inside a git repository |
 | `venv:` | Mauve `#cba6f7` | a virtualenv is active |
