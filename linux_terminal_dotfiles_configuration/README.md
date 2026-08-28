@@ -55,6 +55,7 @@ as root configures `/root` and leaves your account untouched.
   a headless machine.
 - `privip` uses `hostname -I`. `ports` uses `ss -tunlp`.
 - `b` prefers `btop` and falls back to `htop`.
+- Plain colour prompt, not the macOS badge/powerline style, and segments are hidden rather than showing `disconnected` or `inactive`.
 - No Option-key bindings. Ghostty on macOS sent `M-w/a/s/d` and `M-1`–`M-7`;
   on Linux those collide with terminal and window-manager shortcuts, so pane
   navigation is prefix-only.
@@ -77,12 +78,26 @@ as root configures `/root` and leaves your account untouched.
 ## Prompt
 
 ```
-─ [bash]  venv:name  user@host  k8s:cluster  branch*⇡1  ~/path  Local ...  UTC ...
+bahman@Silenus ~/project main*⇡1 venv:api k8s:prod 14:23:05
 $
 ```
 
-Git badge suffixes: `*` unstaged · `+` staged · `⇡N` ahead · `⇣N` behind ·
-`{N}` stashes. The prompt needs a terminal with true colour and Unicode.
+Plain colour, no badges and no background blocks. Every segment after the path
+is conditional and is simply absent when it has nothing to report.
+
+| Segment | Colour | Shown when |
+|---|---|---|
+| `user@host` | green, red for root | always |
+| path | blue | always |
+| branch | peach | inside a git repository |
+| `venv:` | mauve | a virtualenv is active |
+| `k8s:` | sky | `kubectl` has a current context |
+| time | grey | always |
+
+Branch suffixes: `*` unstaged · `+` staged · `⇡N` ahead · `⇣N` behind · `{N}` stashes.
+The `$` turns red when the last command failed, and becomes `#` for root.
+
+Needs a true-colour terminal. GNOME Terminal qualifies.
 
 ## SSH
 

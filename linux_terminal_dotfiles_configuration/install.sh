@@ -140,8 +140,12 @@ cp_file "$REPO/hushlogin" "$HOME/.hushlogin"
 
 _hdr "default shell → bash"
 BASH_BIN="$(command -v bash)"
+CURRENT_SHELL="$(getent passwd "$USER" 2>/dev/null | cut -d: -f7)"
+
 if [ -z "$BASH_BIN" ]; then
     _warn "bash not found in PATH — install it first"
+elif [ "$CURRENT_SHELL" = "$BASH_BIN" ]; then
+    _skip "$USER already uses $BASH_BIN"
 else
     # chsh requires the shell to be listed in /etc/shells
     if ! grep -qxF "$BASH_BIN" /etc/shells 2>/dev/null; then
@@ -149,24 +153,25 @@ else
             echo "$BASH_BIN" | sudo tee -a /etc/shells > /dev/null
             _ok "registered $BASH_BIN in /etc/shells"
         else
-            _warn "$BASH_BIN not in /etc/shells — chsh may fail (add it with sudo)"
+            _warn "$BASH_BIN not in /etc/shells — set it manually with sudo"
         fi
     fi
-    if chsh -s "$BASH_BIN" "$USER" 2>/dev/null; then
-        _ok "$USER: shell → $BASH_BIN"
-    elif command -v usermod &>/dev/null && [ "$HAS_SUDO" = true ]; then
-        sudo usermod -s "$BASH_BIN" "$USER"
-        _ok "$USER: shell → $BASH_BIN (via usermod)"
-    else
-        _warn "Could not set default shell — run manually: chsh -s $BASH_BIN"
-    fi
+    # usermod via sudo is non-interactive. Plain chsh prompts for a password,
+    # so it is only used when sudo was declined, and its prompt is left visible.
     if [ "$HAS_SUDO" = true ]; then
-        if chsh -s "$BASH_BIN" root 2>/dev/null || \
-           { command -v usermod &>/dev/null && sudo usermod -s "$BASH_BIN" root; }; then
-            _ok "root: shell → $BASH_BIN"
-        else
-            _warn "Could not set root shell"
-        fi
+        sudo usermod -s "$BASH_BIN" "$USER" && _ok "$USER: shell → $BASH_BIN"
+    else
+        _warn "changing the login shell needs your password"
+        chsh -s "$BASH_BIN" && _ok "$USER: shell → $BASH_BIN" || \
+            _warn "could not set shell — run manually: chsh -s $BASH_BIN"
+    fi
+fi
+
+if [ "$HAS_SUDO" = true ] && [ -n "$BASH_BIN" ]; then
+    if [ "$(getent passwd root | cut -d: -f7)" = "$BASH_BIN" ]; then
+        _skip "root already uses $BASH_BIN"
+    else
+        sudo usermod -s "$BASH_BIN" root && _ok "root: shell → $BASH_BIN"
     fi
 fi
 
