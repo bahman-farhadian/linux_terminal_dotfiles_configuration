@@ -47,38 +47,58 @@ the **Shows as** value.
 
 ### Step 3 — After install: repositories, quota, checks
 
-#### 1. Add your user to sudo
+#### 1. Add your user to sudoers
 
-The installer only puts the first user in the `sudo` group when the root
-password is left empty. If you set a root password, the user has no `sudo` and
-every command below fails.
+The installer only grants `sudo` when the root password is left empty. If you
+set a root password, the user has none.
 
 ```bash
-su -
+visudo
+```
+
+Find this line:
+
+```
+root    ALL=(ALL:ALL) ALL
+```
+
+Add your own user underneath it, replacing `username` with your login name:
+
+```
+username    ALL=(ALL:ALL) ALL
+```
+
+Save and exit. `visudo` checks the syntax before writing and refuses to save a
+broken file, which is why it is used instead of editing the file directly.
+
+Check it:
+
+```bash
+sudo -l -U username
+```
+
+#### 2. Install vim
+
+```bash
+apt update
 ```
 
 ```bash
-usermod -aG sudo bahman
+apt install vim
 ```
+
+Make it the default editor for `visudo` and friends:
 
 ```bash
-exit
+update-alternatives --config editor
 ```
 
-Log out and log back in, then check:
-
-```bash
-groups
-```
-
-Expect `sudo` in the list.
-
-#### 2. Add contrib and non-free
+#### 3. Add contrib and non-free
 
 The installer writes the classic file, not a `.sources` file:
 
 ```bash
-sudo nano /etc/apt/sources.list
+vim /etc/apt/sources.list
 ```
 
 Make the file read exactly this:
@@ -104,30 +124,30 @@ Check the result:
 grep ^deb /etc/apt/sources.list
 ```
 
-#### 3. Update the system
+#### 4. Update the system
 
 ```bash
-sudo apt update
+apt update
 ```
 
 ```bash
-sudo apt full-upgrade
+apt full-upgrade
 ```
 
-#### 4. Install the tools used for checking
+#### 5. Install the tools used for checking
 
 ```bash
-sudo apt install mokutil dmidecode efibootmgr
+apt install mokutil dmidecode efibootmgr
 ```
 
-#### 5. Edit GRUB: quota and boot timeout
+#### 6. Edit GRUB: quota and boot timeout
 
 Docker can only cap a container's disk size (`--storage-opt size=`) when root
 is mounted with project quota. Root is mounted before `/etc/fstab` is read, so
 this goes on the kernel command line.
 
 ```bash
-sudo nano /etc/default/grub
+vim /etc/default/grub
 ```
 
 Change these two lines so they read:
@@ -143,16 +163,16 @@ every other line in the file as it is.
 Apply it:
 
 ```bash
-sudo update-grub
+update-grub
 ```
 
-#### 6. Reboot
+#### 7. Reboot
 
 ```bash
-sudo systemctl reboot
+systemctl reboot
 ```
 
-#### 7. Check Secure Boot
+#### 8. Check Secure Boot
 
 ```bash
 mokutil --sb-state
@@ -166,15 +186,15 @@ dmesg | grep -i "secure boot"
 
 Expect `secureboot: Secure boot enabled`.
 
-#### 8. Check the machine booted through shim
+#### 9. Check the machine booted through shim
 
 ```bash
-sudo efibootmgr -v | grep -i shim
+efibootmgr -v | grep -i shim
 ```
 
 Expect `\EFI\debian\shimx64.efi`.
 
-#### 9. Check the disk
+#### 10. Check the disk
 
 ```bash
 lsblk
@@ -188,7 +208,7 @@ findmnt -no FSTYPE /
 
 Expect `xfs`.
 
-#### 10. Check the quota
+#### 11. Check the quota
 
 ```bash
 findmnt -no OPTIONS /
@@ -197,15 +217,15 @@ findmnt -no OPTIONS /
 Expect `usrquota` and `prjquota` in the list.
 
 ```bash
-sudo xfs_quota -x -c state /
+xfs_quota -x -c state /
 ```
 
 Expect `Project quota state` with `Accounting: ON` and `Enforcement: ON`.
 
-#### 11. Check the BIOS version
+#### 12. Check the BIOS version
 
 ```bash
-sudo dmidecode -s bios-version
+dmidecode -s bios-version
 ```
 
 Compare with what you wrote down in Step 1.
@@ -213,7 +233,7 @@ Compare with what you wrote down in Step 1.
 **Notes**
 
 - `efi-readvar -v PK` (package `efitools`) reports `no entries` on this machine. That is normal while `Secure Boot Key State` is `Standard`. The firmware keeps its keys internal.
-- If step 7 says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the BIOS. Turn it back on under `Security → Secure Boot`.
+- If step 8 says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the BIOS. Turn it back on under `Security → Secure Boot`.
 - The 3rd party CA is a different problem. It does not turn Secure Boot off — it stops the machine booting at all, with `Invalid signature detected`.
 - Hibernation does not work while Secure Boot is on. The kernel locks itself down and refuses to write the resume image, because it cannot check that the swap was not modified while the machine was off. Suspend works normally. Turning hibernation on means turning Secure Boot off.
 - `/etc/fstab` does not work for the quota. XFS cannot turn quota on at remount, and root is already mounted by then.
@@ -233,19 +253,19 @@ libraries, and Qt applications need help to match the GNOME theme.
 #### 1. Install the missing libraries
 
 ```bash
-sudo apt install libpcre2-16-0 libdouble-conversion3
+apt install libpcre2-16-0 libdouble-conversion3
 ```
 
 #### 2. Install the GNOME theme and the Wayland plugin
 
 ```bash
-sudo apt install qgnomeplatform-qt5 qtwayland5
+apt install qgnomeplatform-qt5 qtwayland5
 ```
 
 #### 3. Set the Qt environment variables
 
 ```bash
-sudo nano /etc/environment
+nano /etc/environment
 ```
 
 Add these two lines:
@@ -300,43 +320,43 @@ Thunderbolt can all be updated from Linux. No Windows and no USB needed.
 #### 1. Install fwupd
 
 ```bash
-sudo apt install fwupd fwupd-amd64-signed
+apt install fwupd fwupd-amd64-signed
 ```
 
 #### 2. Refresh the firmware list
 
 ```bash
-sudo fwupdmgr refresh --force
+fwupdmgr refresh --force
 ```
 
 #### 3. See what the machine has
 
 ```bash
-sudo fwupdmgr get-devices
+fwupdmgr get-devices
 ```
 
 #### 4. See what is available
 
 ```bash
-sudo fwupdmgr get-updates
+fwupdmgr get-updates
 ```
 
 #### 5. Apply
 
 ```bash
-sudo fwupdmgr update
+fwupdmgr update
 ```
 
 #### 6. Reboot to apply
 
 ```bash
-sudo systemctl reboot
+systemctl reboot
 ```
 
 #### 7. Check nothing is left
 
 ```bash
-sudo fwupdmgr get-updates
+fwupdmgr get-updates
 ```
 
 The last line must read `No updates available`. If it does not, repeat from
@@ -345,7 +365,7 @@ step 5.
 #### 8. Check the new BIOS version
 
 ```bash
-sudo dmidecode -s bios-version
+dmidecode -s bios-version
 ```
 
 #### 9. Check Secure Boot survived
@@ -374,10 +394,13 @@ Expect `SecureBoot enabled`.
 
 Everything is written from scratch. Nothing is cloned or downloaded.
 
+Run step 1 as root. Run every step after it as your own user, not root, or the
+configuration lands in `/root` instead of your home directory.
+
 #### 1. Install what the configuration needs
 
 ```bash
-sudo apt install tmux vim git curl jq tree python3 openssl bash-completion xclip htop
+apt install tmux vim git curl jq tree python3 openssl bash-completion xclip htop
 ```
 
 #### 2. Create the directories
