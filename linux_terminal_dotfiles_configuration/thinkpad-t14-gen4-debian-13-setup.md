@@ -272,7 +272,7 @@ apt install -y qt6-wayland qgnomeplatform-qt6 qtwayland5 qgnomeplatform-qt5
 #### 3. Set the Qt environment variables
 
 ```bash
-nano /etc/environment
+vim /etc/environment
 ```
 
 Add these two lines:
