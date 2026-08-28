@@ -141,7 +141,7 @@ apt full-upgrade
 #### 6. Install the tools used for checking
 
 ```bash
-apt install mokutil dmidecode efibootmgr
+apt install -y mokutil dmidecode efibootmgr
 ```
 
 #### 7. Edit GRUB: quota and boot timeout
@@ -210,7 +210,7 @@ Expect `\EFI\debian\shimx64.efi`.
 lsblk
 ```
 
-Expect `1G`, `2G`, and `888G`.
+Expect `1G` (or `1023M`), `2G`, and `888G`.
 
 ```bash
 findmnt -no FSTYPE /
@@ -260,7 +260,7 @@ libraries, and Qt applications need help to match the GNOME theme.
 #### 1. Install the missing libraries
 
 ```bash
-apt install libpcre2-16-0 libdouble-conversion3
+apt install -y libpcre2-16-0 libdouble-conversion3
 ```
 
 #### 2. Install the GNOME theme and the Wayland plugin
@@ -324,7 +324,7 @@ Thunderbolt can all be updated from Linux. No Windows and no USB needed.
 #### 1. Install fwupd
 
 ```bash
-apt install fwupd fwupd-amd64-signed
+apt install -y fwupd fwupd-amd64-signed
 ```
 
 #### 2. Refresh the firmware list
@@ -355,6 +355,12 @@ fwupdmgr update
 
 ```bash
 systemctl reboot
+```
+
+Log back in and become root again before continuing:
+
+```bash
+su -
 ```
 
 #### 7. Check nothing is left
@@ -391,19 +397,27 @@ Expect `SecureBoot enabled`.
 
 ### Step 6 — Packages
 
-#### 1. Install the packages
+#### 1. Become root
+
+The rest of this step is run as root.
+
+```bash
+su -
+```
+
+#### 2. Install the packages
 
 ```bash
 apt install -y bash-completion bridge-utils btop curl ffmpeg filezilla foliate git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc jq keepassxc lshw nano network-manager-openvpn-gnome obs-studio openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux tree unrar vim virt-top vlc wget xclip
 ```
 
-#### 2. Install flatpak
+#### 3. Install flatpak
 
 ```bash
 apt install -y flatpak gnome-software-plugin-flatpak
 ```
 
-#### 3. Add the flathub remote
+#### 4. Add the flathub remote
 
 ```bash
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
@@ -450,7 +464,15 @@ exec bash
 
 ### Step 8 — KVM and libvirt
 
-#### 1. Check the CPU exposes virtualization
+#### 1. Become root
+
+The rest of this step is run as root.
+
+```bash
+su -
+```
+
+#### 2. Check the CPU exposes virtualization
 
 ```bash
 grep -Ec '(vmx|svm)' /proc/cpuinfo
@@ -458,13 +480,13 @@ grep -Ec '(vmx|svm)' /proc/cpuinfo
 
 Expect a number above 0. This machine is Intel, so the flag is `vmx`.
 
-#### 2. Install the packages
+#### 3. Install the packages
 
 ```bash
 apt install -y qemu-system-x86 qemu-utils ovmf virtinst virt-manager libvirt-daemon-system libvirt-clients libosinfo-bin osinfo-db osinfo-db-tools libguestfs-tools
 ```
 
-#### 3. Start the daemon
+#### 4. Start the daemon
 
 ```bash
 systemctl enable --now libvirtd
@@ -476,7 +498,7 @@ systemctl is-active libvirtd
 
 Expect `active`.
 
-#### 4. Turn on nested virtualization
+#### 5. Turn on nested virtualization
 
 ```bash
 cat /sys/module/kvm_intel/parameters/nested
@@ -502,7 +524,7 @@ cat /sys/module/kvm_intel/parameters/nested
 
 Expect `Y`.
 
-#### 5. Enable IP forwarding
+#### 6. Enable IP forwarding
 
 ```bash
 vim /etc/sysctl.d/99-kvm.conf
@@ -524,7 +546,7 @@ sysctl net.ipv4.ip_forward
 
 Expect `net.ipv4.ip_forward = 1`.
 
-#### 6. Raise the open file limit
+#### 7. Raise the open file limit
 
 ```bash
 vim /etc/security/limits.d/99-kvm.conf
@@ -537,13 +559,13 @@ Put this in it:
 *    hard    nofile    1048576
 ```
 
-#### 7. Leave the root shell
+#### 8. Leave the root shell
 
 ```bash
 exit
 ```
 
-#### 8. Add your user to the libvirt and kvm groups
+#### 9. Add your user to the libvirt and kvm groups
 
 ```bash
 sudo usermod -aG libvirt,kvm $USER
@@ -557,7 +579,7 @@ groups
 
 Expect `libvirt` and `kvm` in the list.
 
-#### 9. Verify as your own user
+#### 10. Verify as your own user
 
 ```bash
 virsh list --all
@@ -573,7 +595,7 @@ active.
 **Notes**
 
 - There is no `qemu-kvm` package in trixie. `qemu-system-x86` is the one that provides the emulator, and KVM itself is a kernel module that is already present.
-- Step 8 has to run as your own user, not root. Under `sudo` as root, `$USER` is `root`, so the groups would be added to the wrong account.
+- The `usermod` sub-step has to run as your own user, not root. Under `sudo` as root, `$USER` is `root`, so the groups would be added to the wrong account.
 - Group membership only applies at the next login. `newgrp libvirt` works for one shell if you do not want to log out.
 - `modprobe -r kvm_intel` fails if a virtual machine is running. Shut them down first.
 - Nested virtualization is only needed to run a hypervisor inside a guest. Ordinary guests do not use it.
@@ -585,19 +607,27 @@ active.
 
 Docker Engine from Docker's own repository, not Debian's `docker.io`.
 
-#### 1. Install what the repository setup needs
+#### 1. Become root
+
+The rest of this step is run as root.
+
+```bash
+su -
+```
+
+#### 2. Install what the repository setup needs
 
 ```bash
 apt install -y ca-certificates curl
 ```
 
-#### 2. Create the keyring directory
+#### 3. Create the keyring directory
 
 ```bash
 install -m 0755 -d /etc/apt/keyrings
 ```
 
-#### 3. Fetch Docker's signing key
+#### 4. Fetch Docker's signing key
 
 ```bash
 curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
@@ -607,7 +637,7 @@ curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/doc
 chmod a+r /etc/apt/keyrings/docker.asc
 ```
 
-#### 4. Add the repository
+#### 5. Add the repository
 
 ```bash
 vim /etc/apt/sources.list.d/docker.sources
@@ -628,13 +658,13 @@ Signed-By: /etc/apt/keyrings/docker.asc
 apt update
 ```
 
-#### 5. Install the engine
+#### 6. Install the engine
 
 ```bash
 apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
-#### 6. Start it
+#### 7. Start it
 
 ```bash
 systemctl enable --now docker
@@ -646,7 +676,7 @@ systemctl is-active docker
 
 Expect `active`.
 
-#### 7. Switch to the overlay2 storage driver
+#### 8. Switch to the overlay2 storage driver
 
 Docker now defaults to the containerd snapshotter, which reports itself as
 `overlayfs` and does not implement `--storage-opt size=`. It accepts the flag
@@ -684,7 +714,7 @@ docker info --format '{{.DriverStatus}}'
 
 Expect `Backing Filesystem` to read `xfs` and `Supports d_type` to read `true`.
 
-#### 8. Prove the quota is enforced
+#### 9. Prove the quota is enforced
 
 Reporting the right size is not proof. Fill the container past its limit and
 watch it stop:
@@ -697,13 +727,13 @@ Expect `df` to report about `1.0G`, and `dd` to stop early with
 `No space left on device`. If `dd` writes all 1200 MiB, the limit is not
 active.
 
-#### 9. Leave the root shell
+#### 10. Leave the root shell
 
 ```bash
 exit
 ```
 
-#### 10. Add your user to the docker group
+#### 11. Add your user to the docker group
 
 ```bash
 sudo usermod -aG docker $USER
