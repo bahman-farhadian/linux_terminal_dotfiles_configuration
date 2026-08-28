@@ -579,11 +579,18 @@ desktop entry:
 cp /usr/share/applications/virt-manager.desktop ~/.local/share/applications/
 ```
 
+Find the line to change. The file starts with a few hundred translated
+`Name[xx]=` lines, so do not go looking for it by eye:
+
+```bash
+grep -n '^Exec=' ~/.local/share/applications/virt-manager.desktop
+```
+
 ```bash
 vim ~/.local/share/applications/virt-manager.desktop
 ```
 
-Change the `Exec=` line so it reads:
+Go to that line number and make it read:
 
 ```
 Exec=env GTK_THEME=Adwaita:dark virt-manager --no-fork
