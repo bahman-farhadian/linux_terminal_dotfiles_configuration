@@ -226,6 +226,39 @@ else
     printf '  systemctl --user enable --now lock-keyboard-en.service\n'
 fi
 
+_hdr "SSH server"
+# Root by key only; ordinary users unchanged; port 22 left at the default.
+# A broken sshd_config locks you out of the machine, so this validates before
+# reloading and puts the file back if sshd rejects it.
+_sshd_drop=/etc/ssh/sshd_config.d/99-local.conf
+if [ "$HAS_SUDO" != true ]; then
+    _skip "SSH server needs sudo"
+elif [ ! -d /etc/ssh/sshd_config.d ]; then
+    _skip "no /etc/ssh/sshd_config.d — openssh-server not installed?"
+elif ! sudo grep -qE '^\s*Include\s+/etc/ssh/sshd_config\.d/\*\.conf' /etc/ssh/sshd_config; then
+    _warn "/etc/ssh/sshd_config has no Include for sshd_config.d — a drop-in would be ignored"
+else
+    _sshd_had=false
+    [ -e "$_sshd_drop" ] && _sshd_had=true
+    sudo cp -a "$_sshd_drop" "$_sshd_drop.bak" 2>/dev/null || true
+    sudo tee "$_sshd_drop" >/dev/null <<'SSHDCONF'
+# Root may connect with a key, never with a password.
+PermitRootLogin prohibit-password
+SSHDCONF
+    if sudo sshd -t 2>/dev/null; then
+        sudo rm -f "$_sshd_drop.bak"
+        sudo systemctl reload ssh 2>/dev/null || sudo systemctl reload sshd 2>/dev/null || true
+        _ok "PermitRootLogin prohibit-password, port 22 unchanged"
+    else
+        if [ "$_sshd_had" = true ]; then
+            sudo mv "$_sshd_drop.bak" "$_sshd_drop"
+        else
+            sudo rm -f "$_sshd_drop" "$_sshd_drop.bak"
+        fi
+        _warn "sshd rejected the configuration — reverted, nothing changed"
+    fi
+fi
+
 _hdr "tmux bash completion"
 # Debian packages no tmux completion, so it comes from upstream. Fetched to a
 # temporary file first, so a failed download cannot truncate a working copy.
