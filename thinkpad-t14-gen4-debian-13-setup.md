@@ -34,8 +34,11 @@ sizes in the Size column.
 
 - A "1 TB" disk is 931 GiB, not 1024. Check yours first with
   `lsblk -b -d -o NAME,SIZE` (`Ctrl+Alt+F2` for a shell).
-- The installer also displays decimal GB. Root will show as `859.0 GB` and
-  swap as `42.9 GB`. That is correct — it is the same size.
+- The installer displays decimal GB, but `df -h` in the installed system
+  displays GiB. Root shows as `859.0 GB` while partitioning and as `800G` in
+  `df -h`. Same partition, two labels. This is correct.
+- To size any other partition: type `GiB x 1073.741824` MB, rounded to the
+  nearest whole number.
 - Leave the 88 GiB unpartitioned. This is over-provisioning, which Samsung
   recommends at about 10% on their SSDs. The drive uses the space for wear
   levelling, which keeps write speed up as the disk fills.
