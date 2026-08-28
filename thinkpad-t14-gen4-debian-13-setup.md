@@ -27,7 +27,7 @@ the **Shows as** value.
 
 | # | Partition | Size | Enter as | Shows as | Format | Mount |
 |---|-----------|------|----------|----------|--------|-------|
-| 1 | EFI | 1023 MiB | `1074 MB` | 1.1 GB | FAT32, `esp` flag | `/boot/efi` |
+| 1 | EFI | 1 GiB | `1075 MB` | 1.1 GB | FAT32, `esp` flag | `/boot/efi` |
 | 2 | Boot | 2 GiB | `2147 MB` | 2.1 GB | ext4 | `/boot` |
 | 3 | Root | 888 GiB | `953483 MB` | 953.5 GB | xfs | `/` |
 
@@ -37,8 +37,8 @@ Leave the rest of the disk unpartitioned.
 
 ```
 Disk          953.87 GiB
-EFI + boot      3.00 GiB
 Root          888.00 GiB
+EFI + boot      3.00 GiB
 ------------------------
 Free           62.87 GiB   6.6%
 ```
@@ -51,8 +51,9 @@ as the disk fills. Samsung suggests about 10%. To reach it, use a root of
 
 - The installer counts in GB. `df -h` counts in GiB. Root shows as `953.5 GB`
   now and `888G` later. Same partition.
-- The EFI partition comes out as 1023 MiB, not 1024. The first partition loses
-  1 MiB to alignment. This does not matter.
+- The first partition starts 1 MiB into the disk, so it ends up 1 MiB smaller
+  than asked. `1075 MB` accounts for that and gives a full 1 GiB. If yours
+  still shows `1023M`, it is harmless.
 - For any other size: type `GiB x 1073.741824` MB, rounded.
 - No swap partition. Hibernation needs swap, and hibernation does not work
   while Secure Boot is on. See the note in Step 3.
@@ -161,7 +162,7 @@ lsblk
 findmnt -no FSTYPE /
 ```
 
-Expect `1023M`, `2G`, `888G`, and root `xfs`.
+Expect `1G`, `2G`, `888G`, and root `xfs`.
 
 ### 9. Check the quota
 
