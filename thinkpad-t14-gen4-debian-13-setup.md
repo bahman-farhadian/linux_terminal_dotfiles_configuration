@@ -199,18 +199,55 @@ The installation is done.
 
 ## Part 2 — Configuration
 
-### Step 4 — Runtime libraries
+### Step 4 — Runtime libraries and Qt applications
 
 Prebuilt applications that ship their own Qt still link against a few system
-libraries. A minimal Debian install does not include them.
+libraries, and Qt applications need help to match the GNOME theme.
 
-#### 1. Install the libraries
+#### 1. Install the missing libraries
 
 ```bash
 sudo apt install libpcre2-16-0 libdouble-conversion3
 ```
 
-#### 2. Check a prebuilt binary for anything still missing
+#### 2. Install the GNOME theme and the Wayland plugin
+
+```bash
+sudo apt install qgnomeplatform-qt5 qtwayland5
+```
+
+#### 3. Set the Qt environment variables
+
+```bash
+sudo nano /etc/environment
+```
+
+Add these two lines:
+
+```
+QT_QPA_PLATFORM=wayland;xcb
+QT_QPA_PLATFORMTHEME=gnome
+```
+
+#### 4. Log out and log back in
+
+#### 5. Check the session type
+
+```bash
+echo $XDG_SESSION_TYPE
+```
+
+Expect `wayland`.
+
+#### 6. Check the variables took effect
+
+```bash
+env | grep QT_QPA
+```
+
+Expect both lines.
+
+#### 7. Check a prebuilt binary for anything still missing
 
 ```bash
 LD_LIBRARY_PATH=/path/to/app/usr/lib ldd /path/to/app/binary | grep "not found"
@@ -220,6 +257,11 @@ No output means nothing is missing.
 
 **Notes**
 
+- The variable is `QT_QPA_PLATFORMTHEME`. `QT_QPA_QPLATFORMTHEME` is not a real variable and is ignored without any error.
+- `/etc/environment` is not a shell script. Write `KEY=value` with no `export` and no quotes.
+- `wayland;xcb` tries Wayland first and falls back to X11. Plain `wayland` breaks Qt applications in an X11 session, and any application whose bundled Qt has no Wayland plugin.
+- Variables set in `/etc/environment` apply at the next login, not to the shell you are in now.
+- For Qt 6 applications, also install `qgnomeplatform-qt6`.
 - `libpcre2-16-0` provides `libpcre2-16.so.0` and `libdouble-conversion3` provides `libdouble-conversion.so.3`.
 - Set `LD_LIBRARY_PATH` to the application's own library directory first, or `ldd` reports the bundled libraries as missing too.
 - A program that exits with no message is usually a missing library or a missing graphical session, not a broken program.
