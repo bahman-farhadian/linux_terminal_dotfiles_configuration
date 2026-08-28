@@ -394,7 +394,7 @@ Expect `SecureBoot enabled`.
 #### 1. Install the packages
 
 ```bash
-apt install -y bash-completion bridge-utils btop curl ffmpeg git gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc jq keepassxc lshw nano network-manager-openvpn-gnome openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux tree unrar vim virt-top vlc wget xclip
+apt install -y bash-completion bridge-utils btop curl ffmpeg filezilla foliate git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc jq keepassxc lshw nano network-manager-openvpn-gnome obs-studio openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux tree unrar vim virt-top vlc wget xclip
 ```
 
 #### 2. Install flatpak
@@ -414,6 +414,7 @@ flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.f
 - Log out and back in before flatpak applications appear in GNOME Software.
 - The terminal uses JetBrains Mono at size 14. Either `apt install -y fonts-jetbrains-mono` or download it from jetbrains.com/lp/mono, then select it under `Terminal → Preferences → Profile → Text → Custom font`.
 - Font size changes the terminal cell height. A window whose height is not an exact multiple of that leaves a thin unpainted strip under the last row, so the size is worth tuning.
+- `gnome-firmware` is the graphical front end for the `fwupd` work in Step 5. It shows the same devices and updates as `fwupdmgr`.
 - `virt-top` reads from libvirt. Until libvirt is installed and running it shows nothing.
 
 ### Step 7 — Bash, tmux, and SSH configuration
