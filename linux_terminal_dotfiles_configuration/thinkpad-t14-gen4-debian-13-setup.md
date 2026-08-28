@@ -12,13 +12,13 @@
 | 4 | Allow the 3rd party CA | `Allow Microsoft 3rd Party UEFI CA` = **On** |
 | 5 | Check the other lines | `Secure Boot` = **On**, `Secure Boot Mode` = **User Mode**, `Secure Boot Key State` = **Standard** |
 | 6 | Save and exit | **F10** → **Yes** |
+| 7 | Boot the installer | **F12** at the splash, pick the USB device |
 
 **Notes**
 
-- Debian's bootloader is signed by Microsoft's 3rd party UEFI CA. If this is **Off**, the machine fails to boot with `Invalid signature detected`.
-- Leave `Secure Boot` **On** for the whole install. Debian handles it.
-- Do not touch `Reset to Setup Mode` or `Clear All Secure Boot Keys`. Debian does not need them, and they cause the failure above.
-- Boot the installer with **F12** and pick the USB device. This is a one-time choice and does not change the boot order.
+- Debian's bootloader is signed by Microsoft's 3rd party UEFI CA. With this **Off** the machine will not boot and shows `Invalid signature detected`.
+- Leave `Secure Boot` **On** for the whole install.
+- Never use `Reset to Setup Mode` or `Clear All Secure Boot Keys`. They cause the failure above and Debian does not need them.
 
 ### Step 2 — Disk partitioning
 
@@ -34,16 +34,12 @@ the **Shows as** value.
 
 **Notes**
 
-- Leave the rest of the disk unpartitioned. That free space is SSD over-provisioning: 953.87 GiB disk, minus 3 GiB for EFI and boot, minus 888 GiB for root, leaves 62.87 GiB free, or 6.6%.
-- The drive uses that space for wear levelling, which keeps write speed up as the disk fills. Samsung suggests about 10%.
-- To reach 10%, use a root of 855 GiB (`918049 MB`) instead. That leaves 95.87 GiB free, or 10.1%.
-- The installer counts in GB. `df -h` counts in GiB. Root shows as `953.5 GB` now and `888G` later. Same partition.
-- The first partition starts 1 MiB into the disk, so it ends up 1 MiB smaller than asked. `1075 MB` accounts for that and gives a full 1 GiB. If yours still shows `1023M`, it is harmless.
+- Leave the rest of the disk unpartitioned. That free space is SSD over-provisioning: 953.87 GiB disk, minus 3 GiB for EFI and boot, minus 888 GiB for root, leaves 62.87 GiB. The drive uses it for wear levelling, which keeps write speed up as the disk fills.
+- The installer counts in GB, `df -h` counts in GiB. Root shows as `953.5 GB` here and `888G` later. Same partition.
 - For any other size: type `GiB x 1073.741824` MB, rounded.
-- No swap partition. Hibernation needs swap, and hibernation does not work while Secure Boot is on. See the note in Step 3.
-- The installer warns that no swap space is selected. Continue anyway.
-- XFS handles big files well, like a 200 GiB qcow2 image.
-- Docker runs on XFS. It can also cap container size with `--storage-opt size=`, which needs the `prjquota` mount option.
+- The EFI partition may still come out as `1023M`. That is harmless.
+- No swap partition. Only hibernation needs one, and hibernation does not work while Secure Boot is on.
+- The installer warns that no swap space is selected. Continue.
 
 ### Step 3 — After install: repositories, quota, checks
 
@@ -246,14 +242,11 @@ Compare with what you wrote down in Step 1.
 
 **Notes**
 
-- `efi-readvar -v PK` (package `efitools`) reports `no entries` on this machine. That is normal while `Secure Boot Key State` is `Standard`. The firmware keeps its keys internal.
-- If step 9 says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the BIOS. Turn it back on under `Security → Secure Boot`.
-- The 3rd party CA is a different problem. It does not turn Secure Boot off — it stops the machine booting at all, with `Invalid signature detected`.
-- Hibernation does not work while Secure Boot is on. The kernel locks itself down and refuses to write the resume image, because it cannot check that the swap was not modified while the machine was off. Suspend works normally. Turning hibernation on means turning Secure Boot off.
-- `/etc/fstab` does not work for the quota. XFS cannot turn quota on at remount, and root is already mounted by then.
-- `rootflags` goes in `GRUB_CMDLINE_LINUX`, not `GRUB_CMDLINE_LINUX_DEFAULT`. The plain one applies to every menu entry, including recovery, so the quota stays on there too.
-- Docker only needs `pquota`. `uquota` is user quota and is optional.
-- The kernel renames both options. `pquota` shows as `prjquota` and `uquota` shows as `usrquota`. Same things.
+- If step 9 says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the BIOS. Turn it back on.
+- Hibernation does not work while Secure Boot is on. The kernel refuses to write the resume image because it cannot verify the swap on resume. Suspend works normally.
+- The quota cannot go in `/etc/fstab`. XFS cannot enable quota at remount, and root is already mounted by then.
+- `rootflags` goes in `GRUB_CMDLINE_LINUX`, not `GRUB_CMDLINE_LINUX_DEFAULT`, so it applies to the recovery entries too.
+- The kernel renames the options. `pquota` shows as `prjquota` and `uquota` as `usrquota`.
 
 The installation is done.
 
@@ -317,14 +310,11 @@ No output means nothing is missing.
 
 **Notes**
 
-- The variable is `QT_QPA_PLATFORMTHEME`. `QT_QPA_QPLATFORMTHEME` is not a real variable and is ignored without any error.
-- `/etc/environment` is not a shell script. Write `KEY=value` with no `export` and no quotes.
-- `wayland;xcb` tries Wayland first and falls back to X11. Plain `wayland` breaks Qt applications in an X11 session, and any application whose bundled Qt has no Wayland plugin.
-- Variables set in `/etc/environment` apply at the next login, not to the shell you are in now.
+- `/etc/environment` is not a shell script. Write `KEY=value`, with no `export` and no quotes.
+- `wayland;xcb` tries Wayland and falls back to X11. Plain `wayland` breaks any application whose bundled Qt has no Wayland plugin.
 - For Qt 6 applications, also install `qgnomeplatform-qt6`.
-- `libpcre2-16-0` provides `libpcre2-16.so.0` and `libdouble-conversion3` provides `libdouble-conversion.so.3`.
-- Set `LD_LIBRARY_PATH` to the application's own library directory first, or `ldd` reports the bundled libraries as missing too.
-- A program that exits with no message is usually a missing library or a missing graphical session, not a broken program.
+- Set `LD_LIBRARY_PATH` to the application's own library directory first, or `ldd` reports its bundled libraries as missing too.
+- An application that exits printing nothing is usually a missing library or a missing graphical session, not a broken application.
 
 ### Step 5 — Firmware updates
 
@@ -392,15 +382,12 @@ Expect `SecureBoot enabled`.
 
 **Notes**
 
-- Plug the charger in before step 5. On battery every device reports `Device requires AC power to be connected` and is skipped without failing, so the update looks like it worked when nothing happened.
+- Plug the charger in first. On battery every device reports `Device requires AC power to be connected` and is skipped without failing, so the update looks like it worked when nothing happened.
 - Never power off during a firmware update.
-- Firmware is written during the reboot, not by `fwupdmgr update`. Steps 5 to 7 are one round. Repeat the round until step 7 comes back clean.
-- `System Firmware` is the BIOS. The other entries are the management engine, the SSD, the camera, the fingerprint reader, and the UEFI revocation list.
-- Two headings mean the same thing. `Devices with no available firmware updates` and `Devices with the latest available firmware version` are both fine. Only the last line decides.
-- `UEFI dbx` is Microsoft's revocation list. It is a normal update, but step 9 exists to confirm the machine still boots with Secure Boot on afterwards.
-- `fwupd-amd64-signed` holds the Debian-signed EFI file. Without it, firmware updates stop working while Secure Boot is on.
+- Firmware is written during the reboot, not by `fwupdmgr update`. Steps 5 to 7 are one round. Repeat until step 7 is clean.
+- `Devices with no available firmware updates` and `Devices with the latest available firmware version` both mean nothing to do. Only the last line decides.
+- `fwupd-amd64-signed` holds the Debian-signed EFI file. Without it firmware updates stop working once Secure Boot is on.
 - A BIOS update can reset BIOS settings. If step 9 says `SecureBoot disabled`, redo Step 1.
-- If step 4 reports nothing to do, the firmware is already current. This machine shipped with `N3QET52W (1.52)`, dated 2026-04-23.
 
 ### Step 6 — Packages
 
@@ -424,11 +411,8 @@ flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.f
 
 **Notes**
 
-- The package is `openvpn3-client`. There is no package called `openvpn3`.
-- `gnome-shell-extension-manager` is the Extension Manager application. `gnome-shell-extensions` is the set of official extensions it can enable.
-- `plasma-discover-backend-flatpak` is the KDE software centre backend. On GNOME nothing uses it and it pulls in KDE libraries. Drop it unless you also run Plasma.
 - Log out and back in before flatpak applications appear in GNOME Software.
-- `virt-top` reads from libvirt. Until a libvirt daemon is installed and running it starts and shows nothing.
+- `virt-top` reads from libvirt. Until libvirt is installed and running it shows nothing.
 
 ### Step 7 — Bash, tmux, and SSH configuration
 
@@ -455,9 +439,8 @@ exec bash
 
 **Notes**
 
-- Run this step as your own user, never as root. The installer writes to `$HOME`, so as root it configures `/root` and leaves your account untouched.
-- Run it from the repository directory. It reads the files next to it.
-- The installer asks whether to configure `root` as well. Answer `y` to get the same prompt, aliases, and tmux settings under `su`.
-- It is idempotent. Re-running replaces the SSH block instead of duplicating it.
-- Keep the repository after the install. The installer needs it to re-run.
-- `README.md` covers the prompt, the tmux keys, and what the configuration changes.
+- Run it from the repository directory as your own user. As root it configures `/root` and leaves your account untouched.
+- It asks whether to configure `root` as well. Answer `y` for the same prompt, aliases, and tmux settings under `su`.
+- Safe to re-run. The SSH block is replaced, not duplicated.
+- Keep the repository. The installer needs it to re-run.
+- `README.md` covers the prompt, the tmux keys, and what changes.
