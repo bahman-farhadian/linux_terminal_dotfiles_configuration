@@ -458,6 +458,68 @@ error.
 flatpak install -y flathub org.telegram.desktop com.belmoussaoui.Obfuscate md.obsidian.Obsidian io.gitlab.adhami3310.Impression
 ```
 
+#### 6. Install what the  repository needs
+
+```bash
+apt install -y curl gnupg
+```
+
+#### 7. Create the keyring directory
+
+```bash
+install -m 0755 -d /etc/apt/keyrings
+```
+
+#### 8. Fetch the  signing key
+
+```bash
+curl -fsSL  -o 
+```
+
+```bash
+chmod a+r 
+```
+
+Read the key before trusting it:
+
+```bash
+gpg --show-keys 
+```
+
+#### 9. Add the repository
+
+```bash
+vim 
+```
+
+Put this in it:
+
+```
+Types: deb
+URIs: 
+Suites: stable
+Components: main
+Signed-By: 
+```
+
+```bash
+apt update
+```
+
+#### 10. Install 
+
+```bash
+apt install -y 
+```
+
+#### 11. Check it
+
+```bash
+apt policy 
+```
+
+The `Installed:` line must show a version, not `(none)`.
+
 **Notes**
 
 - Log out and back in before flatpak applications appear in GNOME Software.
@@ -471,6 +533,10 @@ flatpak install -y flathub org.telegram.desktop com.belmoussaoui.Obfuscate md.ob
 - `default-jre` runs `.jar` files with `java -jar`. It pulls OpenJDK 21. The headless variant is not used because a jar that opens a window fails at runtime under it rather than at install time.
 - `net-tools` provides `netstat`, `ifconfig` and `route`. They are superseded by `ss` and `ip` from `iproute2`, which is already installed, but the old names are still what most documentation uses.
 - `virt-top` reads from libvirt. Until libvirt is installed and running it shows nothing.
+-  comes from 's own repository, not Debian's. The key is fetched separately and `Signed-By` limits it to that one repository.
+- `gpg --show-keys` prints the key before apt is told to trust it. Compare the fingerprint with the one  publishes.
+- Run `` as your own user, not root. Its settings and login live in your home directory, so as root they land in `/root`.
+- The keyring directory and the key fetch are done again in Step 9 for Docker. Both are safe to repeat: the directory is left alone if it exists, and the key file is overwritten with the same content.
 
 ### Step 7 — Bash, tmux, and SSH configuration
 
