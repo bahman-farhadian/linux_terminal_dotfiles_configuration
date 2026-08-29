@@ -427,7 +427,7 @@ sudo -i
 #### 2. Install the packages
 
 ```bash
-apt install -y bash-completion bridge-utils btop curl default-jre duf ethtool ffmpeg filezilla foliate git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc lshw nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip
+apt install -y bash-completion bridge-utils btop curl default-jre duf ethtool ffmpeg filezilla foliate git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc lshw nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip yt-dlp
 ```
 
 #### 3. Install flatpak
