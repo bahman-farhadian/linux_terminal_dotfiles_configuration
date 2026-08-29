@@ -91,11 +91,16 @@ _C_FLAMINGO='\[\e[38;2;197;176;136m\]'  # #C5B088 white 8.15:1
 _C_GREY='\[\e[38;2;145;126;107m\]'  # #917E6B bright_black 4.43:1
 _C_RST='\[\e[0m\]'
 
-# Catppuccin Mocha accents, spread around the wheel so no two neighbouring
-# segments share a hue: Green user, Yellow host, Blue path, Peach branch, Mauve
-# venv, Sky k8s. The user name carries the privilege colour and is the only
-# thing that changes; the host keeps its own so it never moves. Everything
-# after the path is conditional and absent when it has nothing to say.
+# Segments are spread around the wheel so no two neighbours share a hue: green
+# user, yellow host, blue path, orange branch, magenta venv, cyan k8s. The user
+# name carries the privilege colour and is the only thing that changes; the host
+# keeps its own so it never moves. Everything after the path is conditional and
+# absent when it has nothing to say.
+#
+# The _C_PEACH, _C_MAUVE, _C_SKY and _C_FLAMINGO names are left over from the
+# Catppuccin palette this used before. They now hold Srcery orange, bright
+# magenta, cyan and white; the names are kept only so the prompt builder below
+# did not have to be rewritten for a colour change.
 _set_prompt() {
     local exit_code=$?
     local line sym sym_col user_col
