@@ -112,6 +112,7 @@ ck "script executable" "$([ -x "$HOME/.local/bin/lock-keyboard-en.sh" ] && echo 
 ck "functions" "$(bash -ic 'type -t update upgrade ports _asroot' 2>/dev/null|grep -c function)" "4"
 ck "aliases"   "$(bash -ic 'alias DE EN kbd' 2>/dev/null|grep -c ^alias)" "3"
 ck "window-size" "$(tmux show-options -g window-size 2>/dev/null|awk '{print $2}')" "smallest"
+ck "gtk3 prefers dark" "$(grep -c '^gtk-application-prefer-dark-theme=1' "$HOME/.config/gtk-3.0/settings.ini" 2>/dev/null)" "1"
 ck "hist ignorespace"  "$(bash -ic 'echo $HISTCONTROL' 2>/dev/null|grep -c 'ignoreboth\|ignorespace')" "1"
 ck "hist append prompt" "$(bash -ic 'echo $PROMPT_COMMAND' 2>/dev/null|grep -c 'history -a')" "1"
 ck "histappend shopt"  "$(bash -ic 'shopt histappend' 2>/dev/null|awk '{print $2}')" "on"

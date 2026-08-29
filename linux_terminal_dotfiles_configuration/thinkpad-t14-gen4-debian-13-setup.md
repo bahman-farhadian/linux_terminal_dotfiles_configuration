@@ -576,6 +576,8 @@ exec bash
 - A command typed with a leading space is not written to the history file. Use it for anything carrying a password or a token. One space is enough.
 - History is written at every prompt, not only when the shell exits. A tmux pane that is killed rather than closed keeps everything typed in it.
 - It also writes `/etc/profile.d/99-history.sh` so both rules apply to every account, not only yours. That file is read by login shells, so an account without these dotfiles gets the rules on a tty or over SSH.
+- It also writes `~/.config/gtk-3.0/settings.ini` with `gtk-application-prefer-dark-theme=1`. GNOME's dark preference is a libadwaita setting, so a GTK3 application that never opted into it stays light. This is narrower than exporting `GTK_THEME`, which would force every GTK application onto the legacy Adwaita-dark including the GTK4 ones that already follow GNOME correctly.
+- `install.sh` owns that file. If you put your own keys in it, they are replaced the next time the dark setting is missing from it.
 - `README.md` covers the prompt, the tmux keys, and what changes.
 
 ### Step 8 — KVM and libvirt
@@ -727,6 +729,7 @@ Both must run without a permission error. `default` must show `active` and
 
 - There is no `qemu-kvm` package in trixie. `qemu-system-x86` is the one that provides the emulator, and KVM itself is a kernel module that is already present.
 - The `usermod` sub-step has to run as your own user, not root. Under `sudo` as root, `$USER` is `root`, so the groups would be added to the wrong account.
+- `virt-manager` is a GTK3 application and ignores the GNOME dark preference on its own. Step 7 writes the GTK3 setting that fixes it. Nothing needs editing in its `.desktop` file.
 - The connection URI matters. Run as an ordinary user, `virsh` defaults to `qemu:///session`, a per-user hypervisor with no networks and no machines. The system VMs are on `qemu:///system`. Set `LIBVIRT_DEFAULT_URI=qemu:///system` if you would rather not type it each time.
 - Group membership only applies at the next login. `newgrp libvirt` works for one shell if you do not want to log out.
 - `modprobe -r kvm_intel` fails if a virtual machine is running. Shut them down first.
