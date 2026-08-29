@@ -567,6 +567,8 @@ exec bash
 - It asks whether to configure `root` as well. Answer `y` for the same prompt, aliases, and tmux settings under `su`.
 - Safe to re-run. The SSH block is replaced, not duplicated.
 - Keep the repository. The installer needs it to re-run.
+- `.bashrc` adds `/usr/local/sbin`, `/usr/sbin` and `/sbin` to your PATH. Debian leaves these out for non-root users, so `sysctl`, `swapon` and `efibootmgr` report `command not found` even though `sudo` runs them. This makes your PATH cover the same directories as root's.
+- Check it with `command -v sysctl`. It must print `/usr/sbin/sysctl`. If it prints nothing, the shell has not been reloaded yet.
 - It also installs `lock-keyboard-en.service`, a systemd user service that switches the keyboard to English the moment the screen locks, whatever layout was active. The unlock prompt is then never stuck on a layout that cannot type your password.
 - Check it with `systemctl --user status lock-keyboard-en.service`. It must be `active (running)`.
 - It also writes `/etc/ssh/sshd_config.d/99-local.conf` so root can only reach SSH with a key, never a password. Ordinary users and port 22 are unchanged. This needs sudo, so answer `y` at the root prompt.

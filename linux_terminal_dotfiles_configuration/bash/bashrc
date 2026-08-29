@@ -41,8 +41,25 @@ HISTFILESIZE=200000
 shopt -s histappend
 shopt -s checkwinsize
 
-# PATH extras
-export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
+# PATH extras. Debian gives root the sbin directories but leaves them out for
+# everyone else, so sysctl, swapon and efibootmgr read as "command not found"
+# for a user who can run them under sudo anyway. Adding them here makes this
+# user's PATH cover the same directories as root's. The case test stops a
+# re-sourced .bashrc from stacking duplicate entries.
+_path_prepend() {
+    [ -d "$1" ] || return 0
+    case ":$PATH:" in
+        *":$1:"*) ;;
+        *) PATH="$1:$PATH" ;;
+    esac
+}
+_path_prepend /sbin
+_path_prepend /usr/sbin
+_path_prepend /usr/local/sbin
+_path_prepend /usr/local/bin
+_path_prepend "$HOME/.local/bin"
+unset -f _path_prepend
+export PATH
 
 # Editor
 export EDITOR=vim
