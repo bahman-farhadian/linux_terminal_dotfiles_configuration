@@ -127,14 +127,15 @@ full-strength accent as the block background with Crust `#11111b` on top.
 
 | Element | Block | Text |
 |---|---|---|
-| session name | Mauve `#cba6f7` | Crust `#11111b` |
-| active window | Green `#a6e3a1` | Crust `#11111b` |
-| inactive window | Surface1 `#45475a` | Text `#cdd6f4` |
-| zoomed marker | Crust `#11111b` | Red `#f38ba8` |
+| session name | Mauve `#ca9ee6` | Crust `#11111b` |
+| active window | Green `#a6d189` | Crust `#11111b` |
+| inactive window | Surface0 `#313244` | Text `#c6d0f5` |
+| zoomed marker | Crust `#11111b` | Red `#e78284` |
 
 Blending an accent down toward the base is what makes it look muddy, so the
 accent stays at full saturation and the dark colour goes on the text instead.
-That puts the session at 9.2:1 and the active window at 12.6:1.
+The accents are Frappe, matching the prompt, over Mocha surfaces, which are the
+darker of the two flavours. Session 8.5:1, active window 10.8:1, inactive 8.7:1.
 
 The bar itself uses `bg=default` so it takes the terminal's own background. A
 terminal window whose height is not an exact multiple of the character cell
