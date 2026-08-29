@@ -616,7 +616,21 @@ groups
 
 Expect `libvirt` and `kvm` in the list.
 
-#### 10. Verify as your own user
+#### 10. Start the default network
+
+It is defined by the package but left stopped, and it does not start at boot
+until told to. Virtual machines on the default network have no connectivity
+without it.
+
+```bash
+virsh -c qemu:///system net-autostart default
+```
+
+```bash
+virsh -c qemu:///system net-start default
+```
+
+#### 11. Verify as your own user
 
 ```bash
 virsh -c qemu:///system list --all
@@ -626,8 +640,8 @@ virsh -c qemu:///system list --all
 virsh -c qemu:///system net-list --all
 ```
 
-Both must run without a permission error, and `default` must be listed and
-active.
+Both must run without a permission error. `default` must show `active` and
+`Autostart yes`.
 
 **Notes**
 
