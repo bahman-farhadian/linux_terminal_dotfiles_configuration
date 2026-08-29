@@ -34,8 +34,10 @@ if [ -z "$TMUX" ] && [ -z "$_in_mux" ] && [ -z "$NO_AUTO_TMUX" ] && command -v t
 fi
 unset _in_mux
 
-# History — full deduplication (ignoredups + erasedups)
-HISTCONTROL=ignoredups:erasedups
+# History. ignoreboth is ignoredups plus ignorespace, so a command typed with a
+# leading space is never written to the file — that is the way to keep a
+# password or a token out of it. erasedups drops older copies of a repeat.
+HISTCONTROL=ignoreboth:erasedups
 HISTSIZE=100000
 HISTFILESIZE=200000
 shopt -s histappend
@@ -127,7 +129,9 @@ _set_prompt() {
     if [ "$exit_code" -eq 0 ]; then sym_col="$_C_GREEN"; else sym_col="$_C_RED"; fi
     PS1="${line} ${sym_col}${sym}${_C_RST} "
 }
-PROMPT_COMMAND='_set_prompt'
+# history -a appends this shell's new lines to the file at every prompt rather
+# than only at exit, so a tmux pane that is killed still keeps its history.
+PROMPT_COMMAND='history -a; _set_prompt'
 
 # ls colours — Linux uses --color=auto and LS_COLORS (set by dircolors)
 alias ls='ls --color=auto'

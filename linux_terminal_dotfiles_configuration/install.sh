@@ -259,6 +259,36 @@ else
     printf '  systemctl --user enable --now lock-keyboard-en.service keyboard-en-tick.timer\n'
 fi
 
+_hdr "shell history for all users"
+# The dotfiles above set this for this account. The drop-in covers every other
+# account, so the two rules hold system wide rather than only for one user.
+_hist_drop=/etc/profile.d/99-history.sh
+if [ "$HAS_SUDO" != true ]; then
+    _skip "history drop-in needs sudo"
+else
+    sudo tee "$_hist_drop" >/dev/null <<'HISTCONF'
+# Command history rules for every account.
+#
+# ignorespace (the second half of ignoreboth) keeps a command typed with a
+# leading space out of the history file. Use it for anything carrying a
+# password or a token.
+#
+# history -a on every prompt appends new lines as they are entered, so a shell
+# that is killed rather than exited — a closed tmux pane, for one — has already
+# written its history.
+HISTCONTROL=ignoreboth:erasedups
+HISTSIZE=100000
+HISTFILESIZE=200000
+shopt -s histappend
+case "$PROMPT_COMMAND" in
+    *'history -a'*) ;;
+    *) PROMPT_COMMAND="history -a${PROMPT_COMMAND:+; $PROMPT_COMMAND}" ;;
+esac
+HISTCONF
+    sudo chmod 0644 "$_hist_drop"
+    _ok "$_hist_drop — leading space ignored, history written each prompt"
+fi
+
 _hdr "SSH server"
 # Root by key only; ordinary users unchanged; port 22 left at the default.
 # A broken sshd_config locks you out of the machine, so this validates before
