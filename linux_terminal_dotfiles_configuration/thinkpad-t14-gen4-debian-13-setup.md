@@ -189,7 +189,7 @@ systemctl reboot
 Log back in and become root again before the checks:
 
 ```bash
-su -
+sudo -i
 ```
 
 #### 9. Check Secure Boot
@@ -337,7 +337,7 @@ Thunderbolt can all be updated from Linux. No Windows and no USB needed.
 Step 4 ended with a log out, so this starts again as an ordinary user.
 
 ```bash
-su -
+sudo -i
 ```
 
 #### 2. Install fwupd
@@ -379,7 +379,7 @@ systemctl reboot
 Log back in and become root again before continuing:
 
 ```bash
-su -
+sudo -i
 ```
 
 #### 8. Check nothing is left
@@ -421,7 +421,7 @@ Expect `SecureBoot enabled`.
 The rest of this step is run as root.
 
 ```bash
-su -
+sudo -i
 ```
 
 #### 2. Install the packages
@@ -514,7 +514,7 @@ exec bash
 The rest of this step is run as root.
 
 ```bash
-su -
+sudo -i
 ```
 
 #### 2. Check the CPU exposes virtualization
@@ -673,7 +673,7 @@ Docker Engine from Docker's own repository, not Debian's `docker.io`.
 The rest of this step is run as root.
 
 ```bash
-su -
+sudo -i
 ```
 
 #### 2. Install what the repository setup needs
@@ -885,7 +885,7 @@ running, so anything in progress carries on.
 #### 1. Become root
 
 ```bash
-su -
+sudo -i
 ```
 
 #### 2. Create the override
