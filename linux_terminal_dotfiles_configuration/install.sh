@@ -148,52 +148,47 @@ cat > "$HOME/.local/bin/lock-keyboard-en.sh" << 'LOCKSH'
 #!/bin/sh
 # Keep the keyboard on English.
 #
-#   watch   on screen lock, go to English whatever was active
-#   tick    every few minutes, if the layout list is already the English pair
-#           but Persian is the selected one, select English
+#   watch   on lock, leave English as the only layout, so nothing else can be
+#           active while the password is typed. On unlock, put Persian back.
+#   tick    every few minutes, drop to English alone and restore the pair.
 #
-# The tick deliberately does nothing while German is the layout, because German
-# is only ever active if it was chosen on purpose.
+# Only the layout list is written. Writing `current` does nothing: GNOME ignores
+# it, and the key reads 0 even while Persian is the live layout. Removing the
+# other layouts is the one method that demonstrably changes what is active,
+# which is why the German case worked when nothing else did.
 
 DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
 export DBUS_SESSION_BUS_ADDRESS
 
 SCHEMA=org.gnome.desktop.input-sources
-EN_SOURCES="[('xkb', 'us'), ('xkb', 'ir')]"
+EN_ONLY="[('xkb', 'us')]"
+EN_PAIR="[('xkb', 'us'), ('xkb', 'ir')]"
 
 sources_now() { gsettings get "$SCHEMA" sources 2>/dev/null; }
-current_now() { gsettings get "$SCHEMA" current 2>/dev/null; }
+set_sources()  { [ "$(sources_now)" = "$1" ] || gsettings set "$SCHEMA" sources "$1"; }
 
-# On lock: force the English pair and select the first entry. Setting the list
-# alone is not enough, because Persian stays in it and stays selected.
-force_english() {
-    [ "$(sources_now)" = "$EN_SOURCES" ] || gsettings set "$SCHEMA" sources "$EN_SOURCES"
-    [ "$(current_now)" = "uint32 0" ]    || gsettings set "$SCHEMA" current 0
-}
-
-# Periodic: only when the list is already the English pair. Leaves German alone.
-select_english() {
-    [ "$(sources_now)" = "$EN_SOURCES" ] || return 0
-    [ "$(current_now)" = "uint32 0" ]    && return 0
-    gsettings set "$SCHEMA" current 0
-}
+english_only()  { set_sources "$EN_ONLY"; }
+restore_pair()  { set_sources "$EN_PAIR"; }
 
 case "${1:-watch}" in
     tick)
-        select_english
+        # Only when the pair is the current list. A deliberate switch to German
+        # is left alone.
+        [ "$(sources_now)" = "$EN_PAIR" ] || exit 0
+        english_only
+        restore_pair
         ;;
     watch)
-        # Act at once if the screen is already locked when this starts.
         case "$(gdbus call --session --dest org.gnome.ScreenSaver \
                 --object-path /org/gnome/ScreenSaver \
                 --method org.gnome.ScreenSaver.GetActive 2>/dev/null)" in
-            *true*) force_english ;;
+            *true*) english_only ;;
         esac
-        # ActiveChanged carries true on lock and false on unlock.
         gdbus monitor --session --dest org.gnome.ScreenSaver 2>/dev/null |
         while IFS= read -r line; do
             case "$line" in
-                *ActiveChanged*true*) force_english ;;
+                *ActiveChanged*true*)  english_only ;;
+                *ActiveChanged*false*) restore_pair ;;
             esac
         done
         ;;
