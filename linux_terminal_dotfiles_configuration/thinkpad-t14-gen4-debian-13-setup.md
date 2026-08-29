@@ -220,7 +220,7 @@ Expect `\EFI\debian\shimx64.efi`.
 lsblk
 ```
 
-Expect `1G` (or `1023M`), `2G`, and `888G`.
+Expect `1G`, `2G`, and `888G`.
 
 ```bash
 findmnt -no FSTYPE /
