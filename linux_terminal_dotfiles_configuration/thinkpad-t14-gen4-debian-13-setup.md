@@ -15,13 +15,14 @@ Step 3, which is a manual edit and is noted there.
 | 2 | Note BIOS version | `Main` tab — write it down |
 | 3 | Open Secure Boot | `Security → Secure Boot` |
 | 4 | Allow the 3rd party CA | `Allow Microsoft 3rd Party UEFI CA` = **On** |
-| 5 | Check the other lines | `Secure Boot` = **On**, `Secure Boot Mode` = **User Mode**, `Secure Boot Key State` = **Standard** |
+| 5 | Check the other lines | `Secure Boot` = **On**, `Secure Boot Mode` = **Custom Mode** |
 | 6 | Save and exit | **F10** → **Yes** |
 | 7 | Boot the installer | **F12** at the splash, pick the USB device |
 
 **Notes**
 
 - Debian's bootloader is signed by Microsoft's 3rd party UEFI CA. With this **Off** the machine will not boot and shows `Invalid signature detected`.
+- Turning the 3rd party CA on switches `Secure Boot Mode` from `Standard Mode` to `Custom Mode`. That is expected. Custom Mode only means the key set is no longer the factory default. Secure Boot still checks every signature.
 - Leave `Secure Boot` **On** for the whole install.
 - Never use `Reset to Setup Mode` or `Clear All Secure Boot Keys`. They cause the failure above and Debian does not need them.
 
@@ -39,10 +40,10 @@ the **Shows as** value.
 
 **Notes**
 
-- Leave the rest of the disk unpartitioned. That free space is SSD over-provisioning: 953.87 GiB disk, minus 3 GiB for EFI and boot, minus 888 GiB for root, leaves 62.87 GiB. The drive uses it for wear levelling, which keeps write speed up as the disk fills.
+- Leave the rest of the disk unpartitioned. That free space is SSD over-provisioning: the disk reports `953.9G`, minus 3 GiB for EFI and boot, minus 888 GiB for root, leaves about 63 GiB. The drive uses it for wear levelling, which keeps write speed up as the disk fills.
 - The installer counts in GB, `df -h` counts in GiB. Root shows as `953.5 GB` here and `888G` later. Same partition.
 - For any other size: type `GiB x 1073.741824` MB, rounded.
-- The EFI partition may still come out as `1023M`. That is harmless.
+- Sizes on the installed system: `lsblk` reports `1G`, `2G`, `888G`. `df -h` reports the EFI partition as `1022M`, because the FAT filesystem uses a little of it. Both are correct.
 - No swap partition. Only hibernation needs one, and hibernation does not work while Secure Boot is on.
 - The installer warns that no swap space is selected. Continue.
 
