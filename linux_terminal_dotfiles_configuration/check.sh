@@ -120,6 +120,13 @@ ck "hist append prompt" "$(bash -ic 'echo $PROMPT_COMMAND' 2>/dev/null|grep -c '
 ck "histappend shopt"  "$(bash -ic 'shopt histappend' 2>/dev/null|awk '{print $2}')" "on"
 hf "history drop-in"   /etc/profile.d/99-history.sh
 
+printf '\n--- Step 7: ssh client config ---\n'
+# The block has to exist and has to be last: ssh takes the first value it finds
+# for each keyword, so a Host * section above the specific hosts overrides them.
+sc="$HOME/.ssh/config"
+ck "ssh managed block" "$(grep -c '^# >>> dotfiles managed block >>>$' "$sc" 2>/dev/null)" "1"
+ck "block is last"     "$(awk '/^# >>> dotfiles managed block >>>/{s=NR} /^Host /{l=NR} END{print (s&&l>s)?"yes":"no"}' "$sc" 2>/dev/null)" "yes"
+
 printf '\n--- Step 7/10: keyboard and lid ---\n'
 ck "lock service" "$(systemctl --user is-active lock-keyboard-en.service)" "active"
 ck "tick timer"   "$(systemctl --user is-active keyboard-en-tick.timer)" "active"
