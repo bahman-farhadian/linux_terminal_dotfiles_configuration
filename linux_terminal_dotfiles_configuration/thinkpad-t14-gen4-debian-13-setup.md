@@ -164,20 +164,26 @@ this goes on the kernel command line.
 vim /etc/default/grub
 ```
 
-Make sure these three lines are present and read exactly this:
+These five lines are the whole active configuration. Make the uncommented lines
+in the file read exactly this, and leave every commented line below them alone:
 
 ```
-GRUB_TIMEOUT=10
+GRUB_DEFAULT=0
+GRUB_TIMEOUT=9
+GRUB_DISTRIBUTOR=`( . /etc/os-release && echo ${NAME} )`
 GRUB_CMDLINE_LINUX_DEFAULT="quiet loglevel=3 systemd.show_status=auto udev.log_level=3"
 GRUB_CMDLINE_LINUX="rootflags=uquota,pquota"
 ```
 
-`GRUB_TIMEOUT` is `5` by default and `GRUB_CMDLINE_LINUX` is empty. Leave
-every other line in the file as it is.
+The whole set is written out rather than a list of lines to change, so a missing
+line is obvious. `GRUB_DEFAULT` and `GRUB_DISTRIBUTOR` come from the installer
+and are left as they are. `GRUB_TIMEOUT` is `5` by default, and both
+`GRUB_CMDLINE_LINUX_DEFAULT` and `GRUB_CMDLINE_LINUX` are what this step sets.
 
-`GRUB_CMDLINE_LINUX_DEFAULT` may be missing from the file rather than just
-wrong. Add it if it is not there. Without it the machine prints every kernel
-and service message across the screen while it boots.
+Compare the file against all five before saving. Deleting
+`GRUB_CMDLINE_LINUX_DEFAULT` rather than editing it is an easy mistake, and the
+result is a machine that prints every kernel and service message across the
+screen while it boots.
 
 Apply it:
 
@@ -187,7 +193,7 @@ update-grub
 
 **Notes on the boot messages**
 
-- `quiet` is what stops the kernel printing to the screen. Debian normally ships it and the boot is loud without it.
+- `quiet` is what stops the kernel printing to the screen. Debian ships it by default, so a loud boot usually means the line was removed rather than never set.
 - `loglevel=3` keeps errors and warnings visible while dropping the rest, so a real failure still reaches you.
 - `systemd.show_status=auto` hides the per-service status lines but brings them back when a unit fails.
 - The two `GRUB_CMDLINE_LINUX` settings are different. `_DEFAULT` applies to the normal entry only, so recovery mode stays verbose, which is what you want from it. The plain one applies to every entry, which is why the quota flags go there.
