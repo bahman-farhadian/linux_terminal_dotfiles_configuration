@@ -59,15 +59,40 @@ _check_prereqs() {
 
 _check_prereqs
 
-printf '\nConfigure root user as well? [y/N]: '
-read -r _ans
+# Root is configured again whenever it was configured before. A prompt that
+# defaults to N meant one Enter left /root holding whatever an earlier run had
+# put there, with no way to notice and no later run to correct it: reapplying
+# converged for this account and quietly drifted for the other one. The stamp
+# records the answer, so the question is asked once and both accounts stay in
+# step from then on. --root and --no-root answer it for an unattended run.
+ROOT_STAMP=/etc/dotfiles-root-configured
+ROOT_WANTED=
+for _arg in "$@"; do
+    case "$_arg" in
+        --root)    ROOT_WANTED=yes ;;
+        --no-root) ROOT_WANTED=no ;;
+    esac
+done
+
+if [ -n "$ROOT_WANTED" ]; then
+    :
+elif [ -e "$ROOT_STAMP" ]; then
+    ROOT_WANTED=yes
+    _ok "root was configured before — keeping it in step (--no-root to stop)"
+else
+    printf '\nConfigure root user as well? [y/N]: '
+    read -r _ans
+    [[ "$_ans" =~ ^[Yy] ]] && ROOT_WANTED=yes || ROOT_WANTED=no
+fi
+
 HAS_SUDO=false
-if [[ "$_ans" =~ ^[Yy] ]]; then
+if [ "$ROOT_WANTED" = yes ]; then
     if sudo -v; then HAS_SUDO=true; _ok "sudo granted"
     else _warn "sudo failed — root skipped"
     fi
 else
     _skip "root configuration"
+    [ -e "$ROOT_STAMP" ] && _warn "/root still holds an older copy — rerun with --root to refresh it"
 fi
 
 _hdr "bash"
@@ -78,6 +103,13 @@ if [ "$HAS_SUDO" = true ]; then
     sudo_cp "$REPO/bash/bash_profile" /root/.bash_profile
     sudo_cp "$REPO/bash/bashrc"       /root/.bashrc
     sudo_cp "$REPO/bash/bash_aliases" /root/.bash_aliases
+    # Remembered so the question is asked once and never silently answered N on
+    # a later run. World readable on purpose: the check has to work before sudo.
+    sudo tee "$ROOT_STAMP" >/dev/null <<'STAMP'
+# /root is configured from this dotfiles repository. install.sh refreshes it on
+# every run because this file exists. Delete it to stop that.
+STAMP
+    sudo chmod 0644 "$ROOT_STAMP"
 fi
 
 _hdr "tmux"
@@ -85,55 +117,99 @@ cp_file "$REPO/tmux/tmux.conf" "$HOME/.tmux.conf"
 [ "$HAS_SUDO" = true ] && sudo_cp "$REPO/tmux/tmux.conf" /root/.tmux.conf || true
 
 _hdr "ssh"
-_upsert_ssh() {
-    local config="$1"
-    grep -qF 'AddKeysToAgent 5m' "$config" 2>/dev/null && return 0
-    if grep -qF 'StrictHostKeyChecking no' "$config" 2>/dev/null; then
-        if command -v python3 &>/dev/null; then
-            local py
-            py=$(mktemp)
-            cat > "$py" << 'PYEOF'
-import sys, re
-path = sys.argv[1]
-try: text = open(path).read()
-except FileNotFoundError: text = ''
-text = re.sub(r'\nHost \*\n(?:[ \t][^\n]*\n?)*', '', '\n' + text).strip()
-open(path, 'w').write(text + '\n' if text else '')
+# The repository's settings live between markers and are rewritten on every run,
+# so editing ssh/config here actually reaches the machine. The old version added
+# them once and then returned early forever on finding `AddKeysToAgent 5m`, which
+# meant no later edit was ever applied.
+#
+# Everything outside the markers is left byte for byte as it was: these files
+# carry personal Host entries the repository knows nothing about.
+#
+# The block goes at the END of the file. ssh takes the first value it finds for
+# each keyword, so a `Host *` section placed above the specific hosts silently
+# wins over them — `Port 22` in the defaults defeats the `Port 443` written for
+# a host that has to reach the outside on 443.
+_ssh_py=$(mktemp)
+cat > "$_ssh_py" << 'PYEOF'
+import re, sys
+
+path, block_path = sys.argv[1], sys.argv[2]
+BEGIN = "# >>> dotfiles managed block >>>"
+END = "# <<< dotfiles managed block <<<"
+
+try:
+    text = open(path).read()
+except FileNotFoundError:
+    text = ""
+
+# This run replaces the previous run's block.
+text = re.sub(re.escape(BEGIN) + r".*?" + re.escape(END) + r"[ \t]*\n?", "", text, flags=re.S)
+
+
+# Installs from before the markers existed wrote the same settings unmarked, and
+# usually at the top where they override every host below. Recognise that block
+# by the options only this repository sets, so a `Host *` section someone wrote
+# themselves is not touched.
+def drop_if_ours(match):
+    body = match.group(0)
+    mine = "UserKnownHostsFile /dev/null" in body or "AddKeysToAgent" in body
+    return "" if mine else body
+
+
+text = re.sub(r"(?m)^Host \*[ \t]*\n(?:[ \t]+[^\n]*\n?)*", drop_if_ours, text)
+text = re.sub(r"\n{3,}", "\n\n", text).strip("\n")
+
+managed = "\n".join([
+    BEGIN,
+    "# Written by install.sh and replaced on every run. Edit ssh/config in the",
+    "# repository, not here. Put your own Host entries ABOVE this block: ssh uses",
+    "# the first value it finds for each keyword, so these defaults have to come",
+    "# last or they override every host above them.",
+    open(block_path).read().strip("\n"),
+    END,
+])
+
+open(path, "w").write((text + "\n\n" if text else "") + managed + "\n")
 PYEOF
-            python3 "$py" "$config"
-            rm -f "$py"
-        else
-            _warn "python3 not found — skipping SSH dedup (stale Host * block left in place)"
-        fi
+
+_apply_ssh() {
+    local config="$1" label="$2"
+    if ! command -v python3 >/dev/null 2>&1; then
+        _warn "python3 not found — $label left alone"
+        return 1
     fi
-    printf '\n' >> "$config"
-    cat "$REPO/ssh/config" >> "$config"
-    return 1
+    # Rewritten via a temporary file, so a failure partway through cannot leave a
+    # half-written config behind for a file holding every host you log in to.
+    local tmp; tmp=$(mktemp); chmod 600 "$tmp"
+    cat "$config" > "$tmp" 2>/dev/null || true
+    if python3 "$_ssh_py" "$tmp" "$REPO/ssh/config"; then
+        cat "$tmp" > "$config"
+        rm -f "$tmp"
+        _ok "$label — managed block refreshed, your own Host entries untouched"
+    else
+        rm -f "$tmp"
+        _warn "$label unchanged — could not rewrite it"
+        return 1
+    fi
 }
 
 mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
 touch "$HOME/.ssh/config" && chmod 600 "$HOME/.ssh/config"
-if _upsert_ssh "$HOME/.ssh/config"; then
-    _ok "SSH already present in ~/.ssh/config"
-else
-    chmod 600 "$HOME/.ssh/config"
-    _ok "SSH applied to ~/.ssh/config"
-fi
+_apply_ssh "$HOME/.ssh/config" "~/.ssh/config" || true
+chmod 600 "$HOME/.ssh/config"
 
 if [ "$HAS_SUDO" = true ]; then
     sudo mkdir -p /root/.ssh && sudo chmod 700 /root/.ssh
     _rtmp=$(mktemp)
-    sudo cat /root/.ssh/config 2>/dev/null > "$_rtmp" || true
     chmod 600 "$_rtmp"
-    if _upsert_ssh "$_rtmp"; then
-        _ok "SSH already present in /root/.ssh/config"
-    else
+    sudo cat /root/.ssh/config 2>/dev/null > "$_rtmp" || true
+    if _apply_ssh "$_rtmp" "/root/.ssh/config"; then
         sudo cp "$_rtmp" /root/.ssh/config
         sudo chmod 600 /root/.ssh/config
-        _ok "SSH applied to /root/.ssh/config"
     fi
     rm -f "$_rtmp"
 fi
+rm -f "$_ssh_py"
 
 _hdr "misc"
 cp_file "$REPO/hushlogin" "$HOME/.hushlogin"

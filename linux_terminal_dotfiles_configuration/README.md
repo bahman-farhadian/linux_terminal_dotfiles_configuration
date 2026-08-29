@@ -44,18 +44,49 @@ sudo apt install tmux vim git curl jq tree python3 openssl bash-completion xclip
 exec bash
 ```
 
-The script is idempotent. It asks whether to configure `root` as well — answer
-`y` to get the same prompt, aliases, and tmux settings under `su`.
+The script is idempotent, and idempotent for both accounts. It asks once whether
+to configure `root` as well — answer `y` to get the same prompt, aliases, and
+tmux settings under `su`. The answer is recorded in `/etc/dotfiles-root-configured`,
+so every later run refreshes `/root` too rather than leaving it on whatever an
+earlier run happened to install. `--root` and `--no-root` answer the question for
+an unattended run; deleting the stamp stops root being managed.
 
 Run it as your own user, never as root. It installs into `$HOME`, so running it
 as root configures `/root` and leaves your account untouched.
+
+### What it overwrites, and what it leaves alone
+
+`.bashrc`, `.bash_profile`, `.bash_aliases`, `.tmux.conf` and `.hushlogin` are
+replaced outright on every run, for both accounts. They are this repository's
+files; whatever is in them came from here, and anything added to them by hand is
+lost on the next run. Put personal additions in a file this repository does not
+name.
+
+`~/.ssh/config` is the exception, because it holds Host entries that have nothing
+to do with these dotfiles. Only the marked block is rewritten:
+
+```
+# >>> dotfiles managed block >>>
+Host *
+    StrictHostKeyChecking no
+    ...
+# <<< dotfiles managed block <<<
+```
+
+Everything outside the markers is kept byte for byte, and the block is written at
+the **end** of the file. That position matters: `ssh` uses the first value it
+finds for each keyword, so a `Host *` section sitting above the specific hosts
+overrides all of them — `Port 22` in the defaults quietly defeats the `Port 443`
+written for a host that has to reach the outside on 443. An install from before
+the markers existed wrote the block at the top and had exactly that effect; the
+first run of the current script moves it to the end and repairs those hosts.
 
 ## Differences from the macOS set
 
 - No Homebrew, no `pbcopy`/`pbpaste`, no `gnubin` coreutils shim.
 - `cpy` uses `xclip` when a display is present, and falls back to plain `tee` on
   a headless machine.
-- `privip` uses `hostname -I`. `ports` uses `ss -tunlp`.
+- `privip` lists every private address by interface. `ports` uses `ss -tunlp`.
 - `b` prefers `btop` and falls back to `htop`.
 - Plain colour prompt, not the macOS badge/powerline style, and segments are hidden rather than showing `disconnected` or `inactive`.
 - No Option-key bindings. Ghostty on macOS sent `M-w/a/s/d` and `M-1`–`M-7`;
@@ -195,13 +226,33 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 | `kbd` | show the current input sources |
 | `pubkey` | print the first SSH public key |
 | `password` | random base64-48 string |
-| `pubip` / `privip` | external / private IP |
+| `pubip` / `privip` | external IP / every private address, by interface |
 | `ports` | listening TCP and UDP sockets, with the process holding each |
 | `cpy` | pipe filter — `cmd 2>&1 \| cpy` prints and copies |
 
 `ports`, `update` and `upgrade` are functions, not aliases, because they decide
 whether `sudo` is needed: as root they run the commands directly, otherwise through
 `sudo`. `update` changes nothing beyond refreshing the package lists.
+
+`privip` is a function for a different reason. On a machine running a VPN, Docker
+and libvirt there is no single private address to report — this one holds five:
+
+```
+$ privip
+wlp0s20f3   192.168.8.2  ← default route
+tun0        10.11.12.21
+tun1        192.168.80.53
+virbr0      192.168.122.1
+docker0     172.17.0.1
+```
+
+`hostname -I` prints those same five as one unlabelled line, in whatever order the
+interfaces happened to appear, so it cannot tell you which is which. `privip`
+names the interface behind each one and puts them in a useful order: the address
+the kernel would actually route out with first, the local bridges last, since
+docker0 and virbr0 are this host talking to its own containers and guests rather
+than addresses anything else reaches it on. Marking the default route is a routing
+table lookup: nothing is sent over the network.
 
 `DE` and `EN` replace the GNOME input source list outright rather than adding
 to it, so only the named layouts remain. They take effect immediately, with no

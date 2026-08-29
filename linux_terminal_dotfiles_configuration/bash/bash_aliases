@@ -18,7 +18,42 @@ command -v btop &>/dev/null && alias b='btop' || { command -v htop &>/dev/null &
 alias reload='exec $SHELL -l'
 alias path='echo $PATH | tr ":" "\n"'
 alias pubip='curl -s https://ipwho.is/ | jq .'
-alias privip="hostname -I | awk '{print \$1}'"
+# Every private address this host holds, named by the interface carrying it.
+# `hostname -I` prints the same addresses as one unlabelled line in kernel
+# interface order, which answers nothing on a machine like this: with a VPN up
+# and Docker and libvirt running there are five of them, and which one comes
+# first depends on the order the interfaces happened to appear. So print all of
+# them and say which is which.
+#
+# The default route is marked by asking the kernel which source address it
+# would route out with. That is a routing table lookup only — no packet is
+# sent, and 1.1.1.1 is never contacted.
+privip() {
+    local routed out
+    routed=$(ip -4 route get 1.1.1.1 2>/dev/null |
+             awk '{for (i = 1; i < NF; i++) if ($i == "src") { print $(i+1); exit }}')
+
+    # Sorted by the rank in column one, which is then cut away: the routed
+    # address first, the local bridges last — docker0 and virbr0 are this host
+    # talking to its own containers and guests, not addresses anything else
+    # reaches it on. sort -s keeps interface order within each rank.
+    out=$(ip -4 -o addr show scope global 2>/dev/null |
+          awk -v routed="$routed" '
+              {
+                  split($4, a, "/")
+                  rank = (a[1] == routed) ? 0 : ($2 ~ /^(docker|virbr|br-|veth)/ ? 2 : 1)
+                  mark = (a[1] == routed) ? "  ← default route" : ""
+                  printf "%d\t%-11s %s%s\n", rank, $2, a[1], mark
+              }' |
+          sort -s -k1,1n | cut -f2-)
+
+    if [ -n "$out" ]; then
+        printf '%s\n' "$out"
+    else
+        echo "No global IPv4 address on any interface." >&2
+        return 1
+    fi
+}
 pubkey() {
     local key
     for key in ~/.ssh/id_ed25519.pub ~/.ssh/id_ecdsa.pub ~/.ssh/id_rsa.pub; do
