@@ -122,20 +122,20 @@ NO_AUTO_TMUX=1 bash
 tmux is run rather than `exec`'d, so a broken `~/.tmux.conf` leaves you at a
 working shell instead of a terminal that closes the moment it opens.
 
-The status bar follows the pattern the Catppuccin tmux port uses: a
-full-strength accent as the block background with Crust `#11111b` on top.
+The status bar uses Catppuccin's dark ramp only, no accents. It is chrome, so
+it stays out of the way and lets the prompt carry the colour. Blocks are told
+apart by stepping up the surface ramp rather than by hue.
 
 | Element | Block | Text |
 |---|---|---|
-| session name | Mauve `#af6dd9` | Crust `#11111b` |
-| active window | Green `#80be57` | Crust `#11111b` |
-| inactive window | Surface0 `#313244` | Text `#c6d0f5` |
-| zoomed marker | Crust `#11111b` | Red `#e05e60` |
+| inactive window | Surface0 `#313244` | Overlay2 `#9399b2` |
+| session name | Surface1 `#45475a` | Text `#cdd6f4` |
+| active window | Surface2 `#585b70` | Text `#cdd6f4` |
+| zoomed marker | Crust `#11111b` | Red `#f38ba8` |
 
-Blending an accent down toward the base is what makes it look muddy, so the
-accent stays at full saturation and the dark colour goes on the text instead.
-The accents are the same darkened Frappe as the prompt, over Mocha surfaces.
-Session 5.4:1, active window 8.4:1, inactive 8.7:1.
+The active window is the lightest block so it leads the eye; the inactive ones
+sit darkest with dimmed text. Red is the only accent left and appears only where
+it means something — the zoomed marker and the synchronised-panes borders.
 
 The bar itself uses `bg=default` so it takes the terminal's own background. A
 terminal window whose height is not an exact multiple of the character cell
@@ -148,23 +148,22 @@ up as a seam against it.
 bahman @ Silenus ~/project main*⇡1 venv:api k8s:prod $
 ```
 
-One line, plain colour, no badges and no background blocks. The accents are
-Catppuccin Frappe taken 20% down in HSL lightness — 32% darker overall, with
-saturation rising from 77 to 114, since lowering lightness keeps the colour
-where blending toward the background greys it out. Each is clamped so it never
-falls under 4.6:1. No clock — use
+One line, plain colour, no badges and no background blocks. The accents are Catppuccin
+Frappe exactly as published — the darkest flavour whose accents still work on a
+dark background. Deriving anything darker is what read as muddy, so these are
+the shipped values. The colour lives here; the tmux bar stays neutral. No clock — use
 `date` when you want one. Only the user name changes colour, so root is obvious at a glance
 while the host name stays put.
 
 | Segment | Colour | Shown when |
 |---|---|---|
-| user | Green `#80be57`, Red `#e05e60` for root | always |
-| `@` | Overlay0 `#6d748f` | always |
-| host | Yellow `#d7aa54` | always |
-| path | Blue `#5b85e7` | always |
-| branch | Peach `#e87236` | inside a git repository |
-| `venv:` | Mauve `#af6dd9` | a virtualenv is active |
-| `k8s:` | Sky `#62b8c8` | `kubectl` has a current context |
+| user | Green `#a6d189`, Red `#e78284` for root | always |
+| `@` | Overlay0 `#737994` | always |
+| host | Yellow `#e5c890` | always |
+| path | Blue `#8caaee` | always |
+| branch | Peach `#ef9f76` | inside a git repository |
+| `venv:` | Mauve `#ca9ee6` | a virtualenv is active |
+| `k8s:` | Sky `#99d1db` | `kubectl` has a current context |
 
 Branch suffixes carry their own colour: `*` unstaged is Red, `+` staged is
 Green, `⇡N` ahead and `⇣N` behind are Sky, `{N}` stashes is Flamingo.

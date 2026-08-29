@@ -70,25 +70,24 @@ export VISUAL=vim
 # Prevent venv from overwriting our custom prompt
 export VIRTUAL_ENV_DISABLE_PROMPT=1
 
-# Catppuccin Frappe taken 20% down in HSL lightness — foreground colours only,
-# no badges. Frappe alone was still too bright. Reducing lightness in HSL keeps
-# hue and saturation, which is the difference between dark and muddy: blending
-# an accent toward the background greys it out, while this leaves the colour
-# intact and only lowers it. Saturation rises from 77 to 114 as a result.
+# Catppuccin Frappe, straight from the palette — foreground colours only, no
+# badges. These are published values, not blends or lightness-scaled versions of
+# them: deriving a darker colour is what turned the earlier attempts muddy, so
+# the prompt uses the flavour as shipped. Frappe is the darkest Catppuccin
+# flavour whose accents still work on a dark background.
 #
-# 32% darker overall, and each is clamped so it never falls under 4.6:1 against
-# the Base #1e1e2e background. The separator is allowed down to 3.5:1 because it
-# should recede. The relative order is preserved, so yellow still reads brighter
-# than green and green brighter than blue.
-_C_GREEN='\[\e[38;2;128;190;87m\]'  # #80be57
-_C_RED='\[\e[38;2;224;94;96m\]'  # #e05e60
-_C_YELLOW='\[\e[38;2;215;170;84m\]'  # #d7aa54
-_C_BLUE='\[\e[38;2;91;133;231m\]'  # #5b85e7
-_C_PEACH='\[\e[38;2;232;114;54m\]'  # #e87236
-_C_MAUVE='\[\e[38;2;175;109;217m\]'  # #af6dd9
-_C_SKY='\[\e[38;2;98;184;200m\]'  # #62b8c8
-_C_FLAMINGO='\[\e[38;2;220;122;122m\]'  # #dc7a7a
-_C_GREY='\[\e[38;2;109;116;143m\]'  # #6d748f
+# The colour lives here, in the prompt. The tmux bar is deliberately neutral so
+# the two do not compete.
+
+_C_GREEN='\[\e[38;2;166;209;137m\]'  # #a6d189
+_C_RED='\[\e[38;2;231;130;132m\]'  # #e78284
+_C_YELLOW='\[\e[38;2;229;200;144m\]'  # #e5c890
+_C_BLUE='\[\e[38;2;140;170;238m\]'  # #8caaee
+_C_PEACH='\[\e[38;2;239;159;118m\]'  # #ef9f76
+_C_MAUVE='\[\e[38;2;202;158;230m\]'  # #ca9ee6
+_C_SKY='\[\e[38;2;153;209;219m\]'  # #99d1db
+_C_FLAMINGO='\[\e[38;2;238;190;190m\]'  # #eebebe
+_C_GREY='\[\e[38;2;115;121;148m\]'  # #737994
 _C_RST='\[\e[0m\]'
 
 # Catppuccin Mocha accents, spread around the wheel so no two neighbouring
