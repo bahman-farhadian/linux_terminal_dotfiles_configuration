@@ -252,7 +252,7 @@ Compare with what you wrote down in Step 1.
 
 **Notes**
 
-- If step 9 says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the BIOS. Turn it back on.
+- If the Secure Boot check says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the BIOS. Turn it back on.
 - Hibernation does not work while Secure Boot is on. The kernel refuses to write the resume image because it cannot verify the swap on resume. Suspend works normally.
 - The quota cannot go in `/etc/fstab`. XFS cannot enable quota at remount, and root is already mounted by then.
 - `rootflags` goes in `GRUB_CMDLINE_LINUX`, not `GRUB_CMDLINE_LINUX_DEFAULT`, so it applies to the recovery entries too.
@@ -389,7 +389,7 @@ fwupdmgr get-updates
 ```
 
 The last line must read `No updates available`. If it does not, repeat from
-step 6.
+the Apply sub-step.
 
 #### 9. Check the new BIOS version
 
@@ -409,10 +409,10 @@ Expect `SecureBoot enabled`.
 
 - Plug the charger in first. On battery every device reports `Device requires AC power to be connected` and is skipped without failing, so the update looks like it worked when nothing happened.
 - Never power off during a firmware update.
-- Firmware is written during the reboot, not by `fwupdmgr update`. Steps 6 to 8 are one round. Repeat until step 8 is clean.
+- Firmware is written during the reboot, not by `fwupdmgr update`. Apply, reboot and re-check are one round. Repeat until the check is clean.
 - `Devices with no available firmware updates` and `Devices with the latest available firmware version` both mean nothing to do. Only the last line decides.
 - `fwupd-amd64-signed` holds the Debian-signed EFI file. Without it firmware updates stop working once Secure Boot is on.
-- A BIOS update can reset BIOS settings. If step 10 says `SecureBoot disabled`, redo Step 1.
+- A BIOS update can reset BIOS settings. If the Secure Boot check says `SecureBoot disabled`, redo Step 1.
 
 ### Step 6 — Packages
 
@@ -879,76 +879,15 @@ docker run --rm hello-world
 
 **Notes**
 
-- Debian's `docker.io` and `podman-docker` conflict with Docker Engine. If either was installed earlier, remove it before Step 5.
-- Step 10 must run as your own user, not root. Under `sudo` as root, `$USER` is `root`, and the group would go to the wrong account.
+- Debian's `docker.io` and `podman-docker` conflict with Docker Engine. If either was installed earlier, remove it before installing the engine.
+- Adding your user to the `docker` group must run as your own user, not root. Under `sudo` as root, `$USER` is `root`, and the group would go to the wrong account.
 - Membership in the `docker` group is equivalent to root. Any member can start a container that mounts the whole filesystem. Treat it as an admin privilege, not a convenience.
 - `Suites: trixie` is written out rather than derived from `/etc/os-release`, so the file says which release it is pinned to. Change it when the machine is upgraded.
 - `--storage-opt size=` works only on `overlay2` over XFS with project quota. It is not supported on ext4, and not by the containerd snapshotter.
 - Switching the driver hides images pulled under the previous one. They are not deleted, but they live in a separate store. Pull them again if anything is missing.
 - `--rm` deletes the container when it exits, so these checks leave nothing behind.
 
-### Step 10 — Sort the application grid into folders
-
-The grid behind **Super+A** can be grouped into folders. This sorts every
-installed application into a folder named for its first letter. Run it as your
-own user, not root: the layout is a per-user setting.
-
-#### 1. See what it will do
-
-```bash
-./gnome-app-folders.py --list
-```
-
-Nothing is changed. Each application is listed under the folder it would go
-into.
-
-#### 2. Apply it
-
-```bash
-./gnome-app-folders.py --apply
-```
-
-It prints each folder and its count as it goes, then resets
-`org.gnome.shell app-picker-layout`. The dock is left alone.
-
-To empty the pinned dock at the same time:
-
-```bash
-./gnome-app-folders.py --clear-dock
-```
-
-#### 3. Read back what was written
-
-```bash
-./gnome-app-folders.py --status
-```
-
-This reads the settings, not the source files, so it shows what GNOME will
-actually use.
-
-#### 4. Log out and log back in
-
-GNOME Shell reads the folder layout when the session starts. Under Wayland the
-shell cannot be restarted on its own, so a full log out is needed.
-
-#### 5. Check
-
-Press **Super+A**. The grid shows folders `A` to `Z`, plus `0-9` and `Other` if
-anything falls outside the alphabet.
-
-**Notes**
-
-- GNOME Shell keeps its own arrangement of the grid in `org.gnome.shell app-picker-layout`. While that exists it overrides the folder layout, so folders appear to do nothing even after a log out. The script resets it, which is what makes the change take.
-- Re-run it after installing anything. It clears the folders it manages and rebuilds them from the applications present at that moment, so a new entry lands in the right folder and nothing else moves.
-- Applications are read from every directory the desktop uses, including flatpak exports, so flatpaks are sorted alongside everything else.
-- Entries marked `NoDisplay` or `Hidden` are skipped, which is why the count is smaller than the number of `.desktop` files on disk.
-- Sorting is by the displayed name, not the file name. `org.gnome.Nautilus.desktop` is called Files, so it lands under `F`.
-- `--clear-dock` also unpins everything from the dock. It is off by default, so a normal run never changes the dock.
-- Nothing is changed without `--apply` or `--clear-dock`. Run it with no arguments to see the options.
-- `--status` reads the settings back. If it disagrees with `--list`, the write failed rather than the sort being wrong.
-- To undo it completely: `gsettings reset org.gnome.desktop.app-folders folder-children` followed by `gsettings reset org.gnome.shell app-picker-layout`.
-
-### Step 11 — Laptop lid
+### Step 10 — Laptop lid
 
 Closing the lid locks the session and turns the display off. The machine keeps
 running, so anything in progress carries on.
@@ -1023,7 +962,7 @@ The uptime must have kept counting, with no resume in between.
 - Every change here needs another reboot. Editing the file changes nothing until logind reloads it.
 - GNOME delegates the lid to logind, so this is what decides the behaviour. GNOME's own blank and lock timeouts still apply and are set in Settings.
 
-### Step 12 — Visual Studio Code extensions
+### Step 11 — Visual Studio Code extensions
 
 A suggested set, not a requirement. Visual Studio Code is not in the Debian
 archive and is not installed by this guide, so `code` must already be on the
@@ -1053,6 +992,67 @@ code --list-extensions
 - `--install-extension` may be repeated, so all of them go in one command. Extensions already present are left alone, which makes this safe to re-run.
 - To capture the set from a machine you have already configured: `code --list-extensions | sed 's/^/code --install-extension /'`.
 - Pin versions with `code --list-extensions --show-versions` if the list needs to be reproducible rather than current.
+
+### Step 12 — Sort the application grid into folders
+
+The grid behind **Super+A** can be grouped into folders. This sorts every
+installed application into a folder named for its first letter. Run it as your
+own user, not root: the layout is a per-user setting.
+
+#### 1. See what it will do
+
+```bash
+./gnome-app-folders.py --list
+```
+
+Nothing is changed. Each application is listed under the folder it would go
+into.
+
+#### 2. Apply it
+
+```bash
+./gnome-app-folders.py --apply
+```
+
+It prints each folder and its count as it goes, then resets
+`org.gnome.shell app-picker-layout`. The dock is left alone.
+
+To empty the pinned dock at the same time:
+
+```bash
+./gnome-app-folders.py --clear-dock
+```
+
+#### 3. Read back what was written
+
+```bash
+./gnome-app-folders.py --status
+```
+
+This reads the settings, not the source files, so it shows what GNOME will
+actually use.
+
+#### 4. Log out and log back in
+
+GNOME Shell reads the folder layout when the session starts. Under Wayland the
+shell cannot be restarted on its own, so a full log out is needed.
+
+#### 5. Check
+
+Press **Super+A**. The grid shows folders `A` to `Z`, plus `0-9` and `Other` if
+anything falls outside the alphabet.
+
+**Notes**
+
+- GNOME Shell keeps its own arrangement of the grid in `org.gnome.shell app-picker-layout`. While that exists it overrides the folder layout, so folders appear to do nothing even after a log out. The script resets it, which is what makes the change take.
+- Re-run it after installing anything. It clears the folders it manages and rebuilds them from the applications present at that moment, so a new entry lands in the right folder and nothing else moves.
+- Applications are read from every directory the desktop uses, including flatpak exports, so flatpaks are sorted alongside everything else.
+- Entries marked `NoDisplay` or `Hidden` are skipped, which is why the count is smaller than the number of `.desktop` files on disk.
+- Sorting is by the displayed name, not the file name. `org.gnome.Nautilus.desktop` is called Files, so it lands under `F`.
+- `--clear-dock` also unpins everything from the dock. It is off by default, so a normal run never changes the dock.
+- Nothing is changed without `--apply` or `--clear-dock`. Run it with no arguments to see the options.
+- `--status` reads the settings back. If it disagrees with `--list`, the write failed rather than the sort being wrong.
+- To undo it completely: `gsettings reset org.gnome.desktop.app-folders folder-children` followed by `gsettings reset org.gnome.shell app-picker-layout`.
 
 ### Step 13 — Check the whole setup
 
