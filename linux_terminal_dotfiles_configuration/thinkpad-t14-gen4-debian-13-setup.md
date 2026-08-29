@@ -427,7 +427,7 @@ sudo -i
 #### 2. Install the packages
 
 ```bash
-apt install -y bash-completion bridge-utils btop curl default-jre duf ethtool ffmpeg filezilla foliate git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc lshw nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip yt-dlp
+apt install -y bash-completion bridge-utils btop curl default-jre duf ethtool ffmpeg filezilla foliate fonts-jetbrains-mono git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc lshw nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip yt-dlp
 ```
 
 #### 3. Install flatpak
@@ -527,7 +527,7 @@ The `Installed:` line must show a version, not `(none)`.
 - `flatpak install` takes several application IDs at once, and `-y` stops it asking to confirm each one. Installed as root, they are available to every user.
 - `No remote refs found` from `flatpak install` means the remote is missing, not that the application is. Check `flatpak remotes` first.
 - A remote added with `--user` is invisible to a `flatpak install` run as root, and the reverse. `flatpak remotes` shows which installation each belongs to.
-- The terminal uses JetBrains Mono at size 14. Either `apt install -y fonts-jetbrains-mono` or download it from jetbrains.com/lp/mono, then select it under `Terminal → Preferences → Profile → Text → Custom font`.
+- The terminal uses JetBrains Mono at size 14. `fonts-jetbrains-mono` is in the package list above, so it is already installed. Select it under `Terminal → Preferences → Profile → Text → Custom font`.
 - Font size changes the terminal cell height. A window whose height is not an exact multiple of that leaves a thin unpainted strip under the last row, so the size is worth tuning.
 - `gnome-firmware` is the graphical front end for the `fwupd` work in Step 5. It shows the same devices and updates as `fwupdmgr`.
 - `default-jre` runs `.jar` files with `java -jar`. It pulls OpenJDK 21. The headless variant is not used because a jar that opens a window fails at runtime under it rather than at install time.
@@ -1051,3 +1051,28 @@ code --list-extensions
 - To capture the set from a machine you have already configured: `code --list-extensions | sed 's/^/code --install-extension /'`.
 - Pin versions with `code --list-extensions --show-versions` if the list needs to be reproducible rather than current.
 
+### Step 13 — Check the whole setup
+
+`check.sh` in this repository runs every check the steps above describe and
+prints `PASS` or `FAIL` for each one.
+
+#### 1. Run it
+
+```bash
+./check.sh
+```
+
+#### 2. Read the totals
+
+The last line gives the counts. Any failure names what it found and what it
+expected, so it points at the step to redo.
+
+**Notes**
+
+- Run it as your own user from a desktop session terminal. It refuses to start as root or on a plain tty, because the dotfiles, GNOME settings, user services and group membership all live in your account and need the session bus.
+- It asks for your sudo password once. Some checks read files only root can see.
+- It needs network. It pulls the `busybox` and `hello-world` images to prove the Docker storage quota is really enforced.
+- It only reads. Nothing on the machine is changed, so it is safe to run at any time.
+- It exits `0` when everything passes and `1` otherwise.
+- `nested conf` reports `not needed` when the kernel already has nested virtualisation on. That is a pass, not a gap.
+- The Claude Code key check is pinned to the fingerprint published for the release key. If Anthropic rotates it, this fails on purpose and the new key needs checking by hand.
