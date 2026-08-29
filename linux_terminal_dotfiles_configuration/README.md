@@ -122,19 +122,19 @@ NO_AUTO_TMUX=1 bash
 tmux is run rather than `exec`'d, so a broken `~/.tmux.conf` leaves you at a
 working shell instead of a terminal that closes the moment it opens.
 
-The status bar uses Catppuccin's dark ramp only, no accents. It is chrome, so
+The status bar uses Srcery's gray ramp only, no accents. It is chrome, so
 it stays out of the way and lets the prompt carry the colour. Blocks are told
-apart by stepping up the surface ramp rather than by hue.
+apart by stepping up the gray ramp rather than by hue.
 
 | Element | Block | Text |
 |---|---|---|
-| inactive window | Surface0 `#313244` | Overlay2 `#9399b2` |
-| session name | Surface1 `#45475a` | Text `#cdd6f4` |
-| active window | Surface2 `#585b70` | Text `#cdd6f4` |
-| zoomed marker | Crust `#11111b` | Red `#f38ba8` |
+| inactive window | gray3 `#312F2C` | white `#C5B088` |
+| session name | gray4 `#3B3935` | bright_white `#FCE8C3` |
+| active window | gray6 `#504D47` | bright_white `#FCE8C3` |
+| zoomed marker | black `#121110` | bright_red `#F75341` |
 
 The active window is the lightest block so it leads the eye; the inactive ones
-sit darkest with dimmed text. Red is the only accent left and appears only where
+sit darkest with dimmed text. bright_red is the only accent left and appears only where
 it means something — the zoomed marker and the synchronised-panes borders.
 
 The bar itself uses `bg=default` so it takes the terminal's own background. A
@@ -148,26 +148,30 @@ up as a seam against it.
 bahman @ Silenus ~/project main*⇡1 venv:api k8s:prod $
 ```
 
-One line, plain colour, no badges and no background blocks. The accents are Catppuccin
-Frappe exactly as published — the darkest flavour whose accents still work on a
-dark background. Deriving anything darker is what read as muddy, so these are
-the shipped values. The colour lives here; the tmux bar stays neutral. No clock — use
+One line, plain colour, no badges and no background blocks. The accents are Srcery, used exactly as
+published. Where the normal variant sits too dark on the background the bright
+one is used instead, which is why blue, magenta and red are the bright forms and
+the rest are not. The colour lives here; the tmux bar stays neutral. No clock — use
 `date` when you want one. Only the user name changes colour, so root is obvious at a glance
 while the host name stays put.
 
 | Segment | Colour | Shown when |
 |---|---|---|
-| user | Green `#a6d189`, Red `#e78284` for root | always |
-| `@` | Overlay0 `#737994` | always |
-| host | Yellow `#e5c890` | always |
-| path | Blue `#8caaee` | always |
-| branch | Peach `#ef9f76` | inside a git repository |
-| `venv:` | Mauve `#ca9ee6` | a virtualenv is active |
-| `k8s:` | Sky `#99d1db` | `kubectl` has a current context |
+| user | Green `#519F50`, Red `#F75341` for root | always |
+| `@` | Overlay0 `#917E6B` | always |
+| host | Yellow `#FBB829` | always |
+| path | Blue `#68A8E4` | always |
+| branch | Peach `#FF5F00` | inside a git repository |
+| `venv:` | Mauve `#FF5C8F` | a virtualenv is active |
+| `k8s:` | Sky `#0AAEB3` | `kubectl` has a current context |
 
 Branch suffixes carry their own colour: `*` unstaged is Red, `+` staged is
 Green, `⇡N` ahead and `⇣N` behind are Sky, `{N}` stashes is Flamingo.
 The `$` turns red when the last command failed, and becomes `#` for root.
+
+For the full effect set the terminal profile to Srcery too, so the background
+is `#1C1B19` and the ANSI colours match. The contrast figures above are measured
+against that background.
 
 Needs a true-colour terminal. GNOME Terminal qualifies.
 
