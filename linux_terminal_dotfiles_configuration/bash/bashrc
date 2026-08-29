@@ -70,24 +70,25 @@ export VISUAL=vim
 # Prevent venv from overwriting our custom prompt
 export VIRTUAL_ENV_DISABLE_PROMPT=1
 
-# Catppuccin Frappe, straight from the palette — foreground colours only, no
-# badges. These are published values, not blends or lightness-scaled versions of
-# them: deriving a darker colour is what turned the earlier attempts muddy, so
-# the prompt uses the flavour as shipped. Frappe is the darkest Catppuccin
-# flavour whose accents still work on a dark background.
+# Srcery — foreground colours only, no badges. Published values from the
+# upstream palette, used as they ship. Where the normal variant sits too dark on
+# the background the bright one is used instead, which is why blue, magenta and
+# red are the bright forms and the rest are not. Contrast against Srcery's own
+# background #1C1B19 is noted per colour; the lowest is the separator at 4.43:1,
+# which should recede anyway.
 #
-# The colour lives here, in the prompt. The tmux bar is deliberately neutral so
+# The colour lives here, in the prompt. The tmux bar uses Srcery's gray ramp so
 # the two do not compete.
 
-_C_GREEN='\[\e[38;2;166;209;137m\]'  # #a6d189
-_C_RED='\[\e[38;2;231;130;132m\]'  # #e78284
-_C_YELLOW='\[\e[38;2;229;200;144m\]'  # #e5c890
-_C_BLUE='\[\e[38;2;140;170;238m\]'  # #8caaee
-_C_PEACH='\[\e[38;2;239;159;118m\]'  # #ef9f76
-_C_MAUVE='\[\e[38;2;202;158;230m\]'  # #ca9ee6
-_C_SKY='\[\e[38;2;153;209;219m\]'  # #99d1db
-_C_FLAMINGO='\[\e[38;2;238;190;190m\]'  # #eebebe
-_C_GREY='\[\e[38;2;115;121;148m\]'  # #737994
+_C_GREEN='\[\e[38;2;81;159;80m\]'  # #519F50 green 5.27:1
+_C_RED='\[\e[38;2;247;83;65m\]'  # #F75341 bright_red 5.14:1
+_C_YELLOW='\[\e[38;2;251;184;41m\]'  # #FBB829 yellow 9.83:1
+_C_BLUE='\[\e[38;2;104;168;228m\]'  # #68A8E4 bright_blue 6.81:1
+_C_PEACH='\[\e[38;2;255;95;0m\]'  # #FF5F00 orange 5.65:1
+_C_MAUVE='\[\e[38;2;255;92;143m\]'  # #FF5C8F bright_magenta 5.88:1
+_C_SKY='\[\e[38;2;10;174;179m\]'  # #0AAEB3 cyan 6.33:1
+_C_FLAMINGO='\[\e[38;2;197;176;136m\]'  # #C5B088 white 8.15:1
+_C_GREY='\[\e[38;2;145;126;107m\]'  # #917E6B bright_black 4.43:1
 _C_RST='\[\e[0m\]'
 
 # Catppuccin Mocha accents, spread around the wheel so no two neighbouring
