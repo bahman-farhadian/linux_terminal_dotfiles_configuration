@@ -458,6 +458,68 @@ error.
 flatpak install -y flathub org.telegram.desktop com.belmoussaoui.Obfuscate md.obsidian.Obsidian io.gitlab.adhami3310.Impression
 ```
 
+#### 6. Install what the Claude Code repository needs
+
+```bash
+apt install -y curl gnupg
+```
+
+#### 7. Create the keyring directory
+
+```bash
+install -m 0755 -d /etc/apt/keyrings
+```
+
+#### 8. Fetch the Claude Code signing key
+
+```bash
+curl -fsSL https://downloads.claude.ai/keys/claude-code.asc -o /etc/apt/keyrings/claude-code.asc
+```
+
+```bash
+chmod a+r /etc/apt/keyrings/claude-code.asc
+```
+
+Read the key before trusting it:
+
+```bash
+gpg --show-keys /etc/apt/keyrings/claude-code.asc
+```
+
+#### 9. Add the repository
+
+```bash
+vim /etc/apt/sources.list.d/claude-code.sources
+```
+
+Put this in it:
+
+```
+Types: deb
+URIs: https://downloads.claude.ai/claude-code/apt/stable
+Suites: stable
+Components: main
+Signed-By: /etc/apt/keyrings/claude-code.asc
+```
+
+```bash
+apt update
+```
+
+#### 10. Install Claude Code
+
+```bash
+apt install -y claude-code
+```
+
+#### 11. Check it
+
+```bash
+apt policy claude-code
+```
+
+The `Installed:` line must show a version, not `(none)`.
+
 **Notes**
 
 - Log out and back in before flatpak applications appear in GNOME Software.
@@ -471,6 +533,10 @@ flatpak install -y flathub org.telegram.desktop com.belmoussaoui.Obfuscate md.ob
 - `default-jre` runs `.jar` files with `java -jar`. It pulls OpenJDK 21. The headless variant is not used because a jar that opens a window fails at runtime under it rather than at install time.
 - `net-tools` provides `netstat`, `ifconfig` and `route`. They are superseded by `ss` and `ip` from `iproute2`, which is already installed, but the old names are still what most documentation uses.
 - `virt-top` reads from libvirt. Until libvirt is installed and running it shows nothing.
+- Claude Code comes from Anthropic's own repository, not Debian's. The key is fetched separately and `Signed-By` limits it to that one repository.
+- `gpg --show-keys` prints the key before apt is told to trust it. Compare the fingerprint with the one Anthropic publishes.
+- Run `claude` as your own user, not root. Its settings and login live in your home directory, so as root they land in `/root`.
+- The keyring directory and the key fetch are done again in Step 9 for Docker. Both are safe to repeat: the directory is left alone if it exists, and the key file is overwritten with the same content.
 
 ### Step 7 — Bash, tmux, and SSH configuration
 
