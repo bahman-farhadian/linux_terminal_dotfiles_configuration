@@ -525,14 +525,15 @@ apt install -y qemu-system-x86 qemu-utils ovmf virtinst virt-manager libvirt-dae
 #### 4. Start the daemon
 
 ```bash
-systemctl enable --now libvirtd
+systemctl enable --now libvirtd.socket
 ```
 
 ```bash
-systemctl is-active libvirtd
+systemctl is-active libvirtd.socket
 ```
 
-Expect `active`.
+Expect `active`. `libvirtd.service` itself stays `inactive` until something
+connects to the socket, which is normal and not a fault.
 
 #### 5. Turn on nested virtualization
 
@@ -618,11 +619,11 @@ Expect `libvirt` and `kvm` in the list.
 #### 10. Verify as your own user
 
 ```bash
-virsh list --all
+virsh -c qemu:///system list --all
 ```
 
 ```bash
-virsh net-list --all
+virsh -c qemu:///system net-list --all
 ```
 
 Both must run without a permission error, and `default` must be listed and
@@ -632,6 +633,7 @@ active.
 
 - There is no `qemu-kvm` package in trixie. `qemu-system-x86` is the one that provides the emulator, and KVM itself is a kernel module that is already present.
 - The `usermod` sub-step has to run as your own user, not root. Under `sudo` as root, `$USER` is `root`, so the groups would be added to the wrong account.
+- The connection URI matters. Run as an ordinary user, `virsh` defaults to `qemu:///session`, a per-user hypervisor with no networks and no machines. The system VMs are on `qemu:///system`. Set `LIBVIRT_DEFAULT_URI=qemu:///system` if you would rather not type it each time.
 - Group membership only applies at the next login. `newgrp libvirt` works for one shell if you do not want to log out.
 - `modprobe -r kvm_intel` fails if a virtual machine is running. Shut them down first.
 - Nested virtualization is only needed to run a hypervisor inside a guest. Ordinary guests do not use it.
