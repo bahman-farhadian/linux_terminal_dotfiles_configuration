@@ -131,28 +131,37 @@ against it.
 ## Prompt
 
 ```
-bahman @ Silenus ~/project main*⇡1 venv:api k8s:prod $
+ bahman@Silenus  ~/project  main*⇡1  venv:api  k8s:prod
+$
 ```
 
-One line, plain colour, no badges and no background blocks. No clock — use
-`date` when you want one. Only the user name changes colour, so root is obvious at a glance
-while the host name stays put.
+Two lines. Every segment draws Text `#cdd6f4` on its own dark block, so all of
+it reads equally well and the block colour alone says which segment you are
+looking at. Same approach as the tmux status bar. No clock — use `date` when you
+want one. Only the `user@host` block changes colour, so root is obvious at a
+glance.
 
-| Segment | Colour | Shown when |
+| Segment | Block | Shown when |
 |---|---|---|
-| user | Green `#a6e3a1`, Red `#f38ba8` for root | always |
-| `@` | Overlay0 `#6c7086` | always |
-| host | Yellow `#f9e2af` | always |
-| path | Blue `#89b4fa` | always |
-| branch | Peach `#fab387` | inside a git repository |
-| `venv:` | Mauve `#cba6f7` | a virtualenv is active |
-| `k8s:` | Sky `#89dceb` | `kubectl` has a current context |
+| `user@host` | Green `#455a4a`, Red `#77485a` for root | always |
+| path | Blue `#45577b` | always |
+| branch | Peach `#6c5045` | inside a git repository |
+| `venv:` | Mauve `#5f5077` | a virtualenv is active |
+| `k8s:` | Sapphire `#395a6f` | `kubectl` has a current context |
 
-Branch suffixes carry their own colour: `*` unstaged is Red, `+` staged is
-Green, `⇡N` ahead and `⇣N` behind are Sky, `{N}` stashes is Flamingo.
-The `$` turns red when the last command failed, and becomes `#` for root.
+Each block is its Catppuccin Mocha accent blended into Crust as far as it goes
+while still holding the white text near 5:1, which is the darkest that hue gets
+before it turns grey.
 
-Needs a true-colour terminal. GNOME Terminal qualifies.
+Branch suffixes keep their own bright accent, because the colour is the whole
+point of them: `*` unstaged is Red, `+` staged is Green, `⇡N` ahead and `⇣N`
+behind are Sky, `{N}` stashes is Flamingo.
+
+The `$` sits on its own line, turns Red when the last command failed, and
+becomes `#` for root.
+
+No powerline separators, so no patched font is needed. Needs a true-colour
+terminal. GNOME Terminal qualifies.
 
 ## Aliases
 
