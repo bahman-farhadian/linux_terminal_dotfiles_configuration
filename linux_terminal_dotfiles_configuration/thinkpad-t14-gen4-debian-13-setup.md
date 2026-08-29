@@ -912,6 +912,17 @@ systemd-analyze cat-config systemd/logind.conf | grep -i handlelidswitch
 
 The first two must read `lock`, the third `ignore`.
 
+This command reads the files on disk, not what the running daemon loaded, so it
+shows the new value whether or not the reboot has happened. To see what logind
+is actually doing, close the lid and read the journal:
+
+```bash
+journalctl -b -u systemd-logind --since '2 min ago' --no-pager | tail -5
+```
+
+`Lid closed.` with no action after it means the daemon is still running the
+previous configuration.
+
 #### 5. Check the behaviour
 
 Close the lid, wait a minute, open it again. It must ask for the password, and:
@@ -929,6 +940,7 @@ The uptime must have kept counting, with no resume in between.
 - The three settings cover the three cases logind separates: on battery, on external power, and docked. Setting only the first leaves the machine suspending whenever it is plugged in.
 - Docked stays `ignore`, which is also the systemd default. With external displays attached, closing the lid should not lock the machine.
 - Reboot rather than `systemctl restart systemd-logind`. Restarting it can end the graphical session.
+- Every change here needs another reboot. Editing the file changes nothing until logind reloads it.
 - GNOME delegates the lid to logind, so this is what decides the behaviour. GNOME's own blank and lock timeouts still apply and are set in Settings.
 
 ### Step 12 — Visual Studio Code extensions
