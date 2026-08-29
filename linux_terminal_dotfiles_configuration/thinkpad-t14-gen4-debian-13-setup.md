@@ -870,8 +870,8 @@ anything falls outside the alphabet.
 
 ### Step 11 — Laptop lid
 
-Closing the lid must not suspend the machine. The display goes off because the
-lid is shut; nothing else should happen.
+Closing the lid locks the session and turns the display off. The machine keeps
+running, so anything in progress carries on.
 
 #### 1. Become root
 
@@ -893,8 +893,8 @@ Put this in it:
 
 ```
 [Login]
-HandleLidSwitch=ignore
-HandleLidSwitchExternalPower=ignore
+HandleLidSwitch=lock
+HandleLidSwitchExternalPower=lock
 HandleLidSwitchDocked=ignore
 ```
 
@@ -910,11 +910,11 @@ systemctl reboot
 systemd-analyze cat-config systemd/logind.conf | grep -i handlelidswitch
 ```
 
-All three must read `ignore`.
+The first two must read `lock`, the third `ignore`.
 
 #### 5. Check the behaviour
 
-Close the lid, wait a minute, open it again.
+Close the lid, wait a minute, open it again. It must ask for the password, and:
 
 ```bash
 uptime
@@ -925,9 +925,11 @@ The uptime must have kept counting, with no resume in between.
 **Notes**
 
 - A drop-in under `/etc/systemd/logind.conf.d/` is used rather than editing `/etc/systemd/logind.conf`, so a package upgrade cannot overwrite it.
+- `lock` screen-locks every session without suspending, which is the difference from `suspend` and from `ignore`. `ignore` does nothing at all: no lock, no display off.
 - The three settings cover the three cases logind separates: on battery, on external power, and docked. Setting only the first leaves the machine suspending whenever it is plugged in.
+- Docked stays `ignore`, which is also the systemd default. With external displays attached, closing the lid should not lock the machine.
 - Reboot rather than `systemctl restart systemd-logind`. Restarting it can end the graphical session.
-- GNOME delegates the lid to logind, so `ignore` stops the suspend. GNOME's own blank and lock timeouts still apply and are set in Settings.
+- GNOME delegates the lid to logind, so this is what decides the behaviour. GNOME's own blank and lock timeouts still apply and are set in Settings.
 
 ### Step 12 — Visual Studio Code extensions
 
