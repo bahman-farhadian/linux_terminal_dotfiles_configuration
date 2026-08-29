@@ -128,13 +128,15 @@ apart by stepping up the gray ramp rather than by hue.
 
 | Element | Block | Text |
 |---|---|---|
-| inactive window | gray3 `#312F2C` | white `#C5B088` |
-| session name | gray4 `#3B3935` | bright_white `#FCE8C3` |
+| inactive window | gray3 `#312F2C` | bright_white `#FCE8C3` |
+| session name | gray4 `#3B3935` | bright_yellow `#FED06E` |
 | active window | gray6 `#504D47` | bright_white `#FCE8C3` |
 | zoomed marker | black `#121110` | bright_red `#F75341` |
 
-The active window is the lightest block so it leads the eye; the inactive ones
-sit darkest with dimmed text. bright_red is the only accent left and appears only where
+Both tabs take bright_white, so the active one is told apart by its lighter
+block rather than by dimmer text. The session name carries bright_yellow, the
+brightest Srcery accent that keeps its contrast, since it is the one thing in
+the bar worth picking out at a glance. bright_red is the only accent left and appears only where
 it means something — the zoomed marker and the synchronised-panes borders.
 
 The bar itself uses `bg=default` so it takes the terminal's own background. A
