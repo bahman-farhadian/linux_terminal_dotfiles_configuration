@@ -92,30 +92,6 @@ upgrade() {
     fi
 }
 
-# System update — apt and flatpak together.
-# Functions rather than aliases: an alias cannot decide whether sudo is needed.
-_asroot() {
-    if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo "$@"; fi
-}
-
-# What would change. Refreshes the sources, then lists it without touching
-# anything.
-update() {
-    _asroot apt update
-    apt list --upgradable
-    command -v flatpak >/dev/null 2>&1 && flatpak remote-ls --updates
-}
-
-# Apply it, then clean up after both.
-upgrade() {
-    _asroot apt full-upgrade
-    _asroot apt autoremove --purge
-    if command -v flatpak >/dev/null 2>&1; then
-        _asroot flatpak update
-        _asroot flatpak uninstall --unused
-    fi
-}
-
 # Keyboard layout — replaces the GNOME input source list outright, so only the
 # named layouts remain. Takes effect immediately, no log out.
 alias DE="gsettings set org.gnome.desktop.input-sources sources \"[('xkb', 'de')]\""
