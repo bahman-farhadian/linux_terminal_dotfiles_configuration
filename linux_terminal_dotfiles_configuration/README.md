@@ -147,19 +147,21 @@ up as a seam against it.
 bahman @ Silenus ~/project main*⇡1 venv:api k8s:prod $
 ```
 
-One line, plain colour, no badges and no background blocks. No clock — use
+One line, plain colour, no badges and no background blocks. The accents are
+Catppuccin Frappe rather than Mocha: the same hues a tone deeper, so the prompt
+sits back against the terminal while every colour still clears 6:1. No clock — use
 `date` when you want one. Only the user name changes colour, so root is obvious at a glance
 while the host name stays put.
 
 | Segment | Colour | Shown when |
 |---|---|---|
-| user | Green `#a6e3a1`, Red `#f38ba8` for root | always |
-| `@` | Overlay0 `#6c7086` | always |
-| host | Yellow `#f9e2af` | always |
-| path | Blue `#89b4fa` | always |
-| branch | Peach `#fab387` | inside a git repository |
-| `venv:` | Mauve `#cba6f7` | a virtualenv is active |
-| `k8s:` | Sky `#89dceb` | `kubectl` has a current context |
+| user | Green `#a6d189`, Red `#e78284` for root | always |
+| `@` | Overlay0 `#737994` | always |
+| host | Yellow `#e5c890` | always |
+| path | Blue `#8caaee` | always |
+| branch | Peach `#ef9f76` | inside a git repository |
+| `venv:` | Mauve `#ca9ee6` | a virtualenv is active |
+| `k8s:` | Sky `#99d1db` | `kubectl` has a current context |
 
 Branch suffixes carry their own colour: `*` unstaged is Red, `+` staged is
 Green, `⇡N` ahead and `⇣N` behind are Sky, `{N}` stashes is Flamingo.

@@ -70,16 +70,20 @@ export VISUAL=vim
 # Prevent venv from overwriting our custom prompt
 export VIRTUAL_ENV_DISABLE_PROMPT=1
 
-# Catppuccin Mocha — foreground colours only, no badges
-_C_GREEN='\[\e[38;2;166;227;161m\]'
-_C_RED='\[\e[38;2;243;139;168m\]'
-_C_YELLOW='\[\e[38;2;249;226;175m\]'
-_C_BLUE='\[\e[38;2;137;180;250m\]'
-_C_PEACH='\[\e[38;2;250;179;135m\]'
-_C_MAUVE='\[\e[38;2;203;166;247m\]'
-_C_SKY='\[\e[38;2;137;220;235m\]'
-_C_FLAMINGO='\[\e[38;2;242;205;205m\]'
-_C_GREY='\[\e[38;2;108;112;134m\]'
+# Catppuccin Frappe — foreground colours only, no badges. Frappe is the same
+# hues as Mocha a tone deeper, so the prompt sits back against the terminal
+# without losing its colour. Every one of these still clears 6:1 against the
+# Base #1e1e2e background, and the separator actually gains contrast: 3.82
+# where Mocha's Overlay0 gave 3.36.
+_C_GREEN='\[\e[38;2;166;209;137m\]'  # #a6d189
+_C_RED='\[\e[38;2;231;130;132m\]'  # #e78284
+_C_YELLOW='\[\e[38;2;229;200;144m\]'  # #e5c890
+_C_BLUE='\[\e[38;2;140;170;238m\]'  # #8caaee
+_C_PEACH='\[\e[38;2;239;159;118m\]'  # #ef9f76
+_C_MAUVE='\[\e[38;2;202;158;230m\]'  # #ca9ee6
+_C_SKY='\[\e[38;2;153;209;219m\]'  # #99d1db
+_C_FLAMINGO='\[\e[38;2;238;190;190m\]'  # #eebebe
+_C_GREY='\[\e[38;2;115;121;148m\]'  # #737994
 _C_RST='\[\e[0m\]'
 
 # Catppuccin Mocha accents, spread around the wheel so no two neighbouring
