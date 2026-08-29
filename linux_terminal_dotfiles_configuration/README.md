@@ -22,6 +22,7 @@ linux_terminal_dotfiles_configuration/
 ├── ssh/
 │   └── config         → appended to ~/.ssh/config
 ├── install.sh
+├── check.sh
 ├── gnome-app-folders.py
 ├── hushlogin          → ~/.hushlogin
 └── thinkpad-t14-gen4-debian-13-setup.md
