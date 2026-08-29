@@ -122,21 +122,20 @@ NO_AUTO_TMUX=1 bash
 tmux is run rather than `exec`'d, so a broken `~/.tmux.conf` leaves you at a
 working shell instead of a terminal that closes the moment it opens.
 
-The status bar uses Srcery's gray ramp only, no accents. It is chrome, so
+The status bar uses Gruvbox's background ramp only, no accents. It is chrome, so
 it stays out of the way and lets the prompt carry the colour. Blocks are told
-apart by stepping up the gray ramp rather than by hue.
+apart by stepping up that ramp rather than by hue.
 
 | Element | Block | Text |
 |---|---|---|
-| inactive window | gray3 `#312F2C` | bright_white `#FCE8C3` |
-| session name | gray4 `#3B3935` | bright_yellow `#FED06E` |
-| active window | gray6 `#504D47` | bright_white `#FCE8C3` |
-| zoomed marker | black `#121110` | bright_red `#F75341` |
+| inactive window | bg1 `#3c3836` | fg1 `#ebdbb2` |
+| session name | bg2 `#504945` | bright yellow `#fabd2f` |
+| active window | bg3 `#665c54` | fg0 `#fbf1c7` |
+| zoomed marker | bg0_h `#1d2021` | bright red `#fb4934` |
 
-Both tabs take bright_white, so the active one is told apart by its lighter
-block rather than by dimmer text. The session name carries bright_yellow, the
-brightest Srcery accent that keeps its contrast, since it is the one thing in
-the bar worth picking out at a glance. bright_red is the only accent left and appears only where
+Both tabs stay light, so the active one is told apart by its lighter block
+rather than by dimmer text. The session name carries bright yellow, since it
+names the session and is worth picking out at a glance. bright red is the only accent left and appears only where
 it means something — the zoomed marker and the synchronised-panes borders.
 
 The bar itself uses `bg=default` so it takes the terminal's own background. A
@@ -150,30 +149,33 @@ up as a seam against it.
 bahman @ Silenus ~/project main*⇡1 venv:api k8s:prod $
 ```
 
-One line, plain colour, no badges and no background blocks. The accents are Srcery, used exactly as
-published. Where the normal variant sits too dark on the background the bright
-one is used instead, which is why blue, magenta and red are the bright forms and
-the rest are not. The colour lives here; the tmux bar stays neutral. No clock — use
+One line, plain colour, no badges and no background blocks. The accents are Gruvbox dark, used
+exactly as published. The bright variants carry the prompt because the normal
+ones sit too dark on `bg0`: blue is 3.48:1 normal against 5.48:1 bright, purple
+the same. The colour lives here; the tmux bar stays neutral. No clock — use
 `date` when you want one. Only the user name changes colour, so root is obvious at a glance
 while the host name stays put.
 
 | Segment | Colour | Shown when |
 |---|---|---|
-| user | Green `#519F50`, Red `#F75341` for root | always |
-| `@` | Overlay0 `#917E6B` | always |
-| host | Yellow `#FBB829` | always |
-| path | Blue `#68A8E4` | always |
-| branch | Peach `#FF5F00` | inside a git repository |
-| `venv:` | Mauve `#FF5C8F` | a virtualenv is active |
-| `k8s:` | Sky `#0AAEB3` | `kubectl` has a current context |
+| user | bright green `#b8bb26`, bright red `#fb4934` for root | always |
+| `@` | gray `#928374` | always |
+| host | bright yellow `#fabd2f` | always |
+| path | bright blue `#83a598` | always |
+| branch | orange `#fe8019` | inside a git repository |
+| `venv:` | bright purple `#d3869b` | a virtualenv is active |
+| `k8s:` | bright aqua `#8ec07c` | `kubectl` has a current context |
 
 Branch suffixes carry their own colour: `*` unstaged is Red, `+` staged is
 Green, `⇡N` ahead and `⇣N` behind are Sky, `{N}` stashes is Flamingo.
 The `$` turns red when the last command failed, and becomes `#` for root.
 
-For the full effect set the terminal profile to Srcery too, so the background
-is `#1C1B19` and the ANSI colours match. The contrast figures above are measured
-against that background.
+For the full effect set the terminal profile to Gruvbox dark too, so the
+background is `#282828` and the ANSI colours match. The contrast figures above
+are measured against that background.
+
+`install.sh` uses the same palette for its own output: bright green for a step
+that succeeded, bright yellow for a warning, gray for one that was skipped.
 
 Needs a true-colour terminal. GNOME Terminal qualifies.
 

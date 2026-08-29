@@ -70,25 +70,27 @@ export VISUAL=vim
 # Prevent venv from overwriting our custom prompt
 export VIRTUAL_ENV_DISABLE_PROMPT=1
 
-# Srcery — foreground colours only, no badges. Published values from the
-# upstream palette, used as they ship. Where the normal variant sits too dark on
-# the background the bright one is used instead, which is why blue, magenta and
-# red are the bright forms and the rest are not. Contrast against Srcery's own
-# background #1C1B19 is noted per colour; the lowest is the separator at 4.43:1,
-# which should recede anyway.
+# Gruvbox dark — foreground colours only, no badges. Published values, used as
+# they ship. The bright variants carry the prompt because the normal ones sit
+# too dark on bg0: blue is 3.48:1 normal against 5.48:1 bright, purple the same,
+# red 2.69:1 against 4.29:1.
 #
-# The colour lives here, in the prompt. The tmux bar uses Srcery's gray ramp so
-# the two do not compete.
+# Bright red is the one value under 4.5:1, at 4.29:1. It is Gruvbox's own
+# pairing of bright red on bg0 and it only ever draws the single-character marks
+# — the dirty asterisk, the root hash, the failed prompt symbol — all in bold.
+#
+# The colour lives here, in the prompt. The tmux bar uses the bg ramp so the two
+# do not compete.
 
-_C_GREEN='\[\e[38;2;81;159;80m\]'  # #519F50 green 5.27:1
-_C_RED='\[\e[38;2;247;83;65m\]'  # #F75341 bright_red 5.14:1
-_C_YELLOW='\[\e[38;2;251;184;41m\]'  # #FBB829 yellow 9.83:1
-_C_BLUE='\[\e[38;2;104;168;228m\]'  # #68A8E4 bright_blue 6.81:1
-_C_PEACH='\[\e[38;2;255;95;0m\]'  # #FF5F00 orange 5.65:1
-_C_MAUVE='\[\e[38;2;255;92;143m\]'  # #FF5C8F bright_magenta 5.88:1
-_C_SKY='\[\e[38;2;10;174;179m\]'  # #0AAEB3 cyan 6.33:1
-_C_FLAMINGO='\[\e[38;2;197;176;136m\]'  # #C5B088 white 8.15:1
-_C_GREY='\[\e[38;2;145;126;107m\]'  # #917E6B bright_black 4.43:1
+_C_GREEN='\[\e[38;2;184;187;38m\]'  # #b8bb26 bright green 7.14:1
+_C_RED='\[\e[38;2;251;73;52m\]'  # #fb4934 bright red 4.29:1
+_C_YELLOW='\[\e[38;2;250;189;47m\]'  # #fabd2f bright yellow 8.69:1
+_C_BLUE='\[\e[38;2;131;165;152m\]'  # #83a598 bright blue 5.48:1
+_C_PEACH='\[\e[38;2;254;128;25m\]'  # #fe8019 orange 5.84:1
+_C_MAUVE='\[\e[38;2;211;134;155m\]'  # #d3869b bright purple 5.37:1
+_C_SKY='\[\e[38;2;142;192;124m\]'  # #8ec07c bright aqua 7.01:1
+_C_FLAMINGO='\[\e[38;2;213;196;161m\]'  # #d5c4a1 fg2 8.59:1
+_C_GREY='\[\e[38;2;146;131;116m\]'  # #928374 gray 4.02:1
 _C_RST='\[\e[0m\]'
 
 # Segments are spread around the wheel so no two neighbours share a hue: green
@@ -97,10 +99,10 @@ _C_RST='\[\e[0m\]'
 # keeps its own so it never moves. Everything after the path is conditional and
 # absent when it has nothing to say.
 #
-# The _C_PEACH, _C_MAUVE, _C_SKY and _C_FLAMINGO names are left over from the
-# Catppuccin palette this used before. They now hold Srcery orange, bright
-# magenta, cyan and white; the names are kept only so the prompt builder below
-# did not have to be rewritten for a colour change.
+# The _C_PEACH, _C_MAUVE, _C_SKY and _C_FLAMINGO names are left over from an
+# earlier palette. They now hold Gruvbox orange, bright purple, bright aqua and
+# fg2; the names are kept only so the prompt builder below did not have to be
+# rewritten for a colour change.
 _set_prompt() {
     local exit_code=$?
     local line sym sym_col user_col

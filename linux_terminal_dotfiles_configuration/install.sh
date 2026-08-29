@@ -5,9 +5,9 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ "$(uname -s)" = "Linux" ] || { echo "Linux only." >&2; exit 1; }
 
-_ok()   { printf '\033[32m✔ %s\033[0m\n' "$*"; }
-_warn() { printf '\033[33m⚠ %s\033[0m\n' "$*"; }
-_skip() { printf '\033[90m⊘ %s\033[0m\n' "$*"; }
+_ok()   { printf '\033[38;2;184;187;38m✔ %s\033[0m\n' "$*"; }
+_warn() { printf '\033[38;2;250;189;47m⚠ %s\033[0m\n' "$*"; }
+_skip() { printf '\033[38;2;146;131;116m⊘ %s\033[0m\n' "$*"; }
 _hdr()  { printf '\n%s\n' "$*"; }
 
 cp_file() { mkdir -p "$(dirname "$2")"; cp "$1" "$2"; _ok "applied: $2"; }
@@ -432,5 +432,5 @@ if [ "$HAS_SUDO" = true ] && [ -n "$BASH_BIN" ]; then
     fi
 fi
 
-printf '\n\033[32m✔ Done.\033[0m Log out and back in for the shell change to take effect.\n'
+printf '\n\033[38;2;184;187;38m✔ Done.\033[0m Log out and back in for the shell change to take effect.\n'
 printf '  Reload now: exec bash\n'
