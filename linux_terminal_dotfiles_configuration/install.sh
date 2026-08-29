@@ -289,6 +289,21 @@ HISTCONF
     _ok "$_hist_drop — leading space ignored, history written each prompt"
 fi
 
+_hdr "GTK3 dark theme"
+# GNOME's colour-scheme=prefer-dark is a libadwaita setting. A GTK3 application
+# that never opted into it keeps the light theme regardless — virt-manager is
+# one. This tells GTK3 itself to prefer dark, which is narrower than exporting
+# GTK_THEME: GTK4 and libadwaita applications keep following GNOME on their own,
+# rather than being forced onto the legacy Adwaita-dark.
+_gtk3="$HOME/.config/gtk-3.0/settings.ini"
+if grep -qs '^gtk-application-prefer-dark-theme=1' "$_gtk3"; then
+    _ok "GTK3 already set to prefer dark"
+else
+    mkdir -p "$(dirname "$_gtk3")"
+    printf '[Settings]\ngtk-application-prefer-dark-theme=1\n' > "$_gtk3"
+    _ok "$_gtk3 — GTK3 applications follow dark"
+fi
+
 _hdr "SSH server"
 # Root by key only; ordinary users unchanged; port 22 left at the default.
 # A broken sshd_config locks you out of the machine, so this validates before
