@@ -122,46 +122,50 @@ NO_AUTO_TMUX=1 bash
 tmux is run rather than `exec`'d, so a broken `~/.tmux.conf` leaves you at a
 working shell instead of a terminal that closes the moment it opens.
 
-The status bar is coloured text rather than badges, matching the prompt, and
-uses `bg=default` so it takes the terminal's own background. A terminal window
-whose height is not an exact multiple of the character cell leaves a strip
-below the last row; any fixed background colour on the bar shows up as a seam
-against it.
+The status bar follows the pattern the Catppuccin tmux port uses: a
+full-strength accent as the block background with Crust `#11111b` on top.
+
+| Element | Block | Text |
+|---|---|---|
+| session name | Mauve `#cba6f7` | Crust `#11111b` |
+| active window | Green `#a6e3a1` | Crust `#11111b` |
+| inactive window | Surface1 `#45475a` | Text `#cdd6f4` |
+| zoomed marker | Crust `#11111b` | Red `#f38ba8` |
+
+Blending an accent down toward the base is what makes it look muddy, so the
+accent stays at full saturation and the dark colour goes on the text instead.
+That puts the session at 9.2:1 and the active window at 12.6:1.
+
+The bar itself uses `bg=default` so it takes the terminal's own background. A
+terminal window whose height is not an exact multiple of the character cell
+leaves a strip below the last row; any fixed background colour on the bar shows
+up as a seam against it.
 
 ## Prompt
 
 ```
- bahman@Silenus  ~/project  main*⇡1  venv:api  k8s:prod
-$
+bahman @ Silenus ~/project main*⇡1 venv:api k8s:prod $
 ```
 
-Two lines. Every segment draws Text `#cdd6f4` on its own dark block, so all of
-it reads equally well and the block colour alone says which segment you are
-looking at. Same approach as the tmux status bar. No clock — use `date` when you
-want one. Only the `user@host` block changes colour, so root is obvious at a
-glance.
+One line, plain colour, no badges and no background blocks. No clock — use
+`date` when you want one. Only the user name changes colour, so root is obvious at a glance
+while the host name stays put.
 
-| Segment | Block | Shown when |
+| Segment | Colour | Shown when |
 |---|---|---|
-| `user@host` | Green `#455a4a`, Red `#77485a` for root | always |
-| path | Blue `#45577b` | always |
-| branch | Peach `#6c5045` | inside a git repository |
-| `venv:` | Mauve `#5f5077` | a virtualenv is active |
-| `k8s:` | Sapphire `#395a6f` | `kubectl` has a current context |
+| user | Green `#a6e3a1`, Red `#f38ba8` for root | always |
+| `@` | Overlay0 `#6c7086` | always |
+| host | Yellow `#f9e2af` | always |
+| path | Blue `#89b4fa` | always |
+| branch | Peach `#fab387` | inside a git repository |
+| `venv:` | Mauve `#cba6f7` | a virtualenv is active |
+| `k8s:` | Sky `#89dceb` | `kubectl` has a current context |
 
-Each block is its Catppuccin Mocha accent blended into Crust as far as it goes
-while still holding the white text near 5:1, which is the darkest that hue gets
-before it turns grey.
+Branch suffixes carry their own colour: `*` unstaged is Red, `+` staged is
+Green, `⇡N` ahead and `⇣N` behind are Sky, `{N}` stashes is Flamingo.
+The `$` turns red when the last command failed, and becomes `#` for root.
 
-Branch suffixes keep their own bright accent, because the colour is the whole
-point of them: `*` unstaged is Red, `+` staged is Green, `⇡N` ahead and `⇣N`
-behind are Sky, `{N}` stashes is Flamingo.
-
-The `$` sits on its own line, turns Red when the last command failed, and
-becomes `#` for root.
-
-No powerline separators, so no patched font is needed. Needs a true-colour
-terminal. GNOME Terminal qualifies.
+Needs a true-colour terminal. GNOME Terminal qualifies.
 
 ## Aliases
 
@@ -207,21 +211,6 @@ unwanted layouts is the only method that reliably changes what is active.
 
 Both are per-user: the settings, the services and the session bus all belong to
 your login, so none of it applies to a root shell.
-
-To open a terminal without tmux:
-
-```bash
-NO_AUTO_TMUX=1 bash
-```
-
-tmux is run rather than `exec`'d, so a broken `~/.tmux.conf` leaves you at a
-working shell instead of a terminal that closes the moment it opens.
-
-The status bar is coloured text rather than badges, matching the prompt, and
-uses `bg=default` so it takes the terminal's own background. A terminal window
-whose height is not an exact multiple of the character cell leaves a strip
-below the last row; any fixed background colour on the bar shows up as a seam
-against it.
 
 ## GNOME shortcuts
 
