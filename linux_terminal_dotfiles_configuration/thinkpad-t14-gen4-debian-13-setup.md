@@ -331,37 +331,45 @@ No output means nothing is missing.
 Lenovo publishes firmware to LVFS, so the BIOS, embedded controller, and
 Thunderbolt can all be updated from Linux. No Windows and no USB needed.
 
-#### 1. Install fwupd
+#### 1. Become root
+
+Step 4 ended with a log out, so this starts again as an ordinary user.
+
+```bash
+su -
+```
+
+#### 2. Install fwupd
 
 ```bash
 apt install -y fwupd fwupd-amd64-signed
 ```
 
-#### 2. Refresh the firmware list
+#### 3. Refresh the firmware list
 
 ```bash
 fwupdmgr refresh --force
 ```
 
-#### 3. See what the machine has
+#### 4. See what the machine has
 
 ```bash
 fwupdmgr get-devices
 ```
 
-#### 4. See what is available
+#### 5. See what is available
 
 ```bash
 fwupdmgr get-updates
 ```
 
-#### 5. Apply
+#### 6. Apply
 
 ```bash
 fwupdmgr update
 ```
 
-#### 6. Reboot to apply
+#### 7. Reboot to apply
 
 ```bash
 systemctl reboot
@@ -373,22 +381,22 @@ Log back in and become root again before continuing:
 su -
 ```
 
-#### 7. Check nothing is left
+#### 8. Check nothing is left
 
 ```bash
 fwupdmgr get-updates
 ```
 
 The last line must read `No updates available`. If it does not, repeat from
-step 5.
+step 6.
 
-#### 8. Check the new BIOS version
+#### 9. Check the new BIOS version
 
 ```bash
 dmidecode -s bios-version
 ```
 
-#### 9. Check Secure Boot survived
+#### 10. Check Secure Boot survived
 
 ```bash
 mokutil --sb-state
@@ -400,10 +408,10 @@ Expect `SecureBoot enabled`.
 
 - Plug the charger in first. On battery every device reports `Device requires AC power to be connected` and is skipped without failing, so the update looks like it worked when nothing happened.
 - Never power off during a firmware update.
-- Firmware is written during the reboot, not by `fwupdmgr update`. Steps 5 to 7 are one round. Repeat until step 7 is clean.
+- Firmware is written during the reboot, not by `fwupdmgr update`. Steps 6 to 8 are one round. Repeat until step 8 is clean.
 - `Devices with no available firmware updates` and `Devices with the latest available firmware version` both mean nothing to do. Only the last line decides.
 - `fwupd-amd64-signed` holds the Debian-signed EFI file. Without it firmware updates stop working once Secure Boot is on.
-- A BIOS update can reset BIOS settings. If step 9 says `SecureBoot disabled`, redo Step 1.
+- A BIOS update can reset BIOS settings. If step 10 says `SecureBoot disabled`, redo Step 1.
 
 ### Step 6 — Packages
 
