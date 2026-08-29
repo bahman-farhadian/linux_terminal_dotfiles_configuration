@@ -164,7 +164,6 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 | `v` | vim |
 | `b` | btop, or htop if btop is missing |
 | `ll` / `l` / `la` | listings |
-| `nekoray` | root only — starts nekoray with its icon |
 | `DE` | keyboard: German only |
 | `EN` | keyboard: US English and Persian |
 | `kbd` | show the current input sources |
@@ -173,14 +172,6 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 | `pubip` / `privip` | external / private IP |
 | `ports` | listening TCP and UDP sockets, with the process holding each |
 | `cpy` | pipe filter — `cmd 2>&1 \| cpy` prints and copies |
-
-`nekoray` is defined only when the shell is root and the binary is present, so
-it never appears for an ordinary user where it would start and then fail on the
-tunnel. It runs from `/nekoray`, because the binary loads `geoip.dat`,
-`geosite.dat` and `config/` by relative path, and backgrounds itself the way the
-bundled launcher does. It passes no icon: the application sets an
-empty one itself after Qt reads the command line, so `_NET_WM_ICON` is empty
-whatever is given. Only a `.desktop` file can supply an icon for it.
 
 `ports`, `update` and `upgrade` are functions, not aliases, because they decide
 whether `sudo` is needed: as root they run the commands directly, otherwise through
@@ -192,20 +183,17 @@ log out.
 
 `install.sh` writes `~/.local/bin/lock-keyboard-en.sh` and runs it two ways.
 
-`lock-keyboard-en.service` watches for the screen locking and, whatever layout
-was active, switches to English. German is dropped from the list; Persian stays
-in the list but is deselected. Already English does nothing.
+`lock-keyboard-en.service` watches for the screen locking. On lock it makes
+English the only layout in the list, so nothing else can be active while the
+password is typed. On unlock it puts Persian back.
 
-`keyboard-en-tick.timer` runs every 10 minutes whether the screen is locked or
-not. It acts only when the layout list is already the English pair and Persian
-is the selected one, and then selects English. It leaves German alone, since
-German is only active if it was chosen deliberately.
+`keyboard-en-tick.timer` runs every 10 minutes and does the same drop and
+restore, but only when the list is already the English pair, so a deliberate
+switch to German is left alone.
 
-| State | On lock | Every 10 min |
-|---|---|---|
-| German | switch to English | nothing |
-| Persian | select English | select English |
-| English | nothing | nothing |
+Only the layout list is written. GNOME ignores writes to the selected index,
+and that key reads `0` even while Persian is the live layout, so removing the
+unwanted layouts is the only method that reliably changes what is active.
 
 Both are per-user: the settings, the services and the session bus all belong to
 your login, so none of it applies to a root shell.
@@ -224,95 +212,6 @@ uses `bg=default` so it takes the terminal's own background. A terminal window
 whose height is not an exact multiple of the character cell leaves a strip
 below the last row; any fixed background colour on the bar shows up as a seam
 against it.
-
-## Prompt
-
-```
-bahman @ Silenus ~/project main*⇡1 venv:api k8s:prod $
-```
-
-One line, plain colour, no badges and no background blocks. No clock — use
-`date` when you want one. Only the user name changes colour, so root is obvious at a glance
-while the host name stays put.
-
-| Segment | Colour | Shown when |
-|---|---|---|
-| user | Green `#a6e3a1`, Red `#f38ba8` for root | always |
-| `@` | Overlay0 `#6c7086` | always |
-| host | Yellow `#f9e2af` | always |
-| path | Blue `#89b4fa` | always |
-| branch | Peach `#fab387` | inside a git repository |
-| `venv:` | Mauve `#cba6f7` | a virtualenv is active |
-| `k8s:` | Sky `#89dceb` | `kubectl` has a current context |
-
-Branch suffixes carry their own colour: `*` unstaged is Red, `+` staged is
-Green, `⇡N` ahead and `⇣N` behind are Sky, `{N}` stashes is Flamingo.
-The `$` turns red when the last command failed, and becomes `#` for root.
-
-Needs a true-colour terminal. GNOME Terminal qualifies.
-
-## Aliases
-
-| Alias | Action |
-|---|---|
-| `update` | refresh apt sources, list what apt and flatpak would upgrade |
-| `upgrade` | upgrade apt and flatpak, then autoremove, purge and drop unused runtimes |
-| `c` / `reload` | clear / restart the shell |
-| `t` | tmux |
-| `v` | vim |
-| `b` | btop, or htop if btop is missing |
-| `ll` / `l` / `la` | listings |
-| `nekoray` | root only — starts nekoray with its icon |
-| `DE` | keyboard: German only |
-| `EN` | keyboard: US English and Persian |
-| `kbd` | show the current input sources |
-| `pubkey` | print the first SSH public key |
-| `password` | random base64-48 string |
-| `pubip` / `privip` | external / private IP |
-| `ports` | listening TCP and UDP sockets, with the process holding each |
-| `cpy` | pipe filter — `cmd 2>&1 \| cpy` prints and copies |
-
-`nekoray` is defined only when the shell is root and the binary is present, so
-it never appears for an ordinary user where it would start and then fail on the
-tunnel. It runs from `/nekoray`, because the binary loads `geoip.dat`,
-`geosite.dat` and `config/` by relative path, and backgrounds itself the way the
-bundled launcher does. It passes no icon: the application sets an
-empty one itself after Qt reads the command line, so `_NET_WM_ICON` is empty
-whatever is given. Only a `.desktop` file can supply an icon for it.
-
-`ports`, `update` and `upgrade` are functions, not aliases, because they decide
-whether `sudo` is needed: as root they run the commands directly, otherwise through
-`sudo`. `update` changes nothing beyond refreshing the package lists.
-
-`DE` and `EN` replace the GNOME input source list outright rather than adding
-to it, so only the named layouts remain. They take effect immediately, with no
-log out.
-
-`install.sh` also writes `~/.local/bin/lock-keyboard-en.sh` and a matching
-systemd user service that watches for the screen locking and switches to English the moment it
-happens, whatever layout was active. The unlock prompt is then never left on a
-keyboard that cannot type the password. It does nothing while the session is
-unlocked.
-
-It watches the lock signal rather than polling. A timer only notices the lock on
-its next tick, which is too late to be any use.
-
-It sets both the input source list and the selected index. Setting the list
-alone is not enough: German disappears from it and the selection falls back on
-its own, but Persian stays in the list and stays active unless the index is
-moved.
-
-**Git:** `g gs ga gaa gc gca gco gcob gb gl gd gds gp gpf gpl gpr gst gstp gstl gf grb gcp gwip`
-
-**Python:** `py pip piv va vd pipi pipr pipff jn jl`
-
-**Docker:** `d dps dpsa di dex dlogs dstop dstart dprune dc dcu dcd dcl dcr dcb`
-
-**Kubernetes:** `k kgp kgpa kgs kgn kgd kdes kdp kds kdn klogs kex kap kdel kctx kuse kns krun`
-
-`install.sh` fetches a tmux bash completion into
-`~/.local/share/bash-completion/completions/`. Debian packages none, so tab
-completion for `tmux` and the `t` alias does not work without it.
 
 ## GNOME shortcuts
 

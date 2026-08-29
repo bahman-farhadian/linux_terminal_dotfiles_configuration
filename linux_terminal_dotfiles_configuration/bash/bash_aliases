@@ -57,28 +57,29 @@ upgrade() {
     fi
 }
 
-# Root only. The tunnel needs privileges, so this is not defined for an ordinary
-# user where it would start and then fail. The two variables are what
-# /nekoray/launcher sets before it execs the binary; -qwindowicon is a Qt option
-# and gives the window the icon shipped alongside it.
-if [ "$(id -u)" -eq 0 ] && [ -x /nekoray/nekoray ]; then
-    nekoray() {
-        # Must run from /nekoray: the binary loads geoip.dat, geosite.dat and
-        # config/ by relative path, which is why the launcher execs ./nekoray.
-        # Backgrounded and detached so it behaves like the launcher and does not
-        # hold the terminal.
-        #
-        # No -qwindowicon here: the application calls setWindowIcon() with an
-        # empty icon after Qt has read the command line, so _NET_WM_ICON comes
-        # out empty whatever is passed. Only a .desktop file can give it an icon.
-        (
-            cd /nekoray || return
-            LD_LIBRARY_PATH=/nekoray/usr/lib \
-            QT_PLUGIN_PATH=/nekoray/usr/plugins \
-            setsid ./nekoray >/dev/null 2>&1 &
-        )
-    }
-fi
+# System update — apt and flatpak together.
+# Functions rather than aliases: an alias cannot decide whether sudo is needed.
+_asroot() {
+    if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo "$@"; fi
+}
+
+# What would change. Refreshes the sources, then lists it without touching
+# anything.
+update() {
+    _asroot apt update
+    apt list --upgradable
+    command -v flatpak >/dev/null 2>&1 && flatpak remote-ls --updates
+}
+
+# Apply it, then clean up after both.
+upgrade() {
+    _asroot apt full-upgrade
+    _asroot apt autoremove --purge
+    if command -v flatpak >/dev/null 2>&1; then
+        _asroot flatpak update
+        _asroot flatpak uninstall --unused
+    fi
+}
 
 # Keyboard layout — replaces the GNOME input source list outright, so only the
 # named layouts remain. Takes effect immediately, no log out.
