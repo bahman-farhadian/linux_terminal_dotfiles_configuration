@@ -573,6 +573,9 @@ exec bash
 - Check it with `systemctl --user status lock-keyboard-en.service`. It must be `active (running)`.
 - It also writes `/etc/ssh/sshd_config.d/99-local.conf` so root can only reach SSH with a key, never a password. Ordinary users and port 22 are unchanged. This needs sudo, so answer `y` at the root prompt.
 - It also sets the GNOME shortcuts: `Ctrl+Alt+T` for the terminal, `Super+E` for Files, `Super+I` for Settings, and `Alt+Tab` to switch windows rather than applications.
+- A command typed with a leading space is not written to the history file. Use it for anything carrying a password or a token. One space is enough.
+- History is written at every prompt, not only when the shell exits. A tmux pane that is killed rather than closed keeps everything typed in it.
+- It also writes `/etc/profile.d/99-history.sh` so both rules apply to every account, not only yours. That file is read by login shells, so an account without these dotfiles gets the rules on a tty or over SSH.
 - `README.md` covers the prompt, the tmux keys, and what changes.
 
 ### Step 8 — KVM and libvirt
