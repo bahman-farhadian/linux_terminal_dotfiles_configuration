@@ -58,7 +58,7 @@ for p in vim mokutil dmidecode efibootmgr \
   fwupd fwupd-amd64-signed \
   bash-completion bridge-utils btop curl default-jre duf ethtool ffmpeg filezilla foliate fonts-jetbrains-mono git \
   gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc \
-  iperf3 jq keepassxc lshw nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio \
+  iperf3 jq keepassxc lshw make nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio \
   openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle \
   sudo tmux traceroute tree unrar virt-top vlc wget xclip yt-dlp \
   flatpak gnome-software-plugin-flatpak claude-code \
