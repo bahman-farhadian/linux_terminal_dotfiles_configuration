@@ -1,6 +1,6 @@
 # linux dotfiles
 
-Debian dotfiles for **bash**, **tmux**, and **SSH** — Catppuccin Mocha theme
+Debian dotfiles for **bash**, **tmux**, and **SSH** — Gruvbox dark theme
 throughout. Adapted from the macOS set, with every macOS-only assumption
 removed.
 
