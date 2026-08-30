@@ -96,7 +96,10 @@ ck "ip_forward"      "$(sysctl -n net.ipv4.ip_forward)" "1"
 ck "ip_forward conf" "$(grep -c 'net.ipv4.ip_forward = 1' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
 ck "nofile soft"     "$(grep -c 'soft.*nofile.*65536' /etc/security/limits.d/99-kvm.conf 2>/dev/null)" "1"
 ck "nofile hard"     "$(grep -c 'hard.*nofile.*1048576' /etc/security/limits.d/99-kvm.conf 2>/dev/null)" "1"
-ck "default net"     "$(virsh -c qemu:///system net-list --name 2>/dev/null|grep -c default)" "1"
+ck "no default net"  "$(virsh -c qemu:///system net-list --all --name 2>/dev/null|grep -cx default)" "0"
+ck "static_network_24" "$(virsh -c qemu:///system net-list --name 2>/dev/null|grep -cx static_network_24)" "1"
+ck "net autostart"   "$(virsh -c qemu:///system net-info static_network_24 2>/dev/null|awk '/^Autostart/{print $2}')" "yes"
+ck "virbr1 address"  "$(ip -4 -br addr show virbr1 2>/dev/null|awk '{print $3}')" "192.168.24.1/24"
 
 printf '\n--- Step 9: Docker ---\n'
 ck "docker active"   "$(systemctl is-active docker)" "active"

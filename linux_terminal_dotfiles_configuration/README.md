@@ -36,6 +36,8 @@ linux_terminal_dotfiles_configuration/
 │   ├── ssh/
 │   │   └── config         → managed block in ~/.ssh/config
 │   ├── hushlogin          → ~/.hushlogin
+│   ├── kvm/
+│   │   └── static_network_24.xml   the one libvirt network on this host
 │   ├── install.sh         bash, tmux, ssh, and the GNOME parts
 │   ├── check.sh
 │   ├── gnome-app-folders.py

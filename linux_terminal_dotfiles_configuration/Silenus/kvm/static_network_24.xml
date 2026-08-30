@@ -1,0 +1,43 @@
+<!--
+  Network Name: static_network_24
+
+  This network uses a Class C subnet 192.168.24.0/24:
+    - 192.168.24.0   -> The "network address" used to identify the entire subnet. NetID.
+                        It cannot be assigned to any host or device.
+    - 192.168.24.1   -> Assigned to the libvirt bridge 'virbr1' on the host.
+                        VMs use this as their default gateway.
+    - 192.168.24.2
+      through
+      192.168.24.254 -> Usable range for VM static IPs (no DHCP configured).
+    - 192.168.24.255 -> The "broadcast address" for this subnet. Also not assignable to any host.
+
+  Mode: NAT
+    - All outbound traffic from VMs is translated (NATed) through the host's external interface.
+    - Inbound connections from outside require explicit port forwarding on the host if needed.
+
+  No DHCP:
+    - No <dhcp> section is defined, so each VM must be manually configured with a static IP
+      (e.g., 192.168.24.10, gateway=192.168.24.1, netmask=255.255.255.0).
+
+  Typical VM static configuration might look like:
+    IP Address: 192.168.24.10
+    Netmask:    255.255.255.0
+    Gateway:    192.168.24.1
+    DNS:        8.8.8.8, 1.1.1.1
+
+  This is the only network on this host. libvirt's own 'default' network is
+  removed in Step 8 rather than left stopped, so nothing else claims a subnet
+  or runs a DHCP server for guests that are meant to be static.
+
+    virsh -c qemu:///system net-define    kvm/static_network_24.xml
+    virsh -c qemu:///system net-start     static_network_24
+    virsh -c qemu:///system net-autostart static_network_24
+-->
+
+<network>
+  <name>static_network_24</name>
+  <forward mode="nat"/>
+  <bridge name="virbr1" stp="on" delay="0"/>
+  <ip address="192.168.24.1" netmask="255.255.255.0">
+  </ip>
+</network>
