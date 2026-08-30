@@ -1124,52 +1124,28 @@ between the two machines and nothing else. Dionysus takes `192.168.124.1/30`;
 this end takes `192.168.124.2/30`. Configure it only when the cable is plugged
 in — the profile binds to the adapter's own name.
 
-#### 1. Find the adapter's name and MAC
+#### 1. Confirm which interface the cable is in
 
 ```bash
 ip -br link
 ```
 
-A USB ethernet adapter appears as `enx` followed by its MAC address with the
-colons removed, so `enx001122334455` is `00:11:22:33:44:55`. Read it here rather
-than assuming one; it differs per adapter.
+```bash
+cat /sys/class/net/enp0s31f6/carrier
+```
 
-#### 2. Rename it
+`enp0s31f6` is this laptop's built-in RJ45. `carrier: 1` means the cable is
+plugged in. Nothing is renamed at this end: `enp0s31f6` is a PCI-slot name, so
+it is already stable and already says what it is. Dionysus renames its end only
+because a USB adapter arrives as `enx` followed by its MAC address, which is
+stable but unreadable.
 
-That name is stable but says nothing about what the link is for. A `.link` file
-renames it as udev sets the device up, which is before any profile can bind to
-the old name. Use the MAC from the previous sub-step:
+#### 2. Create the profile
+
+
 
 ```bash
-sudo vim /etc/systemd/network/10-p2plink0.link
-```
-
-Put this in it:
-
-```
-[Match]
-MACAddress=00:11:22:33:44:55
-
-[Link]
-Name=p2plink0
-```
-
-```bash
-sudo update-initramfs -u
-```
-
-Unplug the adapter and plug it back in, then:
-
-```bash
-ip -br link
-```
-
-Expect `p2plink0`.
-
-#### 3. Create the profile
-
-```bash
-nmcli con add type ethernet ifname p2plink0 con-name Dionysus ipv4.method manual ipv4.addresses 192.168.124.2/30 ipv4.never-default yes ipv6.method disabled
+nmcli con add type ethernet ifname enp0s31f6 con-name Dionysus ipv4.method manual ipv4.addresses 192.168.124.2/30 ipv4.never-default yes ipv6.method disabled
 ```
 
 ```bash
@@ -1180,7 +1156,7 @@ nmcli con mod Dionysus connection.autoconnect yes
 nmcli con up Dionysus
 ```
 
-#### 4. Route to Dionysus's guests, preferring this link
+#### 3. Route to Dionysus's guests, preferring this link
 
 Dionysus's guests live on `192.168.32.0/24`, behind Dionysus. There are two ways
 to reach them: across this cable, or across the LAN. Both routes are installed,
@@ -1207,10 +1183,10 @@ nmcli con up Dionysus
 nmcli con up Huawei-Router
 ```
 
-#### 5. Check it
+#### 4. Check it
 
 ```bash
-ip -br addr show p2plink0
+ip -br addr show enp0s31f6
 ```
 
 Expect `192.168.124.2/30`.
@@ -1219,7 +1195,7 @@ Expect `192.168.124.2/30`.
 ip -4 route get 192.168.32.10
 ```
 
-With the cable plugged in, expect `via 192.168.124.1 dev p2plink0`. Unplug it
+With the cable plugged in, expect `via 192.168.124.1 dev enp0s31f6`. Unplug it
 and run the same command: the answer must become `via 192.168.8.3`, on the
 wireless interface.
 
@@ -1237,9 +1213,9 @@ Needs Dionysus up on the other end.
 
 **Notes**
 
-- Both ends carry the same interface name, `p2plink0`, and the same connection name, `Dionysus` — the link is called the same thing from either side. The `.link` file matches on MAC, so each machine renames its own adapter, and connection names are local to a host, so nothing collides.
-- `p2plink0` is chosen to be a name nothing else generates. The kernel produces `en*`, `wl*` and `ww*`; `wpa_supplicant` produces `p2p0` and `p2p-dev-*` for Wi-Fi Direct, which matters here because this machine has Wi-Fi. Both `eth0` and `p2p0` are avoided for that reason.
-- Rename first, create the profile second. A profile bound to the `enx` name stops matching the moment the rename takes effect.
+- The two ends sit on different kinds of interface. Dionysus reaches the cable through a USB-C ethernet adapter, renamed to `p2plink0`; this laptop has a built-in RJ45 and uses it as it comes, `enp0s31f6`. Only the connection name is shared — `Dionysus` at both ends — so the link reads the same from either side. Connection names are local to a host, so nothing collides.
+- A profile bound to an interface that does not exist fails with `No suitable device found for this connection ... mismatching interface name`, naming whichever ethernet device it did find. `nmcli con mod <name> connection.interface-name <iface>` repoints it without recreating it.
+- Nothing is renamed at this end, so none of the naming hazards apply here. On Dionysus, where the USB adapter does get renamed, `p2plink0` is chosen to be a name nothing else generates: the kernel produces `en*`, `wl*` and `ww*`, and `wpa_supplicant` produces `p2p0` and `p2p-dev-*` for Wi-Fi Direct.
 - No gateway and no DNS on this profile. `ipv4.never-default yes` states the same thing a second way, so a later edit that adds a gateway by accident cannot take the default route away from the interface that actually reaches the internet.
 - A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length, or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`–`.3`.
 - This is a second route to Dionysus when its LAN side is broken, which is worth having before reconfiguring that machine's management interface.
