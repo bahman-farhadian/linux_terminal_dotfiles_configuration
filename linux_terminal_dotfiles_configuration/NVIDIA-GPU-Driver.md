@@ -56,8 +56,11 @@ libraries directly rather than through a container.
 
 ## Step 1 — Enable contrib, non-free and non-free-firmware
 
-The driver is not in `main` and never will be: `nvidia-kernel-dkms` is in
-`non-free`, and the firmware blobs are in `non-free-firmware`.
+The driver is not in `main` and never will be. `nvidia-kernel-dkms` and
+`nvidia-smi` are in `non-free`; `non-free-firmware` goes on the same line
+because Debian's own sources carry it and other hardware in the machine may want
+it, not because this driver does — the proprietary driver ships its own
+firmware.
 
 ```bash
 sudo vim /etc/apt/sources.list
@@ -81,14 +84,19 @@ sudo apt update
 ```
 
 ```bash
-apt-cache policy | grep -i non-free
+apt-cache policy | grep -iE 'contrib|non-free'
 ```
 
-Expect `non-free` and `non-free-firmware` component lines.
+Expect `contrib`, `non-free` and `non-free-firmware` component lines. All three
+are needed: the module and `nvidia-smi` are in `non-free`, and
+`nvidia-persistenced` — worth having on a headless machine, see Step 6 — is in
+`contrib`.
 
 **Notes**
 
 - A Debian install from the standard media starts with only `main`, whether it is on metal or in a VM, so the components have to be added either way.
+- Do **not** install `firmware-nvidia-graphics`. Despite the name it is firmware for **nouveau**, the open driver this setup blacklists. The proprietary module carries what it needs.
+- `lspci`, used in the section above, comes from `pciutils`. Its priority is `standard`, so a normal install has it and a minimal one may not: `sudo apt install -y pciutils` if the command is missing.
 - Debian 13 may write `/etc/apt/sources.list.d/debian.sources` in DEB822 format instead, depending on how the installer ran. If that file exists and `/etc/apt/sources.list` does not, edit its `Components:` line to read `main contrib non-free non-free-firmware` rather than creating the classic file alongside it. Two sources for the same suite makes `apt` warn about being configured multiple times.
 
 ## Step 2 — Secure Boot: decide now, act in Step 4
@@ -236,14 +244,21 @@ failure — `mokutil --import` again and take the next reboot.
 #### 5. Confirm it took
 
 ```bash
-mokutil --list-enrolled | grep -iA2 -m1 'DKMS\|Subject'
+mokutil --list-enrolled
 ```
 
 ```bash
 sudo mokutil --list-new
 ```
 
-The first shows the key trusted; the second should now be empty.
+The first lists the trusted keys, the DKMS one now among them — read the subject
+lines rather than grepping for a name, since what the certificate calls itself
+depends on how it was generated. The second should be empty: nothing left
+staged.
+
+The test that actually matters comes in Step 6. A key can be enrolled and the
+module still fail to load for an unrelated reason, so `nvidia-smi` is the proof,
+not this.
 
 **Notes**
 
@@ -255,8 +270,10 @@ The first shows the key trusted; the second should now be empty.
 
 ## Step 5 — Reboot
 
-The running kernel still has `nouveau` loaded, and the blacklist only takes
-effect on a fresh boot.
+**Skip this if you did Step 4** — that reboot already served. Go to Step 6.
+
+Otherwise the running kernel still has `nouveau` loaded, and the blacklist the
+driver installed only takes effect on a fresh boot:
 
 ```bash
 sudo systemctl reboot
