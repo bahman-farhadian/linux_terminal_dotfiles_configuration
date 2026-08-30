@@ -1126,6 +1126,75 @@ interface. Dionysus takes `192.168.124.1/30`; this end takes `192.168.124.2/30`.
 Plug the cable in before starting: the profile binds to an interface name, and
 sub-step 1 reads which.
 
+```mermaid
+graph TB
+    INET(("Internet"))
+    R["Router<br/>192.168.8.1<br/>no DHCP"]
+    INET --- R
+
+    subgraph SIL ["Silenus &middot; ThinkPad T14 Gen 4"]
+        SW["wlp0s20f3 &middot; Huawei-Router<br/>192.168.8.2/24"]
+        SP["enp0s31f6 &middot; Dionysus<br/>192.168.124.2/30"]
+        SB["virbr1 &middot; static_network_24<br/>192.168.24.1/24 &middot; NAT"]
+        SG["guests<br/>192.168.24.2 &ndash; .254<br/>static, no DHCP"]
+        SB --- SG
+    end
+
+    subgraph DIO ["Dionysus &middot; Ryzen 9 3900X"]
+        DW["enp4s0 &middot; wan<br/>192.168.8.3/24"]
+        DP["p2plink0 &middot; Dionysus<br/>192.168.124.1/30"]
+        DB["virbr1 &middot; static_network_32<br/>192.168.32.1/24 &middot; NAT"]
+        DG["guests<br/>192.168.32.2 &ndash; .254<br/>static, no DHCP"]
+        DB --- DG
+    end
+
+    R ---|wifi| SW
+    R ---|Intel I211| DW
+    SP ===|USB-C ethernet cable| DP
+
+    classDef wan fill:#1f6feb,stroke:#0b4fc0,color:#ffffff
+    classDef p2p fill:#8957e5,stroke:#6a3fbf,color:#ffffff
+    classDef guest fill:#2da44e,stroke:#1a7f37,color:#ffffff
+    classDef infra fill:#57606a,stroke:#424a53,color:#ffffff
+    class SW,DW wan
+    class SP,DP p2p
+    class SB,SG,DB,DG guest
+    class R,INET infra
+```
+
+Blue is the way out, purple the point-to-point cable, green the guest networks
+each host NATs behind itself. The two guest subnets differ on purpose — the
+hosts can reach each other, so overlapping ranges would make a guest on one
+indistinguishable from a guest on the other.
+
+```mermaid
+flowchart LR
+    S["Silenus<br/>wants 192.168.32.0/24"]
+    P["via 192.168.124.1<br/>enp0s31f6 &middot; metric 100"]
+    W["via 192.168.8.3<br/>wlp0s20f3 &middot; metric 200"]
+    D["Dionysus<br/>forwards to virbr1"]
+    G["guest<br/>192.168.32.x"]
+
+    S ==>|cable up| P
+    S -.->|cable down| W
+    P ==> D
+    W -.-> D
+    D --> G
+
+    classDef pref fill:#8957e5,stroke:#6a3fbf,color:#ffffff
+    classDef fall fill:#57606a,stroke:#424a53,color:#ffffff
+    classDef host fill:#1f6feb,stroke:#0b4fc0,color:#ffffff
+    classDef guest fill:#2da44e,stroke:#1a7f37,color:#ffffff
+    class P pref
+    class W fall
+    class S,D host
+    class G guest
+```
+
+Both routes are permanent. NetworkManager withdraws a connection's routes when
+it goes down, so unplugging the cable removes the metric-100 route and the
+metric-200 one takes over with no manual step.
+
 #### 1. Confirm which interface the cable is in
 
 ```bash

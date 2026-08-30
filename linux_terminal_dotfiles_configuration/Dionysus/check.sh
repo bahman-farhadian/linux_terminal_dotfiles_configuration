@@ -132,8 +132,10 @@ hf "rename .link"    /etc/systemd/network/10-p2plink0.link
 ck "one default route" "$(ip -4 route show default|wc -l|tr -d ' ')" "1"
 ck "default via wan" "$(ip -4 route show default|grep -c 'dev enp4s0')" "1"
 ck "ip_forward"      "$(sysctl -n net.ipv4.ip_forward)" "1"
-ck "silenus->guests p2p" "$(sudo iptables -C FORWARD -s 192.168.124.2 -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null && echo yes || echo no)" "yes"
-ck "silenus->guests lan" "$(sudo iptables -C FORWARD -s 192.168.8.2 -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null && echo yes || echo no)" "yes"
+for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+  ck "guests reachable from $net" "$(sudo iptables -C FORWARD -s "$net" -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null && echo yes || echo no)" "yes"
+done
+ck "fw rules persisted" "$(grep -c 'd 192.168.32.0/24 -o virbr1 -j ACCEPT' /etc/iptables/rules.v4 2>/dev/null)" "3"
 ck "ip_forward conf" "$(grep -c 'net.ipv4.ip_forward = 1' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
 ck "gateway reachable" "$(ping -c1 -W2 192.168.8.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
 

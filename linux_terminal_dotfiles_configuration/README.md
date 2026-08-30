@@ -21,6 +21,49 @@ Each host has its own directory holding a complete, self-contained copy of what
 it installs. Deploy by running the installer inside the directory for that
 machine.
 
+## The network
+
+```mermaid
+graph TB
+    INET(("Internet"))
+    R["Router<br/>192.168.8.1<br/>no DHCP"]
+    INET --- R
+
+    subgraph SIL ["Silenus &middot; ThinkPad T14 Gen 4"]
+        SW["wlp0s20f3 &middot; Huawei-Router<br/>192.168.8.2/24"]
+        SP["enp0s31f6 &middot; Dionysus<br/>192.168.124.2/30"]
+        SB["virbr1 &middot; static_network_24<br/>192.168.24.1/24 &middot; NAT"]
+        SG["guests<br/>192.168.24.2 &ndash; .254<br/>static, no DHCP"]
+        SB --- SG
+    end
+
+    subgraph DIO ["Dionysus &middot; Ryzen 9 3900X"]
+        DW["enp4s0 &middot; wan<br/>192.168.8.3/24"]
+        DP["p2plink0 &middot; Dionysus<br/>192.168.124.1/30"]
+        DB["virbr1 &middot; static_network_32<br/>192.168.32.1/24 &middot; NAT"]
+        DG["guests<br/>192.168.32.2 &ndash; .254<br/>static, no DHCP"]
+        DB --- DG
+    end
+
+    R ---|wifi| SW
+    R ---|Intel I211| DW
+    SP ===|USB-C ethernet cable| DP
+
+    classDef wan fill:#1f6feb,stroke:#0b4fc0,color:#ffffff
+    classDef p2p fill:#8957e5,stroke:#6a3fbf,color:#ffffff
+    classDef guest fill:#2da44e,stroke:#1a7f37,color:#ffffff
+    classDef infra fill:#57606a,stroke:#424a53,color:#ffffff
+    class SW,DW wan
+    class SP,DP p2p
+    class SB,SG,DB,DG guest
+    class R,INET infra
+```
+
+Blue is the way out, purple the point-to-point cable, green the guest networks
+each host NATs behind itself. The two guest subnets differ on purpose — the
+hosts can reach each other, so overlapping ranges would make a guest on one
+indistinguishable from a guest on the other.
+
 ## Layout
 
 ```
