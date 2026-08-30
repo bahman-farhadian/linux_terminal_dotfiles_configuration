@@ -22,6 +22,13 @@ than appended to, package installs skip what is present, and group membership
 is unchanged when it is already granted. The single exception is `visudo` in
 Step 3, which is a manual edit and is noted there.
 
+**When something needs changing, change it here and re-run the step — never
+patch the machine by hand.** A `sed` against a file this document writes leaves
+the machine and the document disagreeing, and nothing will tell you which is
+right. Every block is written to be run again: the `tee` calls overwrite, the
+`nmcli` and `virsh` definitions replace, and the rule script deletes before it
+inserts. Re-running a step is always cheaper than reconciling a drift later.
+
 ## Part 1 — OS installation
 
 ### Step 1 — BIOS: Secure Boot, virtualization, PCIe addressing
@@ -709,11 +716,13 @@ virsh pool-list --all
 
 Expect `sssd-pool` and `lssd-pool` both active, with autostart `yes`.
 
-#### 7. Remove the default NAT network
+#### 7. Remove libvirt's two defaults
 
-`libvirtd` creates a `default` NAT network on install, typically
-`192.168.122.0/24`, with its own DHCP server. This host uses one network only,
-so `default` is removed rather than left stopped.
+`libvirtd` creates two things of its own on install, and both are wrong for this
+host.
+
+A `default` NAT network, typically `192.168.122.0/24`, with its own DHCP server.
+This host uses one network only, so it is removed rather than left stopped:
 
 ```bash
 virsh net-destroy default
@@ -722,6 +731,25 @@ virsh net-destroy default
 ```bash
 virsh net-undefine default
 ```
+
+A `default` storage pool, pointing at `/var/lib/libvirt/images` — which is on
+the 32 GiB root filesystem. A guest created without naming a pool lands there
+and fills root, while 1 TB of NVMe sits idle. The two pools defined in sub-step
+6 are the whole point of the disk layout, so this one goes too:
+
+```bash
+virsh pool-destroy default
+```
+
+```bash
+virsh pool-undefine default
+```
+
+```bash
+virsh pool-list --all
+```
+
+Expect `sssd-pool` and `lssd-pool`, and no `default`.
 
 #### 8. Define the one network this host uses
 
@@ -793,6 +821,8 @@ Expect `libvirt` and `kvm` in the list.
 - `dmesg` needs `sudo` as well. Debian sets `kernel.dmesg_restrict=1`, so the kernel log is root-only, and a check that reads it as an ordinary user finds an empty buffer rather than an error.
 - The packaged `osinfo-db` is the maintained source, refreshed by `apt upgrade`. Do not use `osinfo-db-import --latest`: it fetches from `releases.pagure.org`, a third-party host libosinfo's own maintainers have flagged as unreliable. It is what makes `virt-install --os-variant` resolve rather than guess.
 - `/etc/security/limits.d` applies to login sessions, not to systemd services. If `libvirtd` itself needs a higher limit, add a `LimitNOFILE` drop-in under `/etc/systemd/system/libvirtd.service.d/`.
+- The `default` storage pool is easy to miss because nothing draws attention to it. It does not appear in `virsh net-list`, it breaks nothing while it sits there, and `virt-install` uses it silently when no pool is named. The failure it produces is a root filesystem filling up weeks later for no visible reason.
+- Removing it does not delete `/var/lib/libvirt/images`. `pool-destroy` stops the pool and `pool-undefine` forgets the definition; the directory and anything in it stay where they are.
 - `net-define` reads the file at define time and stores a copy of its own, so the repository file is not consulted again afterwards. Editing it later means running `net-define` again.
 - The path is relative to the host directory. Give it an absolute path instead if you would rather not change directory, but do not leave it relative while sitting in `/root`, where the file does not exist.
 - IP forwarding is set in Step 10 alongside the bridges, since that is what needs it.

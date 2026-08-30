@@ -126,6 +126,8 @@ ck "hist ignorespace"  "$(bash -ic 'echo $HISTCONTROL' 2>/dev/null|grep -c 'igno
 ck "hist append prompt" "$(bash -ic 'echo $PROMPT_COMMAND' 2>/dev/null|grep -c 'history -a')" "1"
 ck "histappend shopt"  "$(bash -ic 'shopt histappend' 2>/dev/null|awk '{print $2}')" "on"
 hf "history drop-in"   /etc/profile.d/99-history.sh
+ck "login banner"    "$(grep -c 'B A H M A N' /etc/motd 2>/dev/null)" "1"
+ck "no kernel line"  "$([ -x /etc/update-motd.d/10-uname ] && echo executable || echo off)" "off"
 
 printf '\n--- Step 7: ssh client config ---\n'
 # The block has to exist and has to be last: ssh takes the first value it finds
