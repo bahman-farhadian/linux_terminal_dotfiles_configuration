@@ -1135,78 +1135,28 @@ ip -br link
 
 Expect `p2plink0` and no `enx9405bb143cf5`.
 
-#### 5. Create both connection profiles
+#### 5. Configure both interfaces
 
-Written now, activated later. A profile for a device NetworkManager does not yet
-manage is stored without complaint; it simply cannot come up until sub-step 7
-hands the device over.
+One block. It creates both profiles, hands `enp4s0` from ifupdown over to
+NetworkManager, and brings both up.
 
-`wan` — static, because the router runs no DHCP. This is the way out of the
-machine: it carries the default route and the only DNS on this host:
+`wan` is the way out — static, because the router runs no DHCP, carrying the
+default route and the only DNS on this host. `Dionysus` is the point-to-point
+link, with no gateway and no DNS so it cannot compete for that default route.
 
-```bash
-nmcli con add type ethernet ifname enp4s0 con-name wan ipv4.method manual ipv4.addresses 192.168.8.3/24 ipv4.gateway 192.168.8.1 ipv4.dns "8.8.8.8" ipv6.method disabled
-```
-
-```bash
-nmcli con mod wan connection.autoconnect yes
-```
-
-`Dionysus` — the point-to-point link. No gateway and no DNS, so it cannot
-compete with `wan` for the default route:
-
-```bash
-nmcli con add type ethernet ifname p2plink0 con-name Dionysus ipv4.method manual ipv4.addresses 192.168.124.1/30 ipv4.never-default yes ipv6.method disabled
-```
-
-```bash
-nmcli con mod Dionysus connection.autoconnect yes
-```
-
-```bash
-nmcli connection show
-```
-
-Both listed. Neither active yet.
-
-#### 6. Bring up the point-to-point link first
-
-The USB adapter was never in `/etc/network/interfaces`, so NetworkManager owns it
-already and this activates straight away:
-
-```bash
-nmcli con up Dionysus
-```
-
-```bash
-ip -br addr show p2plink0
-```
-
-Expect `192.168.124.1/30`.
-
-Plug the USB-C cable into Silenus, bring up its end — Silenus.md Step 13 — and
-confirm from Silenus that this works:
-
-```bash
-ssh <your-user>@192.168.124.1
-```
-
-This is why the order is what it is. The next sub-step takes `enp4s0`
-down, and this link is a second way in that does not depend on it.
-
-#### 7. Hand `enp4s0` over from ifupdown
-
+The handover in the middle is why this is one block and not a run of sub-steps.
 The installer configured `enp4s0` in `/etc/network/interfaces`, because a
-headless install has no NetworkManager to hand it to. Debian ships
-NetworkManager with `[ifupdown] managed=false`, so it will not touch an
-interface defined there: `nmcli con up wan` fails with the device reported
-`unmanaged` until that stanza is gone.
+headless install has no NetworkManager to hand it to, and Debian ships
+NetworkManager with `[ifupdown] managed=false` — so it will not touch an
+interface defined there. Emptying that file and restarting NetworkManager is
+what hands the interface over, and between those two moments it belongs to
+neither.
 
-**Run this from the console, in a `tmux` session.** It takes `enp4s0` down and
-back up, so a shell reached over that interface goes with it. In a pane on the
-physical console the shell survives and the whole block runs to the end.
+**Run it from the console, in a `tmux` session.** `enp4s0` goes down and comes
+back up, so a shell reached over it does not survive. On the physical console
+the shell does, and the block runs to the end.
 
-See what the installer wrote:
+Look at what the installer wrote first:
 
 ```bash
 cat /etc/network/interfaces
@@ -1216,10 +1166,13 @@ cat /etc/network/interfaces
 ls /etc/network/interfaces.d/
 ```
 
-Then, as one block:
+Then paste the whole block:
 
 ```bash
-cp /etc/network/interfaces /root/interfaces.bak
+nmcli con add type ethernet ifname enp4s0 con-name wan ipv4.method manual ipv4.addresses 192.168.8.3/24 ipv4.gateway 192.168.8.1 ipv4.dns "8.8.8.8" ipv6.method disabled
+nmcli con add type ethernet ifname p2plink0 con-name Dionysus ipv4.method manual ipv4.addresses 192.168.124.1/30 ipv4.never-default yes ipv6.method disabled
+nmcli con mod wan connection.autoconnect yes
+nmcli con mod Dionysus connection.autoconnect yes
 printf 'source /etc/network/interfaces.d/*\n\nauto lo\niface lo inet loopback\n' > /etc/network/interfaces
 grep -rl enp4s0 /etc/network/interfaces.d/ 2>/dev/null | xargs -r rm -f
 systemctl restart NetworkManager
@@ -1228,15 +1181,15 @@ nmcli con up Dionysus
 nmcli con up wan
 ```
 
-#### 8. Confirm
+#### 6. Confirm
 
 ```bash
 nmcli device status
 ```
 
-Expect `enp4s0` `connected` on `wan`, and `p2plink0` `connected` on
-`Dionysus`.  `unmanaged` against `enp4s0` means an ifupdown definition is still
-in place somewhere under `interfaces.d/`.
+Expect `enp4s0` `connected` on `wan`, and `p2plink0` `connected` on `Dionysus`.
+`unmanaged` against `enp4s0` means an ifupdown definition is still in place
+somewhere under `interfaces.d/`.
 
 ```bash
 ip -br addr show | grep -E 'enp4s0|p2plink0'
@@ -1252,10 +1205,14 @@ Exactly one default route, via `192.168.8.1` on `enp4s0`.
 ping -c4 192.168.8.1
 ```
 
-`/root/interfaces.bak` is the way back if any of that is wrong: copy it over
-`/etc/network/interfaces`, `systemctl disable --now NetworkManager`, reboot.
+With the cable in and Silenus's end configured — Silenus.md Step 13 — the link
+answers as well:
 
-#### 9. Enable IP forwarding
+```bash
+ping -c4 192.168.124.2
+```
+
+#### 7. Enable IP forwarding
 
 ```bash
 vim /etc/sysctl.d/99-kvm.conf
@@ -1284,17 +1241,18 @@ Expect `net.ipv4.ip_forward = 1`.
 - `p2plink0` is chosen to be a name nothing else generates. The kernel produces `en*`, `wl*` and `ww*`; `wpa_supplicant` produces `p2p0` and `p2p-dev-*` for Wi-Fi Direct. A rename that collides with an automatically assigned name can race with it, which is why both `eth0` and `p2p0` are avoided.
 - The file must sort before `99-default.link`, where the default naming policy lives. `10-` does.
 - `update-initramfs -u` puts the file in the initramfs too. A USB adapter is not needed that early, so this is precaution rather than requirement, but it costs nothing and means the name is the same whenever the interface does appear.
-- Rename first, create the profile second. A profile bound to `enx9405bb143cf5` stops matching the moment the rename takes effect.
+- Rename first, in sub-step 4, and only then run the block. A profile bound to `enx9405bb143cf5` stops matching the moment the rename takes effect, so the order of the two sub-steps matters.
 - The two profiles are named for what they do, not for the interface underneath. `wan` is the way out; `Dionysus` is the point-to-point link, and Silenus's end of the same cable carries that same name, so the link reads the same from either side. Connection names are local to each host, so nothing collides.
 - `wan` is the router-and-firewall convention: the side facing outward, as against the inside. Worth knowing that this one holds a private address, `192.168.8.3`, because another router sits in front of it doing the real translation. `wan` here means *this host's* way out, not a public address.
 - `ipv4.never-default yes` on the point-to-point link is what keeps it from installing a default route. Without a gateway it would not install one anyway, but stating it means a later edit that adds a gateway by accident cannot silently steal the default route from `enp4s0`.
 - A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`-`.3`.
 - `managed=false` is Debian's default, not NetworkManager's own. It exists so that a machine configured through `/etc/network/interfaces` does not have NetworkManager fight it. The consequence here is that removing the stanza is what hands the interface over — installing NetworkManager alone does nothing.
-- The address does not change across the handover: ifupdown and the new profile both hold `192.168.8.3/24`. The interface still goes down and up, so a session reached over it does not survive — which is why sub-step 7 says console, in `tmux`.
-- The point-to-point link is the other way back. Bring it up first, as sub-step 6 does, and a machine whose `enp4s0` refuses to come back is still reachable on `192.168.124.1` from Silenus.
+- The address does not change across the handover: ifupdown and the new profile both hold `192.168.8.3/24`. The interface still goes down and up, so a session reached over it does not survive — which is why sub-step 5 says console, in `tmux`.
+- No backup of `/etc/network/interfaces` is taken, and none is needed. The new profile carries the same address the installer's stanza did, so nothing is being replaced by something different; the file's whole content is the four lines the block writes back; and at the console the interface can be configured by hand with `ip addr add` if the block somehow leaves it down. A backup file would be one more thing to remember to delete.
+- The block brings `Dionysus` up before `wan`, so a machine whose `enp4s0` refuses to come back is still reachable on `192.168.124.1` from Silenus. That ordering is deliberate, not alphabetical.
 - `ip addr show` takes one device, not a list. `ip -br addr show enp4s0 p2plink0` fails with `either "dev" is duplicate, or "p2plink0" is garbage`; filtering the full listing is the way to see both at once.
 - IPv6 is disabled on both profiles. Nothing in this build uses it, and leaving it on means a second address family to reason about in the firewall.
-- Reaching a guest on `192.168.32.0/24` from Silenus over the point-to-point link needs a route on Silenus pointing at `192.168.124.1`, and forwarding on this host, which sub-step 9 enables. Whether to add that route is not decided here.
+- Reaching a guest on `192.168.32.0/24` from Silenus needs routes on Silenus — Silenus.md Step 13 sub-step 3 — forwarding on this host, which sub-step 7 enables, and the rules in Step 11. All three, or a guest stays unreachable.
 
 ### Step 11 — Firewall
 
