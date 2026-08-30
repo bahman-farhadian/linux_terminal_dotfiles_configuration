@@ -9,8 +9,13 @@
 if [ "$(id -u)" -eq 0 ]; then
   echo "STOP: run as your normal user, not root. Dotfiles, user units and group membership all live in your account."; exit 1
 fi
-pass=0; fail=0; failed=""
+pass=0; fail=0; skip=0; failed=""; skipped=""
 _note(){ failed="$failed  - $1\n"; }
+# na() is for a check that cannot be run here rather than one that failed —
+# something the document makes conditional, or that depends on hardware being
+# attached. It says so, says what to do about it, and does not count as a
+# failure, because a script that cries wolf gets ignored.
+na(){ printf '  N/A   %-32s %s\n' "$1" "$2"; skip=$((skip+1)); skipped="$skipped  - $1: $2\n"; }
 ck(){ if [ "$2" = "$3" ]; then printf '  PASS  %-32s %s\n' "$1" "$2"; pass=$((pass+1));
       else printf '  FAIL  %-32s got[%s] want[%s]\n' "$1" "$2" "$3"; fail=$((fail+1)); _note "$1: got [$2], wanted [$3]"; fi; }
 ok(){ if [ -n "$2" ]; then printf '  PASS  %-32s %s\n' "$1" "$2"; pass=$((pass+1));
@@ -140,7 +145,11 @@ ck "wan address"     "$(ip -4 -br addr show enp4s0 2>/dev/null|awk '{print $3}')
 ck "p2p profile"     "$(nmcli -g connection.id connection show Dionysus 2>/dev/null)" "Dionysus"
 ck "p2p never-default" "$(nmcli -g ipv4.never-default connection show Dionysus 2>/dev/null)" "yes"
 ck "p2p renamed"     "$([ -e /sys/class/net/p2plink0 ] && echo yes || echo no)" "yes"
-ck "p2p address"     "$(ip -4 -br addr show p2plink0 2>/dev/null|awk '{print $3}')" "192.168.124.1/30"
+if [ "$(cat /sys/class/net/p2plink0/carrier 2>/dev/null)" = "1" ]; then
+  ck "p2p address"   "$(ip -4 -br addr show p2plink0 2>/dev/null|awk '{print $3}')" "192.168.124.1/30"
+else
+  na "p2p address" "no cable in p2plink0. The link is up when Silenus is plugged in; the profile is what persists"
+fi
 hf "rename .link"    /etc/systemd/network/10-p2plink0.link
 ck "one default route" "$(ip -4 route show default|wc -l|tr -d ' ')" "1"
 ck "default via wan" "$(ip -4 route show default|grep -c 'dev enp4s0')" "1"
@@ -164,13 +173,19 @@ hf "guest-net-access unit"    /etc/systemd/system/guest-net-access.service
 ck "unit follows libvirtd"    "$(systemctl show -p PartOf --value guest-net-access.service 2>/dev/null|grep -c libvirtd)" "1"
 
 printf '\n========================================\n'
-printf '  PASS %s   FAIL %s\n' "$pass" "$fail"
+printf '  PASS %s   FAIL %s   N/A %s\n' "$pass" "$fail" "$skip"
 printf '========================================\n'
 
 if [ "$fail" -gt 0 ]; then
   printf '\nWhat failed:\n'
   printf "$failed"
   printf '\nEach line names the check, what the machine returned, and what the\ndocument says it should be. The step to redo is the section heading the\ncheck appeared under.\n'
+fi
+
+if [ "$skip" -gt 0 ]; then
+  printf '\nNot tested here:\n'
+  printf "$skipped"
+  printf '\nThese are not failures. Each one needs something that is not true of\nthis machine right now — a profile not yet created, hardware not\nattached — and each line says what would make it testable.\n'
 fi
 
 [ "$fail" -eq 0 ]

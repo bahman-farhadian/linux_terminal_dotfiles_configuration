@@ -11,8 +11,13 @@ fi
 case "$XDG_SESSION_TYPE" in wayland|x11) ;; *)
   echo "STOP: run from a desktop session terminal. XDG_SESSION_TYPE is '$XDG_SESSION_TYPE'; GNOME checks need the session bus."; exit 1 ;;
 esac
-pass=0; fail=0; failed=""
+pass=0; fail=0; skip=0; failed=""; skipped=""
 _note(){ failed="$failed  - $1\n"; }
+# na() is for a check that cannot be run here rather than one that failed —
+# something the document makes conditional, or that depends on hardware being
+# attached. It says so, says what to do about it, and does not count as a
+# failure, because a script that cries wolf gets ignored.
+na(){ printf '  N/A   %-32s %s\n' "$1" "$2"; skip=$((skip+1)); skipped="$skipped  - $1: $2\n"; }
 ck(){ if [ "$2" = "$3" ]; then printf '  PASS  %-32s %s\n' "$1" "$2"; pass=$((pass+1));
       else printf '  FAIL  %-32s got[%s] want[%s]\n' "$1" "$2" "$3"; fail=$((fail+1)); _note "$1: got [$2], wanted [$3]"; fi; }
 ok(){ if [ -n "$2" ]; then printf '  PASS  %-32s %s\n' "$1" "$2"; pass=$((pass+1));
@@ -150,13 +155,21 @@ ck "p2p address"      "$(nmcli -g ipv4.addresses connection show Dionysus 2>/dev
 ck "p2p never-default" "$(nmcli -g ipv4.never-default connection show Dionysus 2>/dev/null)" "yes"
 ck "guest route cable" "$(nmcli -g ipv4.routes connection show Dionysus 2>/dev/null|grep -c '192.168.32.0/24 192.168.124.1 100')" "1"
 ck "guest route fallback" "$(nmcli -t -g NAME connection show|while IFS= read -r c; do nmcli -g ipv4.routes connection show "$c" 2>/dev/null; done|grep -c '192.168.32.0/24 192.168.8.3 200')" "1"
-ck "hephaestus profile" "$(nmcli -g connection.id connection show Hephaestus 2>/dev/null)" "Hephaestus"
-ck "hephaestus address" "$(nmcli -g ipv4.addresses connection show Hephaestus 2>/dev/null)" "192.168.124.6/30"
-ck "hephaestus route"   "$(nmcli -g ipv4.routes connection show Hephaestus 2>/dev/null|grep -c '192.168.40.0/24 192.168.124.5 100')" "1"
-# The fallback lives on the work WiFi profile, which only exists once that
-# network has been joined. Informational: it does not fail on a laptop that has
-# not been to the office yet.
-ok "hephaestus fallback" "$(nmcli -t -g NAME connection show|while IFS= read -r c; do nmcli -g ipv4.routes connection show "$c" 2>/dev/null; done|grep -o '192.168.40.0/24 192.168.88.212 200'|head -1||echo 'not set — work WiFi profile absent')"
+if nmcli -g connection.id connection show Hephaestus >/dev/null 2>&1; then
+  ck "hephaestus profile" "$(nmcli -g connection.id connection show Hephaestus 2>/dev/null)" "Hephaestus"
+  ck "hephaestus address" "$(nmcli -g ipv4.addresses connection show Hephaestus 2>/dev/null)" "192.168.124.6/30"
+  ck "hephaestus route"   "$(nmcli -g ipv4.routes connection show Hephaestus 2>/dev/null|grep -c '192.168.40.0/24 192.168.124.5 100')" "1"
+else
+  na "hephaestus link" "profile not created. Silenus.md Step 13 sub-step 4 adds it; it is only needed once that host is built"
+fi
+# The fallback route lives on the work WiFi profile, which exists only once that
+# network has been joined. Absent, it is untestable rather than wrong.
+_hepfb=$(nmcli -t -g NAME connection show 2>/dev/null|while IFS= read -r c; do nmcli -g ipv4.routes connection show "$c" 2>/dev/null; done|grep -c '192.168.40.0/24 192.168.88.212 200')
+if [ "${_hepfb:-0}" -gt 0 ]; then
+  ck "hephaestus fallback" "$_hepfb" "1"
+else
+  na "hephaestus fallback" "no work WiFi profile here yet. Join that network, then: nmcli con mod <work-wifi-profile> +ipv4.routes \"192.168.40.0/24 192.168.88.212 200\""
+fi
 ck "one link autoconnects" "$(for c in Dionysus Hephaestus; do nmcli -g connection.autoconnect connection show "$c" 2>/dev/null; done|grep -c '^yes$')" "1"
 
 printf '\n--- Step 7/10: keyboard and lid ---\n'
@@ -192,13 +205,19 @@ ck "sshd port"   "$(sudo sshd -T 2>/dev/null|grep '^port'|awk '{print $2}')" "22
 ck "sshd active" "$(systemctl is-active ssh)" "active"
 
 printf '\n========================================\n'
-printf '  PASS %s   FAIL %s\n' "$pass" "$fail"
+printf '  PASS %s   FAIL %s   N/A %s\n' "$pass" "$fail" "$skip"
 printf '========================================\n'
 
 if [ "$fail" -gt 0 ]; then
   printf '\nWhat failed:\n'
   printf "$failed"
   printf '\nEach line names the check, what the machine returned, and what the\ndocument says it should be. The step to redo is the section heading the\ncheck appeared under.\n'
+fi
+
+if [ "$skip" -gt 0 ]; then
+  printf '\nNot tested here:\n'
+  printf "$skipped"
+  printf '\nThese are not failures. Each one needs something that is not true of\nthis machine right now — a profile not yet created, hardware not\nattached — and each line says what would make it testable.\n'
 fi
 
 [ "$fail" -eq 0 ]

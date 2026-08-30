@@ -9,8 +9,13 @@
 if [ "$(id -u)" -eq 0 ]; then
   echo "STOP: run as your normal user, not root. Dotfiles, user units and group membership all live in your account."; exit 1
 fi
-pass=0; fail=0; failed=""
+pass=0; fail=0; skip=0; failed=""; skipped=""
 _note(){ failed="$failed  - $1\n"; }
+# na() is for a check that cannot be run here rather than one that failed —
+# something the document makes conditional, or that depends on hardware being
+# attached. It says so, says what to do about it, and does not count as a
+# failure, because a script that cries wolf gets ignored.
+na(){ printf '  N/A   %-32s %s\n' "$1" "$2"; skip=$((skip+1)); skipped="$skipped  - $1: $2\n"; }
 ck(){ if [ "$2" = "$3" ]; then printf '  PASS  %-32s %s\n' "$1" "$2"; pass=$((pass+1));
       else printf '  FAIL  %-32s got[%s] want[%s]\n' "$1" "$2" "$3"; fail=$((fail+1)); _note "$1: got [$2], wanted [$3]"; fi; }
 ok(){ if [ -n "$2" ]; then printf '  PASS  %-32s %s\n' "$1" "$2"; pass=$((pass+1));
@@ -130,6 +135,11 @@ ck "p2p profile"     "$(nmcli -g connection.id connection show Hephaestus 2>/dev
 ck "p2p interface"   "$(nmcli -g connection.interface-name connection show Hephaestus 2>/dev/null)" "eno1"
 ck "p2p address"     "$(nmcli -g ipv4.addresses connection show Hephaestus 2>/dev/null)" "192.168.124.5/30"
 ck "p2p never-default" "$(nmcli -g ipv4.never-default connection show Hephaestus 2>/dev/null)" "yes"
+if [ "$(cat /sys/class/net/eno1/carrier 2>/dev/null)" = "1" ]; then
+  ck "p2p link up" "$(ip -4 -br addr show eno1 2>/dev/null|awk '{print $3}')" "192.168.124.5/30"
+else
+  na "p2p link up" "no cable in eno1. The link comes up when Silenus is on site; the profile above is what persists"
+fi
 ck "one default route" "$(ip -4 route show default|wc -l|tr -d ' ')" "1"
 ck "default via wan" "$(ip -4 route show default|grep -c 'dev wlp2s0')" "1"
 ck "ip_forward"      "$(sysctl -n net.ipv4.ip_forward)" "1"
@@ -152,13 +162,19 @@ hf "guest-net-access unit"    /etc/systemd/system/guest-net-access.service
 ck "unit follows libvirtd"    "$(systemctl show -p PartOf --value guest-net-access.service 2>/dev/null|grep -c libvirtd)" "1"
 
 printf '\n========================================\n'
-printf '  PASS %s   FAIL %s\n' "$pass" "$fail"
+printf '  PASS %s   FAIL %s   N/A %s\n' "$pass" "$fail" "$skip"
 printf '========================================\n'
 
 if [ "$fail" -gt 0 ]; then
   printf '\nWhat failed:\n'
   printf "$failed"
   printf '\nEach line names the check, what the machine returned, and what the\ndocument says it should be. The step to redo is the section heading the\ncheck appeared under.\n'
+fi
+
+if [ "$skip" -gt 0 ]; then
+  printf '\nNot tested here:\n'
+  printf "$skipped"
+  printf '\nThese are not failures. Each one needs something that is not true of\nthis machine right now — a profile not yet created, hardware not\nattached — and each line says what would make it testable.\n'
 fi
 
 [ "$fail" -eq 0 ]
