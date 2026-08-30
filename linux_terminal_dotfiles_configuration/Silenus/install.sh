@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# linux/install.sh — idempotent dotfiles installer (Linux only)
+# Silenus/install.sh — idempotent dotfiles installer for the workstation.
+#
+# bash, tmux and SSH, plus the desktop-only parts: the keyboard-lock service,
+# the GNOME shortcuts and the GTK3 dark setting. Dionysus/install.sh is the
+# headless counterpart and carries none of those.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

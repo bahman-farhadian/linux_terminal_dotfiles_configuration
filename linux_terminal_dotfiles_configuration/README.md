@@ -5,28 +5,41 @@ throughout. Adapted from the macOS set, with every macOS-only assumption
 removed.
 
 The repository also carries a Debian 13 build guide per machine, named for the
-host: [Silenus.md](Silenus.md), the Lenovo ThinkPad T14 Gen 4 (Intel) GNOME
-workstation these dotfiles were built on, and [Dionysus.md](Dionysus.md), a
-headless AMD Ryzen 9 3900X KVM and Docker host with no desktop environment.
+host: [Silenus/Silenus.md](Silenus/Silenus.md), the Lenovo ThinkPad T14 Gen 4
+(Intel) GNOME workstation these dotfiles were built on, and
+[Dionysus/Dionysus.md](Dionysus/Dionysus.md), a headless AMD Ryzen 9 3900X KVM
+and Docker host with no desktop environment.
+
+Each host has its own directory holding a complete, self-contained copy of what
+it installs. Deploy by running the installer inside the directory for that
+machine.
 
 ## Layout
 
 ```
 linux_terminal_dotfiles_configuration/
-├── bash/
-│   ├── bash_profile   → ~/.bash_profile
-│   ├── bashrc         → ~/.bashrc
-│   └── bash_aliases   → ~/.bash_aliases
-├── tmux/
-│   └── tmux.conf      → ~/.tmux.conf
-├── ssh/
-│   └── config         → managed block in ~/.ssh/config
-├── install.sh
-├── check.sh
-├── gnome-app-folders.py
-├── hushlogin          → ~/.hushlogin
-├── Silenus.md         ThinkPad T14 Gen 4 (Intel) workstation
-└── Dionysus.md        headless Ryzen 9 3900X KVM host
+├── README.md              this file, covering both hosts
+├── Silenus/               ThinkPad T14 Gen 4 (Intel) workstation
+│   ├── bash/
+│   │   ├── bash_profile   → ~/.bash_profile
+│   │   ├── bashrc         → ~/.bashrc
+│   │   └── bash_aliases   → ~/.bash_aliases
+│   ├── tmux/
+│   │   └── tmux.conf      → ~/.tmux.conf
+│   ├── ssh/
+│   │   └── config         → managed block in ~/.ssh/config
+│   ├── hushlogin          → ~/.hushlogin
+│   ├── install.sh         bash, tmux, ssh, and the GNOME parts
+│   ├── check.sh
+│   ├── gnome-app-folders.py
+│   └── Silenus.md
+└── Dionysus/              headless Ryzen 9 3900X KVM host
+    ├── bash/              same three files, without the DE/EN/kbd aliases
+    ├── tmux/
+    ├── ssh/
+    ├── hushlogin
+    ├── install.sh         bash, tmux, ssh only — no GNOME
+    └── Dionysus.md
 ```
 
 ## Prerequisites
@@ -38,6 +51,7 @@ sudo apt install tmux vim git curl jq tree python3 openssl bash-completion xclip
 ## Deploy
 
 ```bash
+cd Silenus     # or: cd Dionysus
 ./install.sh
 ```
 
