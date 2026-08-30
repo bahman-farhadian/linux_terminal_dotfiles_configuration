@@ -131,6 +131,15 @@ sc="$HOME/.ssh/config"
 ck "ssh managed block" "$(grep -c '^# >>> dotfiles managed block >>>$' "$sc" 2>/dev/null)" "1"
 ck "block is last"     "$(awk '/^# >>> dotfiles managed block >>>/{s=NR} /^Host /{l=NR} END{print (s&&l>s)?"yes":"no"}' "$sc" 2>/dev/null)" "yes"
 
+printf '\n--- Step 13: point-to-point link to Dionysus ---\n'
+# Configuration, not live state: this is a laptop and the cable is often out.
+ck "p2p profile"      "$(nmcli -g connection.id connection show Dionysus 2>/dev/null)" "Dionysus"
+ck "p2p interface"    "$(nmcli -g connection.interface-name connection show Dionysus 2>/dev/null)" "enp0s31f6"
+ck "p2p address"      "$(nmcli -g ipv4.addresses connection show Dionysus 2>/dev/null)" "192.168.124.2/30"
+ck "p2p never-default" "$(nmcli -g ipv4.never-default connection show Dionysus 2>/dev/null)" "yes"
+ck "guest route cable" "$(nmcli -g ipv4.routes connection show Dionysus 2>/dev/null|grep -c '192.168.32.0/24 192.168.124.1 100')" "1"
+ck "guest route fallback" "$(nmcli -t -g NAME connection show|while IFS= read -r c; do nmcli -g ipv4.routes connection show "$c" 2>/dev/null; done|grep -c '192.168.32.0/24 192.168.8.3 200')" "1"
+
 printf '\n--- Step 7/10: keyboard and lid ---\n'
 ck "lock service" "$(systemctl --user is-active lock-keyboard-en.service)" "active"
 ck "tick timer"   "$(systemctl --user is-active keyboard-en-tick.timer)" "active"

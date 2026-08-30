@@ -1119,10 +1119,12 @@ anything falls outside the alphabet.
 
 ### Step 13 — Point-to-point link to Dionysus
 
-A USB-C ethernet cable between this laptop and Dionysus, carrying traffic
-between the two machines and nothing else. Dionysus takes `192.168.124.1/30`;
-this end takes `192.168.124.2/30`. Configure it only when the cable is plugged
-in — the profile binds to the adapter's own name.
+A cable between this laptop and Dionysus, carrying traffic between the two
+machines and nothing else. It runs from a USB-C ethernet adapter at Dionysus's
+end into this laptop's built-in RJ45, so the two ends sit on different kinds of
+interface. Dionysus takes `192.168.124.1/30`; this end takes `192.168.124.2/30`.
+Plug the cable in before starting: the profile binds to an interface name, and
+sub-step 1 reads which.
 
 #### 1. Confirm which interface the cable is in
 
@@ -1141,8 +1143,6 @@ because a USB adapter arrives as `enx` followed by its MAC address, which is
 stable but unreadable.
 
 #### 2. Create the profile
-
-
 
 ```bash
 nmcli con add type ethernet ifname enp0s31f6 con-name Dionysus ipv4.method manual ipv4.addresses 192.168.124.2/30 ipv4.never-default yes ipv6.method disabled
