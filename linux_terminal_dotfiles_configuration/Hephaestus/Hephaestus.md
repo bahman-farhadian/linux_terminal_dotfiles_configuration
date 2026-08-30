@@ -16,11 +16,11 @@ desktop environment, administered over SSH. The other hosts are
 
 | # | Fact | Decides |
 |---|------|---------|
-| 1 | CPU vendor and model | Intel or AMD changes the nested-virtualization module (`kvm_intel` / `kvm_amd`) and the IOMMU kernel argument (`intel_iommu=on` / `amd_iommu=on`) in Steps 6 and 8 |
-| 2 | RAM | Whether the open-file and hugepage limits in Step 6 need raising past the defaults |
+| 1 | CPU vendor and model | Intel or AMD changes the nested-virtualization module (`kvm_intel` / `kvm_amd`) and the IOMMU kernel argument (`intel_iommu=on` / `amd_iommu=on`) in Steps 7 and 9 |
+| 2 | RAM | Whether the open-file and hugepage limits in Step 7 need raising past the defaults |
 | 3 | Disks: how many, interface, size | The whole of Step 2, and whether Step 3 manages one XFS filesystem or several |
-| 4 | Role: KVM host, container host, or both | Whether Steps 6, 7 and 8 exist at all |
-| 5 | ~~GPU~~ — **answered: no GPU on this host** | Step 8 does not exist here. Dionysus keeps it; this machine has nothing to pass through |
+| 4 | Role: KVM host, container host, or both | Whether Steps 7, 8 and 9 exist at all |
+| 5 | ~~GPU~~ — **answered: no GPU on this host** | Step 9 does not exist here. Dionysus keeps it; this machine has nothing to pass through |
 | 6 | NIC names | **Partly answered: two interfaces, one Wi-Fi and one RJ45.** Which carries management, and what the second is for, is open |
 | 7 | Addresses | Your `~/.ssh/config` has `Hephaestus` at `192.168.48.2` and `Hephaestus_Outside` at `192.168.88.212`. Confirm which is the management address on this box, and whether both are on it or one is a NAT translation done elsewhere |
 | 8 | Guest subnet | Silenus uses `192.168.24.0/24` and Dionysus `192.168.32.0/24`, both as libvirt networks. This host needs a third overlapping neither, or none if it runs no guests |
@@ -39,7 +39,7 @@ BIOS version so a later firmware update can be told apart from a BIOS reset.
 - Secure Boot per fact 10.
 - **TBD**: the setup key, per fact 9.
 
-*Verification:* none here. The kernel confirms all of it in Step 11.
+*Verification:* none here. The kernel confirms all of it in Step 12.
 
 ### Step 2 — Disk partitioning
 
@@ -81,7 +81,18 @@ The installation is done.
 
 ## Part 2 — Configuration
 
-### Step 4 — Packages
+### Step 4 — Firmware updates
+
+Anything on this machine that publishes to LVFS, updated from Linux with
+`fwupd`. Same shape as the other two hosts: install `fwupd` and
+`fwupd-amd64-signed`, `refresh --force`, `get-devices`, `get-updates`, `update`,
+reboot, then re-check until `get-updates` is clean.
+
+- `fwupd-amd64-signed` is required once Secure Boot is on, which fact 10 expects.
+- Firmware is written during the reboot, not by `fwupdmgr update`, so apply and reboot are one round.
+- **TBD**, per fact 9: whether this machine's board publishes to LVFS at all. Lenovo does, which is why Silenus updates its BIOS this way; ASUS largely does not, which is why Dionysus updates its board from EZ Flash instead. Check the vendor before assuming `fwupdmgr` covers it.
+
+### Step 5 — Packages
 
 The headless list: Silenus's with every desktop package removed. Starting point
 is Dionysus's line, which is already the right shape:
@@ -90,15 +101,15 @@ is Dionysus's line, which is already the right shape:
 bash-completion bridge-utils btop curl git jq lshw make network-manager openssl progress pwgen python3 rsync sshuttle sudo tmux tree unrar vim wget
 ```
 
-- `bash-completion`, `python3` and `openssl` are here because `install.sh` checks for them in Step 5.
-- `network-manager` is here because a headless Debian install does not have it — it arrives on a desktop as a dependency of `gnome-core`. Step 9 needs `nmcli`, so it goes in with everything else rather than in the middle of reconfiguring the network.
+- `bash-completion`, `python3` and `openssl` are here because `install.sh` checks for them in Step 6.
+- `network-manager` is here because a headless Debian install does not have it — it arrives on a desktop as a dependency of `gnome-core`. Step 10 needs `nmcli`, so it goes in with everything else rather than in the middle of reconfiguring the network.
 - `openssh-server` came from the installer and is what you are connected over.
 - **TBD**: anything this machine's role adds, per fact 4.
 
 *Verification:* `grep -Ec '(vmx|svm)' /proc/cpuinfo` above 0, if this host
 virtualizes anything.
 
-### Step 5 — Bash, tmux, and SSH configuration
+### Step 6 — Bash, tmux, and SSH configuration
 
 **Fully settled — nothing TBD.** `Hephaestus/install.sh` is byte-identical to
 `Dionysus/install.sh` apart from its header comment, and `bash/`, `tmux/`,
@@ -117,7 +128,7 @@ between its markers with your own `Host` entries untouched; `sysctl` and
 writes `/etc/ssh/sshd_config.d/99-local.conf`. Open a second session and confirm
 it works before closing the first.
 
-### Step 6 — KVM and libvirt
+### Step 7 — KVM and libvirt
 
 **Exists only if fact 4 says so.** Shape, if it does:
 
@@ -132,7 +143,7 @@ it works before closing the first.
 `virt-manager` is not installed on a headless host. Drive it from Silenus with
 `virt-manager -c qemu+ssh://hephaestus/system`, or use `virsh`.
 
-### Step 7 — Docker
+### Step 8 — Docker
 
 **Exists only if fact 4 says so.** Shape, if it does: Docker's own repository
 rather than Debian's `docker.io`, `data-root` pointed at the data filesystem,
@@ -143,7 +154,7 @@ by filling a container past its limit rather than by reading `df`.
 - The snapshotter accepts `--storage-opt size=` and silently ignores it, so a container gets the whole disk. Turning it off is what makes the Step 3 quota apply.
 - `docker` group membership is equivalent to root. Treat it as an admin privilege.
 
-### Step 8 — GPU passthrough
+### Step 9 — GPU passthrough
 
 **Exists only if fact 5 says so.** Shape, if it does: IOMMU on the kernel command
 line, PCI IDs read at runtime rather than hardcoded, `vfio-pci` bound, every
@@ -151,10 +162,10 @@ competing driver blacklisted — `nouveau`, `nvidia`, `radeon`, `amdgpu`, not ju
 the first — and `vfio` forced into the initramfs.
 
 - **TBD**: `intel_iommu=on` or `amd_iommu=on`, per fact 1.
-- Staged only. Nothing here is verified until the reboot in Step 11.
+- Staged only. Nothing here is verified until the reboot in Step 12.
 - Appending to `/etc/initramfs-tools/modules` is not idempotent; check before repeating.
 
-### Step 9 — Networking
+### Step 10 — Networking
 
 NetworkManager connection profiles via `nmcli`, not `/etc/network/interfaces`.
 
@@ -168,15 +179,15 @@ session.** Run it from a console or inside `tmux`, and know how to reach the box
 physically first. This matters more here than on Dionysus if fact 7 turns out to
 mean Hephaestus is reached from outside its own subnet.
 
-### Step 10 — Firewall
+### Step 11 — Firewall
 
-`iptables-persistent`, only if Step 9 defined a guest subnet to NAT.
+`iptables-persistent`, only if Step 10 defined a guest subnet to NAT.
 
 - MASQUERADE the guest subnet out through the management bridge; permit forwarding out, and back only for `RELATED,ESTABLISHED`.
 - Inbound to a specific guest needs an explicit DNAT rule per exposed service; the base ruleset deliberately does not allow it.
 - `iptables -A` appends, so running the step twice duplicates every rule.
 
-### Step 11 — Reboot and final verification
+### Step 12 — Reboot and final verification
 
 One reboot, then everything staged in Steps 6, 8, 9 and 10 is confirmed
 together — because each of those only takes effect on this boot, and checking
@@ -192,15 +203,18 @@ one.
 
 ## Where this outline came from
 
-Steps 1–3 and 5 are the same on every host here and are settled. Steps 4, 6, 7,
-9, 10 and 11 are the same in shape and differ only in this machine's numbers.
-Step 8 is the only one that may not exist at all.
+Steps 1–3 and 6 are the same on every host here and are settled. Steps 4, 5, 7,
+8, 10, 11 and 12 are the same in shape and differ only in this machine's
+numbers. Step 9 is the only one that does not exist here at all, since this
+machine has no GPU to hand over.
 
-Silenus's steps that are deliberately absent: Qt and runtime libraries, firmware
-via LVFS, the laptop lid, VS Code extensions, and the GNOME application grid.
-None has anything to act on without a desktop. `Hephaestus/bash/bash_aliases`
-drops the `DE`, `EN` and `kbd` aliases for the same reason.
+Silenus's steps that are deliberately absent: Qt and runtime libraries, the
+laptop lid, VS Code extensions, and the GNOME application grid. None has
+anything to act on without a desktop. Firmware is **not** in that list — it
+applies to any machine and is Step 4 here, as on the other two.
+`Hephaestus/bash/bash_aliases` drops the `DE`, `EN` and `kbd` aliases for the
+desktop reason.
 
-Still missing from this directory, and from Dionysus: a `check.sh`. Silenus has
+Still missing from this directory: a `check.sh`. Silenus has
 one. Writing it needs the facts table above, since almost every assertion in it
 is a number this machine has not supplied yet.
