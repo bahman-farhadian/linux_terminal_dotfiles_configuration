@@ -126,7 +126,7 @@ ck "p2p renamed"     "$([ -e /sys/class/net/p2plink0 ] && echo yes || echo no)" 
 ck "p2p address"     "$(ip -4 -br addr show p2plink0 2>/dev/null|awk '{print $3}')" "192.168.124.1/30"
 hf "rename .link"    /etc/systemd/network/10-p2plink0.link
 ck "one default route" "$(ip -4 route show default|wc -l|tr -d ' ')" "1"
-ck "default via internet" "$(ip -4 route show default|grep -c 'dev enp4s0')" "1"
+ck "default via wan" "$(ip -4 route show default|grep -c 'dev enp4s0')" "1"
 ck "ip_forward"      "$(sysctl -n net.ipv4.ip_forward)" "1"
 ck "ip_forward conf" "$(grep -c 'net.ipv4.ip_forward = 1' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
 ck "gateway reachable" "$(ping -c1 -W2 192.168.8.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
