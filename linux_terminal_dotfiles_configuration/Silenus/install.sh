@@ -384,6 +384,40 @@ else
     printf '  systemctl --user enable --now lock-keyboard-en.service keyboard-en-tick.timer\n'
 fi
 
+_hdr "login banner"
+# The same banner on every host: no hostname, no kernel version, nothing that
+# has to be kept in step with the machine it is on. Debian's own motd is two
+# paragraphs of licence boilerplate, and 10-uname reprints the kernel version
+# at every login, which is noise on a machine you log into all day.
+if [ "$HAS_SUDO" != true ]; then
+    _skip "login banner needs sudo"
+else
+    sudo tee /etc/motd >/dev/null <<'MOTD'
++--------------------------------------------------------------------------+
+|                                                                          |
+|                     B A H M A N   F A R H A D I A N                      |
+|                                                                          |
++--------------------------------------------------------------------------+
+|                                                                          |
+|   Authorised access only.                                                |
+|                                                                          |
+|   This system and everything done on it are logged. If you have          |
+|   not been given access by the owner, disconnect now.                    |
+|                                                                          |
++--------------------------------------------------------------------------+
+MOTD
+    sudo chmod 0644 /etc/motd
+    # /etc/update-motd.d/10-uname regenerates the kernel line into
+    # /run/motd.dynamic on every login. Dropping the execute bit stops it
+    # without deleting a packaged file, so an upgrade can put it back and this
+    # run will turn it off again.
+    if [ -x /etc/update-motd.d/10-uname ]; then
+        sudo chmod -x /etc/update-motd.d/10-uname
+        _ok "kernel line removed from the login banner"
+    fi
+    _ok "/etc/motd — login banner"
+fi
+
 _hdr "shell history for all users"
 # The dotfiles above set this for this account. The drop-in covers every other
 # account, so the two rules hold system wide rather than only for one user.
