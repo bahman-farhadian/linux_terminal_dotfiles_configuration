@@ -126,7 +126,13 @@ ck "hist ignorespace"  "$(bash -ic 'echo $HISTCONTROL' 2>/dev/null|grep -c 'igno
 ck "hist append prompt" "$(bash -ic 'echo $PROMPT_COMMAND' 2>/dev/null|grep -c 'history -a')" "1"
 ck "histappend shopt"  "$(bash -ic 'shopt histappend' 2>/dev/null|awk '{print $2}')" "on"
 hf "history drop-in"   /etc/profile.d/99-history.sh
-ck "login banner"    "$(grep -c 'B A H M A N' /etc/motd 2>/dev/null)" "1"
+hf "banner file"     /etc/ssh/banner.txt
+ck "banner content"  "$(grep -c 'B A H M A N' /etc/ssh/banner.txt 2>/dev/null)" "1"
+# What matters is that sshd serves it, not that the file exists. sshd -T prints
+# the effective configuration, so this catches a drop-in that was written but
+# never reloaded.
+ck "sshd serves banner" "$(sudo sshd -T 2>/dev/null|awk '/^banner /{print $2}')" "/etc/ssh/banner.txt"
+ck "motd emptied"    "$(wc -c < /etc/motd 2>/dev/null|tr -d ' ')" "0"
 ck "no kernel line"  "$([ -x /etc/update-motd.d/10-uname ] && echo executable || echo off)" "off"
 
 printf '\n--- Step 7: ssh client config ---\n'

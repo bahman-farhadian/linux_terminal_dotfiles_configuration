@@ -219,14 +219,17 @@ _hdr "misc"
 cp_file "$REPO/hushlogin" "$HOME/.hushlogin"
 
 _hdr "login banner"
-# The same banner on every host: no hostname, no kernel version, nothing that
-# has to be kept in step with the machine it is on. Debian's own motd is two
-# paragraphs of licence boilerplate, and 10-uname reprints the kernel version
-# at every login, which is noise on a machine you log into all day.
+# Shown before authentication, by sshd's Banner, so every account sees it — a
+# notice telling someone they are not welcome is worth nothing once they are
+# already logged in. It also sidesteps ~/.hushlogin, which suppresses the motd
+# and is installed above for exactly the quiet this banner would spoil.
+#
+# The same file on every host: no hostname, no kernel version, nothing that has
+# to be kept in step with the machine it sits on.
 if [ "$HAS_SUDO" != true ]; then
     _skip "login banner needs sudo"
 else
-    sudo tee /etc/motd >/dev/null <<'MOTD'
+    sudo tee /etc/ssh/banner.txt >/dev/null <<'BANNER'
 +--------------------------------------------------------------------------+
 |                                                                          |
 |                     B A H M A N   F A R H A D I A N                      |
@@ -239,17 +242,17 @@ else
 |   not been given access by the owner, disconnect now.                    |
 |                                                                          |
 +--------------------------------------------------------------------------+
-MOTD
-    sudo chmod 0644 /etc/motd
-    # /etc/update-motd.d/10-uname regenerates the kernel line into
-    # /run/motd.dynamic on every login. Dropping the execute bit stops it
-    # without deleting a packaged file, so an upgrade can put it back and this
-    # run will turn it off again.
+BANNER
+    sudo chmod 0644 /etc/ssh/banner.txt
+    # Debian's own motd is two paragraphs of licence boilerplate, and 10-uname
+    # reprints the kernel version at every login. Neither is wanted; emptying
+    # the file leaves nothing for an account without .hushlogin to read.
+    sudo truncate -s 0 /etc/motd
     if [ -x /etc/update-motd.d/10-uname ]; then
         sudo chmod -x /etc/update-motd.d/10-uname
         _ok "kernel line removed from the login banner"
     fi
-    _ok "/etc/motd — login banner"
+    _ok "/etc/ssh/banner.txt — shown before authentication, to every account"
 fi
 
 _hdr "shell history for all users"
@@ -300,6 +303,10 @@ else
     sudo tee "$_sshd_drop" >/dev/null <<'SSHDCONF'
 # Root may connect with a key, never with a password.
 PermitRootLogin prohibit-password
+
+# Shown before authentication, to every account. ~/.hushlogin suppresses the
+# motd for the user who has one; it has no effect on this.
+Banner /etc/ssh/banner.txt
 SSHDCONF
     if sudo sshd -t 2>/dev/null; then
         sudo rm -f "$_sshd_drop.bak"
