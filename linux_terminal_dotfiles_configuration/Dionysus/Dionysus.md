@@ -10,7 +10,7 @@ adapter, doing different jobs. Three disks:
 
 | Role | Interface | Size |
 |---|---|---|
-| OS and Docker `data-root` | SATA SSD | 233 GB |
+| OS and Docker `data-root` | SATA SSD | 233 GiB as `lsblk` reports it — a 250 GB drive |
 | `sssd` — VM system disks, Docker volumes | NVMe | 250 GB |
 | `lssd` — VM data disks, Docker volumes | NVMe | 1 TB |
 
@@ -62,8 +62,8 @@ installer will then display the **Shows as** value.
 |---|-----------|------|----------|----------|--------|-------|
 | 1 | EFI | 1 GiB | `1075 MB` | 1.1 GB | EFI System Partition | `/boot/efi` |
 | 2 | Boot | 2 GiB | `2147 MB` | 2.1 GB | ext4 | `/boot` |
-| 3 | Root | 30 GiB | `32212 MB` | 32.2 GB | ext4 | `/` |
-| 4 | Data | remainder | `max` | about 199.9 GB | xfs | `/data-root` |
+| 3 | Root | 32 GiB | `34360 MB` | 34.4 GB | ext4 | `/` |
+| 4 | Data | 192 GiB | `206158 MB` | 206.2 GB | xfs | `/data-root` |
 
 **NVMe 250 GB (`nvme0n1`)**
 
@@ -82,10 +82,12 @@ environment task; this host stays headless.
 
 **Notes**
 
-- The installer counts in GB, `df -h` counts in GiB. The root partition is entered as `32212 MB`, shows as `32.2 GB`, and reports as `30G` once installed. Same partition.
+- The installer counts in GB, `df -h` counts in GiB. The root partition is entered as `34360 MB`, shows as `34.4 GB`, and reports as `32G` once installed. Same partition.
 - For any other size: type `GiB x 1073.741824` MB, rounded. The EFI partition is entered as `1075 MB` rather than the 1074 the formula gives; that is the number Silenus uses for the same partition, and one megabyte over makes no difference.
-- `max` fills the rest of the disk. It is used for `sda4` and for both NVMe disks, which take one partition each and no over-provisioning: unlike Silenus's root disk, these are not the disk the OS runs from.
-- Sizes on the installed system: `lsblk` reports `1G`, `2G`, `30G` on `sda`. `df -h` reports the EFI partition as about `1022M`, because the FAT filesystem uses a little of it. Both are correct.
+- The four partitions on `sda` come to 227 GiB of the 233 GiB the disk reports, leaving about 6 GiB unpartitioned. That free space is SSD over-provisioning, the same reasoning as Silenus: the drive uses it for wear levelling, which keeps write speed up as the disk fills. It is a smaller margin than Silenus keeps — 2.6% against 6.6% — so raise it by taking a few GiB off `/data-root` if this disk is expected to run close to full.
+- `data-root` is a fixed 192 GiB rather than `max` precisely so that margin exists. `max` would consume the whole remainder and leave none.
+- `max` is still used for both NVMe disks, which take one partition each with no over-provisioning: unlike the SATA SSD, neither is the disk the OS runs from.
+- Sizes on the installed system: `lsblk` reports `1G`, `2G`, `32G` and `192G` on `sda`. `df -h` reports the EFI partition as about `1022M`, because the FAT filesystem uses a little of it. Both are correct.
 - `sda4` mounts at `/data-root` first and the two NVMe partitions mount as nested points beneath it. The installer creates the parent directory and orders the mounts itself, so no separate top-level mountpoints are needed.
 - OS install ISOs live on the SATA SSD under `/data-root/isos`, referenced by the functional tests in Step 11.
 - No swap partition. Omit it from the table entirely rather than adding one and disabling it later.
@@ -295,7 +297,7 @@ Expect `\EFI\debian\shimx64.efi`.
 lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS
 ```
 
-Expect `1G`, `2G` and `30G` on `sda`, with `sda4` and both NVMe disks XFS.
+Expect `1G`, `2G`, `32G` and `192G` on `sda`, with `sda4` and both NVMe disks XFS.
 
 ```bash
 swapon --show
