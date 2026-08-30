@@ -266,6 +266,12 @@ on_lock() {
 
 # Exactly what the lock replaced, or the English pair when nothing was recorded
 # — a first unlock after the service starts, for one.
+#
+# Restoring the pair has to leave English selected, never Persian. Rewriting the
+# list is the only thing that resets the selection, so the pair is put back by
+# way of English-only rather than written straight: from any state that is not
+# already English-only, a direct write could hand the session back with Persian
+# live. German and every other list are restored as they were, untouched.
 on_unlock() {
     if [ -r "$PREVIOUS" ]; then
         want=$(cat "$PREVIOUS")
@@ -273,6 +279,7 @@ on_unlock() {
     else
         want="$EN_PAIR"
     fi
+    [ "$want" = "$EN_PAIR" ] && set_sources "$EN_ONLY"
     set_sources "$want"
 }
 

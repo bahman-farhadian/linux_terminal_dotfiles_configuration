@@ -292,9 +292,15 @@ log out.
 English the only layout, whatever was in use a moment earlier — German
 included — so the password prompt is always typable. What was in use is written
 to `$XDG_RUNTIME_DIR/lock-keyboard-en.previous` first, and the unlock restores
-it exactly. A deliberate German layout therefore survives a lock cycle rather
-than being discarded by it, and the file lives under the runtime directory so a
-stale layout is never restored across a reboot.
+it. A deliberate German layout therefore survives a lock cycle rather than being
+discarded by it, and the file lives under the runtime directory so a stale
+layout is never restored across a reboot.
+
+The English pair is the one thing not restored verbatim: it is put back by way
+of English-only, so the session always comes back with English selected rather
+than Persian. Rewriting the list is what resets the selection, so going through
+English-only is what makes that certain instead of incidental. Every other
+layout, German included, is restored exactly as it was.
 
 `keyboard-en-tick.timer` runs every 10 minutes and manages the English pair
 only. German, or any other list set by hand, is left untouched. With the pair in
