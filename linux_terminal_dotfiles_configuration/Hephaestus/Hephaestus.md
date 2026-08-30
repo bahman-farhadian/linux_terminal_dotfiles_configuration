@@ -1198,6 +1198,7 @@ The guest needs a static address on `192.168.40.0/24` with gateway
 - Verification is gathered here because the changes in Steps 9 and 10 only take effect on this boot. Checking them earlier reports the state before the change, which reads as a pass and is not one.
 - `virt-install` with `--cdrom` expects a console, which a headless host does not have. `--noautoconsole` is in the line above for that reason; connect afterwards with `virsh console <vm-name>`.
 - The inward reachability test is the first point in the build where it can honestly be run, because until now no guest held an address.
+- **Reaching a guest from off-site is an SSH hop, not a route.** Silenus routes `192.168.40.0/24` across the cable when it is here, and across the work LAN when it is on that WiFi. From anywhere else — over the office VPN, from home — the way in is `ssh hephaestus` and then `ssh <guest-address>`, or `ssh -J hephaestus <guest-address>` in one line. No route over the VPN is configured on either side, deliberately: it would need a change on the office router for a path this already covers.
 
 ### Step 12 — Check the whole setup
 
