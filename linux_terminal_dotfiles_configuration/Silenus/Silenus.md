@@ -1130,51 +1130,62 @@ sub-step 1 reads which.
 ```mermaid
 graph TB
     INET(("Internet"))
-    R["Router<br/>192.168.8.1<br/>no DHCP"]
+    R["Router &middot; home<br/>192.168.8.1<br/>no DHCP"]
+    AP["WiFi &middot; work<br/>192.168.88.0/24"]
     INET --- R
+    INET --- AP
 
     subgraph SIL ["Silenus &middot; ThinkPad T14 Gen 4"]
         SW["wlp0s20f3 &middot; WiFi<br/>connection: Huawei-Router<br/>192.168.8.2/24"]
-        SP["enp0s31f6 &middot; onboard RJ45<br/>connection: Dionysus<br/>192.168.124.2/30"]
+        SP["enp0s31f6 &middot; onboard RJ45<br/>Dionysus 192.168.124.2/30<br/>Hephaestus 192.168.124.6/30"]
         SB["virbr1 &middot; static_network_24<br/>192.168.24.1/24 &middot; NAT"]
-        SG["guests<br/>192.168.24.2 &ndash; .254<br/>static, no DHCP"]
+        SG["guests 192.168.24.2 &ndash; .254"]
         SB --- SG
     end
 
-    subgraph DIO ["Dionysus &middot; Ryzen 9 3900X"]
+    subgraph DIO ["Dionysus &middot; Ryzen 9 3900X &middot; home"]
         DW["enp4s0 &middot; onboard Intel I211<br/>connection: wan<br/>192.168.8.3/24"]
-        DP["p2plink0 &middot; external USB NIC<br/>connection: Dionysus<br/>192.168.124.1/30"]
+        DP["p2plink0 &middot; external USB NIC<br/>192.168.124.1/30"]
         DB["virbr1 &middot; static_network_32<br/>192.168.32.1/24 &middot; NAT"]
-        DG["guests<br/>192.168.32.2 &ndash; .254<br/>static, no DHCP"]
+        DG["guests 192.168.32.2 &ndash; .254"]
         DB --- DG
+    end
+
+    subgraph HEP ["Hephaestus &middot; work"]
+        HW["wlp2s0 &middot; WiFi<br/>connection: wan<br/>192.168.88.212/24"]
+        HE["eno1 &middot; onboard ethernet<br/>192.168.124.5/30"]
+        HB["virbr1 &middot; static_network_40<br/>192.168.40.1/24 &middot; NAT"]
+        HG["guests 192.168.40.2 &ndash; .254"]
+        HB --- HG
     end
 
     R -.-|WiFi| SW
     R ---|ethernet| DW
-    SP ===|ethernet cable| DP
+    AP -.-|WiFi| HW
+    SP ===|cable at home| DP
+    SP -.-|cable at work| HE
 
     classDef wan fill:#1f6feb,stroke:#0b4fc0,color:#ffffff
     classDef p2p fill:#8957e5,stroke:#6a3fbf,color:#ffffff
     classDef guest fill:#2da44e,stroke:#1a7f37,color:#ffffff
     classDef infra fill:#57606a,stroke:#424a53,color:#ffffff
-    class SW,DW wan
-    class SP,DP p2p
-    class SB,SG,DB,DG guest
-    class R,INET infra
+    class SW,DW,HW wan
+    class SP,DP,HE p2p
+    class SB,SG,DB,DG,HB,HG guest
+    class R,AP,INET infra
 ```
 
-Blue is each host's way out, purple the point-to-point link, green the guest
-networks each host NATs behind itself. The dotted line is wireless; the solid
-ones are cable.
+Blue is each host's way out, purple the point-to-point links, green the guest
+networks each host NATs behind itself. Dotted lines are wireless or a cable that
+is only connected at one site; solid ones are permanent cable.
 
-The point-to-point link is not symmetric hardware. Dionysus reaches it through
-an **external USB NIC**, because its only onboard port is already the way out;
-Silenus uses its **onboard RJ45**, which is otherwise unused. Between them is an
-ordinary ethernet cable.
+Silenus has one spare ethernet port and two peers, so it carries a profile for
+each and only one is up at a time — `Dionysus` autoconnects at home,
+`Hephaestus` is brought up by hand on arrival at work.
 
-The two guest subnets differ on purpose — the hosts can reach each other, so
-overlapping ranges would make a guest on one indistinguishable from a guest on
-the other.
+Three guest subnets, three point-to-point `/30`s out of one `/29`, and no two
+overlap: the hosts can reach one another, so an address has to say which machine
+it belongs to.
 
 ```mermaid
 flowchart LR
@@ -1261,7 +1272,43 @@ nmcli con up Dionysus
 nmcli con up Huawei-Router
 ```
 
-#### 4. Check it
+#### 4. The second link, to Hephaestus
+
+The same port carries a cable to Hephaestus when this laptop is at that site, on
+its own `/30`. One interface, two profiles, one of them up at a time:
+
+```bash
+nmcli con add type ethernet ifname enp0s31f6 con-name Hephaestus ipv4.method manual ipv4.addresses 192.168.124.6/30 ipv4.never-default yes ipv6.method disabled
+```
+
+```bash
+nmcli con mod Hephaestus connection.autoconnect no
+```
+
+```bash
+nmcli con mod Hephaestus +ipv4.routes "192.168.40.0/24 192.168.124.5 100"
+```
+
+`Dionysus` keeps `autoconnect yes` and comes up on its own at home. `Hephaestus`
+is brought up by hand on arrival, which takes the port from `Dionysus`:
+
+```bash
+nmcli con up Hephaestus
+```
+
+```bash
+ip -br addr show enp0s31f6
+```
+
+Expect `192.168.124.6/30`.
+
+```bash
+ping -c4 192.168.124.5
+```
+
+Back home, `nmcli con up Dionysus` takes it back.
+
+#### 5. Check it
 
 ```bash
 ip -br addr show enp0s31f6
@@ -1297,6 +1344,9 @@ Needs Dionysus up on the other end.
 - No gateway and no DNS on this profile. `ipv4.never-default yes` states the same thing a second way, so a later edit that adds a gateway by accident cannot take the default route away from the interface that actually reaches the internet.
 - A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length, or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`–`.3`.
 - This is a second route to Dionysus when its LAN side is broken, which is worth having before reconfiguring that machine's management interface.
+- Two point-to-point links share this one port, because the laptop has only one spare ethernet socket and is never at both sites at once. Neither can autoconnect blindly: with a `/30` there is no way to tell from carrier alone which peer is on the far end, so `Dionysus` autoconnects for the common case and `Hephaestus` is a deliberate `nmcli con up` on arrival. Activating either releases the port from the other.
+- The two subnets are adjacent `/30`s out of the same `/29`: `192.168.124.0/30` for Dionysus, hosts `.1` and `.2`, and `192.168.124.4/30` for Hephaestus, hosts `.5` and `.6`. One range covers every point-to-point link in the estate with no two colliding.
+- Hephaestus's guests get a route the same way Dionysus's do, `192.168.40.0/24` via `192.168.124.5`, but no LAN fallback: that machine is at another site and unreachable from here when the cable is out.
 - Both routes are permanent, and NetworkManager withdraws a connection's routes when that connection goes down. Unplugging the cable therefore removes the metric-100 route on its own and the metric-200 one takes over, with no manual step. Plugging it back restores the preference.
 - The metrics are what express "prefer the cable". Same destination, two next hops, lower metric wins. `ip -4 route get 192.168.32.10` is the way to ask the kernel which it would actually use, rather than reading the table and inferring.
 - **The route alone does not make guests reachable.** A libvirt NAT network permits outbound traffic and `RELATED,ESTABLISHED` return traffic; a connection opened from outside into `192.168.32.0/24` is not in either category and is dropped on Dionysus. Dionysus.md Step 11 carries the forwarding rule that allows it. Test with `ping` to a guest, not by reading the routing table.

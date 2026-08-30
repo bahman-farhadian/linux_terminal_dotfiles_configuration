@@ -1098,51 +1098,62 @@ Persisted through NetworkManager's own connection profiles with `nmcli`, not
 ```mermaid
 graph TB
     INET(("Internet"))
-    R["Router<br/>192.168.8.1<br/>no DHCP"]
+    R["Router &middot; home<br/>192.168.8.1<br/>no DHCP"]
+    AP["WiFi &middot; work<br/>192.168.88.0/24"]
     INET --- R
+    INET --- AP
 
     subgraph SIL ["Silenus &middot; ThinkPad T14 Gen 4"]
         SW["wlp0s20f3 &middot; WiFi<br/>connection: Huawei-Router<br/>192.168.8.2/24"]
-        SP["enp0s31f6 &middot; onboard RJ45<br/>connection: Dionysus<br/>192.168.124.2/30"]
+        SP["enp0s31f6 &middot; onboard RJ45<br/>Dionysus 192.168.124.2/30<br/>Hephaestus 192.168.124.6/30"]
         SB["virbr1 &middot; static_network_24<br/>192.168.24.1/24 &middot; NAT"]
-        SG["guests<br/>192.168.24.2 &ndash; .254<br/>static, no DHCP"]
+        SG["guests 192.168.24.2 &ndash; .254"]
         SB --- SG
     end
 
-    subgraph DIO ["Dionysus &middot; Ryzen 9 3900X"]
+    subgraph DIO ["Dionysus &middot; Ryzen 9 3900X &middot; home"]
         DW["enp4s0 &middot; onboard Intel I211<br/>connection: wan<br/>192.168.8.3/24"]
-        DP["p2plink0 &middot; external USB NIC<br/>connection: Dionysus<br/>192.168.124.1/30"]
+        DP["p2plink0 &middot; external USB NIC<br/>192.168.124.1/30"]
         DB["virbr1 &middot; static_network_32<br/>192.168.32.1/24 &middot; NAT"]
-        DG["guests<br/>192.168.32.2 &ndash; .254<br/>static, no DHCP"]
+        DG["guests 192.168.32.2 &ndash; .254"]
         DB --- DG
+    end
+
+    subgraph HEP ["Hephaestus &middot; work"]
+        HW["wlp2s0 &middot; WiFi<br/>connection: wan<br/>192.168.88.212/24"]
+        HE["eno1 &middot; onboard ethernet<br/>192.168.124.5/30"]
+        HB["virbr1 &middot; static_network_40<br/>192.168.40.1/24 &middot; NAT"]
+        HG["guests 192.168.40.2 &ndash; .254"]
+        HB --- HG
     end
 
     R -.-|WiFi| SW
     R ---|ethernet| DW
-    SP ===|ethernet cable| DP
+    AP -.-|WiFi| HW
+    SP ===|cable at home| DP
+    SP -.-|cable at work| HE
 
     classDef wan fill:#1f6feb,stroke:#0b4fc0,color:#ffffff
     classDef p2p fill:#8957e5,stroke:#6a3fbf,color:#ffffff
     classDef guest fill:#2da44e,stroke:#1a7f37,color:#ffffff
     classDef infra fill:#57606a,stroke:#424a53,color:#ffffff
-    class SW,DW wan
-    class SP,DP p2p
-    class SB,SG,DB,DG guest
-    class R,INET infra
+    class SW,DW,HW wan
+    class SP,DP,HE p2p
+    class SB,SG,DB,DG,HB,HG guest
+    class R,AP,INET infra
 ```
 
-Blue is each host's way out, purple the point-to-point link, green the guest
-networks each host NATs behind itself. The dotted line is wireless; the solid
-ones are cable.
+Blue is each host's way out, purple the point-to-point links, green the guest
+networks each host NATs behind itself. Dotted lines are wireless or a cable that
+is only connected at one site; solid ones are permanent cable.
 
-The point-to-point link is not symmetric hardware. Dionysus reaches it through
-an **external USB NIC**, because its only onboard port is already the way out;
-Silenus uses its **onboard RJ45**, which is otherwise unused. Between them is an
-ordinary ethernet cable.
+Silenus has one spare ethernet port and two peers, so it carries a profile for
+each and only one is up at a time — `Dionysus` autoconnects at home,
+`Hephaestus` is brought up by hand on arrival at work.
 
-The two guest subnets differ on purpose — the hosts can reach each other, so
-overlapping ranges would make a guest on one indistinguishable from a guest on
-the other.
+Three guest subnets, three point-to-point `/30`s out of one `/29`, and no two
+overlap: the hosts can reach one another, so an address has to say which machine
+it belongs to.
 
 #### 1. Become root
 
