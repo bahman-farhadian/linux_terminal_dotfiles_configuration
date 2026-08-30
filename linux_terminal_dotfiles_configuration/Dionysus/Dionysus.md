@@ -1335,16 +1335,7 @@ falls to the `REJECT`. That is the gap this step closes.
 Rule 1 is the whole point of the step. Rule 2 is a convenience for one service
 and most builds never need it.
 
-#### 3. Install iptables-persistent
-
-```bash
-sudo apt install -y iptables-persistent
-```
-
-Needed for the optional rule in sub-step 6. The required rules do not use it,
-for the reason the next sub-step gives.
-
-#### 4. Add the required rules, as a service
+#### 3. Add the required rules, as a service
 
 The rules have to sit **above** the jump to `LIBVIRT_FWI`, whose last rule is
 `-o virbr1 -j REJECT`. `REJECT` terminates, so a rule below that jump is never
@@ -1393,7 +1384,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now guest-net-access.service
 ```
 
-#### 5. Test the rules, and their position
+#### 4. Test the rules, and their position
 
 ```bash
 sudo iptables -S FORWARD
@@ -1420,10 +1411,17 @@ the rule does anything.
 **This still tests the rules, not reachability.** Pinging a guest address proves
 nothing while no guest holds that address. Reachability is tested in Step 12.
 
-#### 6. Optional — publish a guest service to the LAN
+#### 5. Optional — publish a guest service to the LAN
 
 Only if something on the LAN has to reach a service inside a guest without a
-route to `192.168.32.0/24`. Replace the address and ports:
+route to `192.168.32.0/24`. This is the one part of the step that needs
+`iptables-persistent`, so it is installed here rather than earlier:
+
+```bash
+sudo apt install -y iptables-persistent
+```
+
+Replace the address and ports:
 
 ```bash
 sudo iptables -t nat -A PREROUTING -i enp4s0 -p tcp --dport 2222 -j DNAT --to-destination 192.168.32.10:22
@@ -1438,9 +1436,11 @@ sudo netfilter-persistent save
 - `172.16.0.0/12` includes `172.17.0.0/16`, which is `docker0` on this machine, so containers can reach guests too. Drop that range if you would rather they could not.
 - `-I FORWARD 1` inserts at the head. That position is the whole thing: appended with `-A`, or inserted before `libvirtd` next starts, the rules end up after `LIBVIRT_FWI` has already rejected the packet, and every existence check still passes.
 - `netfilter-persistent` cannot hold this. It restores a ruleset at boot, and `libvirtd` starts afterwards and inserts its jumps on top — so the required rules would come back permanently below the `REJECT`. A unit ordered `After=libvirtd.service docker.service` runs once both have settled, which is the only point at which the head of `FORWARD` means what it looks like it means.
+- That is also why `iptables-persistent` is not installed until sub-step 5. A build that publishes no guest service never needs it, and installing it anyway means a saved snapshot of libvirt's and Docker's chains being restored at boot alongside the copies those daemons rebuild for themselves.
+- If it is already installed and its saved file carries these three rules, nothing breaks: the unit deletes before inserting, so a restored copy in the wrong position is removed and re-added at the head. `sudo netfilter-persistent save` after the unit has run makes the file agree with reality, and `sudo apt purge iptables-persistent` removes the question entirely on a host with no DNAT.
 - The script deletes before inserting, so running it again — by hand, or at the next boot — leaves three rules rather than six.
 - Return traffic needs no rule. Conntrack matches the replies to the connection that was opened, and libvirt's `MASQUERADE` only applies to traffic a guest itself starts towards something outside its own subnet.
-- `netfilter-persistent save` is still what carries the optional DNAT in sub-step 6, which sits in the `nat` table and is not subject to this ordering problem.
+- `netfilter-persistent save` is still what carries the optional DNAT in sub-step 5, which sits in the `nat` table and is not subject to this ordering problem.
 - `systemctl restart guest-net-access` puts the rules back at the head after any `libvirtd` restart, which is worth knowing when a `virsh net-destroy`/`net-start` or a package upgrade has moved them.
 - The guest subnet is `192.168.32.0/24` here and `192.168.24.0/24` on Silenus. They differ on purpose: both hosts are reachable from each other, so overlapping guest ranges would make a guest on one indistinguishable from a guest on the other.
 
