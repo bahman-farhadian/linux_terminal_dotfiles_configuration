@@ -593,7 +593,7 @@ exec bash
 - Keep the repository. The installer needs it to re-run.
 - `.bashrc` adds `/usr/local/sbin`, `/usr/sbin` and `/sbin` to your PATH. Debian leaves these out for non-root users, so `sysctl`, `swapon` and `efibootmgr` report `command not found` even though `sudo` runs them. This makes your PATH cover the same directories as root's.
 - Check it with `command -v sysctl`. It must print `/usr/sbin/sysctl`. If it prints nothing, the shell has not been reloaded yet.
-- It also installs `lock-keyboard-en.service`, a systemd user service that switches the keyboard to English the moment the screen locks, whatever layout was active. The unlock prompt is then never stuck on a layout that cannot type your password.
+- It also installs `lock-keyboard-en.service`, a systemd user service that switches the keyboard to English the moment the screen locks, so the unlock prompt is never stuck on a layout that cannot type your password. It acts only when the list is the English pair: German set with `DE`, or any other list set by hand, is left alone on the lock and on the 10-minute timer alike, and the unlock does not pull it back to the pair. With German active the password prompt is on German too — run `EN` first if that is not what you want.
 - Check it with `systemctl --user status lock-keyboard-en.service`. It must be `active (running)`.
 - It also writes `/etc/ssh/sshd_config.d/99-local.conf` so root can only reach SSH with a key, never a password. Ordinary users and port 22 are unchanged. This needs sudo, so answer `y` at the root prompt.
 - It also sets the GNOME shortcuts: `Ctrl+Alt+T` for the terminal, `Super+E` for Files, `Super+I` for Settings, and `Alt+Tab` to switch windows rather than applications.
