@@ -12,6 +12,11 @@ and Docker host; and [Hephaestus/Hephaestus.md](Hephaestus/Hephaestus.md), a
 second headless KVM host with no GPU, on WiFi with a point-to-point cable to
 the laptop.
 
+Separately, [NVIDIA-guest-driver.md](NVIDIA-guest-driver.md) covers installing
+the NVIDIA driver, `nvidia-smi` and `nvtop` inside a Debian 13 **guest** that
+has a card passed through to it. It is about the virtual machine rather than any
+host here, and stands on its own.
+
 All three follow one outline: Part 1 for the OS install (BIOS, partitioning,
 repositories and quota), Part 2 for the configuration, each step carrying
 numbered sub-steps and a Notes block. The headless guides drop the steps that
@@ -87,7 +92,8 @@ it belongs to.
 
 ```
 linux_terminal_dotfiles_configuration/
-├── README.md              this file, covering both hosts
+├── README.md              this file, covering all three hosts
+├── NVIDIA-guest-driver.md  driver inside a GPU-passthrough guest
 ├── Silenus/               ThinkPad T14 Gen 4 (Intel) workstation
 │   ├── bash/
 │   │   ├── bash_profile   → ~/.bash_profile
