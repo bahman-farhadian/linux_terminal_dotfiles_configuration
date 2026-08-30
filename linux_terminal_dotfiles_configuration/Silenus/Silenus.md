@@ -607,6 +607,8 @@ exec bash
 - A command typed with a leading space is not written to the history file. Use it for anything carrying a password or a token. One space is enough.
 - History is written at every prompt, not only when the shell exits. A tmux pane that is killed rather than closed keeps everything typed in it.
 - It also writes `/etc/profile.d/99-history.sh` so both rules apply to every account, not only yours. That file is read by login shells, so an account without these dotfiles gets the rules on a tty or over SSH.
+- It also writes `/etc/motd`, the banner shown after login. It carries a name and a short notice and no hostname or kernel version, so the same file is correct on every host — which is why `install.sh` writes it rather than the repository keeping one per machine. Debian's own two paragraphs of licence boilerplate are replaced outright.
+- `/etc/update-motd.d/10-uname` reprints the kernel version at every login. Its execute bit is dropped rather than the file deleted, so a package upgrade can restore it and the next `install.sh` run turns it off again. `Last login` is left alone: it is worth seeing.
 - It also writes `~/.config/gtk-3.0/settings.ini` with `gtk-application-prefer-dark-theme=1`. GNOME's dark preference is a libadwaita setting, so a GTK3 application that never opted into it stays light. This is narrower than exporting `GTK_THEME`, which would force every GTK application onto the legacy Adwaita-dark including the GTK4 ones that already follow GNOME correctly.
 - `install.sh` owns that file. If you put your own keys in it, they are replaced the next time the dark setting is missing from it.
 - `README.md` covers the prompt, the tmux keys, and what changes.
