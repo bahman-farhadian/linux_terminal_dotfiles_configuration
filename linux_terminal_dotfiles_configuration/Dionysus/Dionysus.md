@@ -683,6 +683,13 @@ virsh net-undefine default
 statically. The definition is `kvm/static_network_32.xml` in this repository,
 and its comment block carries the address plan.
 
+`sudo -i` in sub-step 1 left you in `/root`, so go back to the host directory
+first — this path is relative to it:
+
+```bash
+cd ~<your-user>/dotfiles/linux_terminal_dotfiles_configuration/Dionysus
+```
+
 ```bash
 virsh net-define kvm/static_network_32.xml
 ```
@@ -738,6 +745,8 @@ Expect `libvirt` and `kvm` in the list.
 - `modprobe -r kvm_amd` fails if a virtual machine is running. Shut them down first.
 - The packaged `osinfo-db` is the maintained source, refreshed by `apt upgrade`. Do not use `osinfo-db-import --latest`: it fetches from `releases.pagure.org`, a third-party host libosinfo's own maintainers have flagged as unreliable. It is what makes `virt-install --os-variant` resolve rather than guess.
 - `/etc/security/limits.d` applies to login sessions, not to systemd services. If `libvirtd` itself needs a higher limit, add a `LimitNOFILE` drop-in under `/etc/systemd/system/libvirtd.service.d/`.
+- `net-define` reads the file at define time and stores a copy of its own, so the repository file is not consulted again afterwards. Editing it later means running `net-define` again.
+- The path is relative to the host directory. Give it an absolute path instead if you would rather not change directory, but do not leave it relative while sitting in `/root`, where the file does not exist.
 - IP forwarding is set in Step 9 alongside the bridges, since that is what needs it.
 
 ### Step 7 — Docker
