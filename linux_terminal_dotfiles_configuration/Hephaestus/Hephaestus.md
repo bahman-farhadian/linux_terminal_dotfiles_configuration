@@ -20,12 +20,12 @@ desktop environment, administered over SSH. The other hosts are
 | 2 | RAM | Whether the open-file and hugepage limits in Step 6 need raising past the defaults |
 | 3 | Disks: how many, interface, size | The whole of Step 2, and whether Step 3 manages one XFS filesystem or several |
 | 4 | Role: KVM host, container host, or both | Whether Steps 6, 7 and 8 exist at all |
-| 5 | GPU present, and passed through? | Whether Step 8 exists |
-| 6 | NIC name and count | Step 9's bridge slave, and whether bonding is in play |
+| 5 | ~~GPU~~ — **answered: no GPU on this host** | Step 8 does not exist here. Dionysus keeps it; this machine has nothing to pass through |
+| 6 | NIC names | **Partly answered: two interfaces, one Wi-Fi and one RJ45.** Which carries management, and what the second is for, is open |
 | 7 | Addresses | Your `~/.ssh/config` has `Hephaestus` at `192.168.48.2` and `Hephaestus_Outside` at `192.168.88.212`. Confirm which is the management address on this box, and whether both are on it or one is a NAT translation done elsewhere |
-| 8 | Guest subnet | Dionysus uses `192.168.24.0/24` on `br-kvm`. This host needs its own, or none if it runs no guests |
+| 8 | Guest subnet | Silenus uses `192.168.24.0/24` and Dionysus `192.168.32.0/24`, both as libvirt networks. This host needs a third overlapping neither, or none if it runs no guests |
 | 9 | Motherboard | The BIOS setup key and the exact names of the virtualization and PCIe settings in Step 1 |
-| 10 | Secure Boot | Silenus keeps it on, Dionysus does not. Step 1 changes shape either way |
+| 10 | Secure Boot | Both other hosts keep it on. Expect the same here unless this board makes it awkward |
 
 ## Part 1 — OS installation
 
@@ -35,7 +35,7 @@ Set the firmware options the OS cannot set for itself, and record the starting
 BIOS version so a later firmware update can be told apart from a BIOS reset.
 
 - Virtualization extensions on — **TBD**: `SVM Mode` on AMD, `Intel VT-x` on Intel.
-- IOMMU on, and `Above 4G Decoding` plus `Resizable BAR`, **only if** fact 5 says a card is being passed through.
+- IOMMU, `Above 4G Decoding` and `Resizable BAR` are not needed: fact 5 is answered and there is no card to pass through.
 - Secure Boot per fact 10.
 - **TBD**: the setup key, per fact 9.
 
@@ -66,7 +66,7 @@ layout of fact 3 changes which filesystems are involved:
 6. Confirm `ftype=1` on every XFS filesystem — a hard requirement for `overlay2` and project quota alike.
 7. Confirm what the installer actually mounted.
 8. Add `,pquota` to the XFS entries in `/etc/fstab`. **TBD**: which entries, per fact 3.
-9. Unmount and mount fresh, children before parents. XFS cannot enable quota on a remount.
+9. Edit GRUB if this host needs anything on the kernel command line, then reboot. The reboot is what makes the quota live: XFS initializes project quota on a real mount and refuses on a remount, so no unmount sequence is needed.
 10. `xfs_quota -x -c 'state'` on each — `Accounting: ON`, `Enforcement: ON`.
 
 **Note carried from Dionysus:** use `state`, never `report -p`. With no projects
