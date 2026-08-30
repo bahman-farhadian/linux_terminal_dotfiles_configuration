@@ -4,8 +4,9 @@ Hostname `Dionysus`. Purely headless: base system and `openssh-server` only, no
 desktop environment, administered over SSH. The GNOME workstation is
 [Silenus.md](../Silenus/Silenus.md).
 
-AMD Ryzen 9 3900X (12c/24t), 128 GB RAM, **two RJ45 network interfaces**, NVIDIA
-GPU reserved for guest passthrough. Three disks:
+AMD Ryzen 9 3900X (12c/24t), 128 GB RAM, NVIDIA GPU reserved for guest
+passthrough, and two network interfaces — an onboard RJ45 and a USB-C ethernet
+adapter, doing different jobs. Three disks:
 
 | Role | Interface | Size |
 |---|---|---|
@@ -451,8 +452,8 @@ Expect `sssd-pool` and `lssd-pool` both active, with autostart `yes`.
 #### 7. Remove the default NAT network
 
 `libvirtd` creates a `default` NAT network on install, typically
-`192.168.122.0/24`. `br-kvm` from Step 9 replaces it, and leaving both active
-means two competing NAT and DHCP setups on one host:
+`192.168.122.0/24`, with its own DHCP server. This host uses one network only,
+so `default` is removed rather than left stopped.
 
 ```bash
 virsh net-destroy default
@@ -462,19 +463,44 @@ virsh net-destroy default
 virsh net-undefine default
 ```
 
+#### 8. Define the one network this host uses
+
+`static_network_32` — NAT on `192.168.32.0/24`, no DHCP, guests configured
+statically. The definition is `kvm/static_network_32.xml` in this repository,
+and its comment block carries the address plan.
+
+```bash
+virsh net-define kvm/static_network_32.xml
+```
+
+```bash
+virsh net-start static_network_32
+```
+
+```bash
+virsh net-autostart static_network_32
+```
+
 ```bash
 virsh net-list --all
 ```
 
-Expect no `default` network listed.
+Expect `static_network_32` active with `Autostart yes`, and no `default`.
 
-#### 8. Leave the root shell
+```bash
+ip -br addr show virbr1
+```
+
+Expect `192.168.32.1/24`. libvirt creates and owns this bridge, which is why
+Step 9 builds no bridge of its own.
+
+#### 9. Leave the root shell
 
 ```bash
 exit
 ```
 
-#### 9. Add your user to the libvirt and kvm groups
+#### 10. Add your user to the libvirt and kvm groups
 
 ```bash
 sudo usermod -aG libvirt,kvm $USER
@@ -754,6 +780,14 @@ update-initramfs -u -k all
 
 ### Step 9 — Networking
 
+Two interfaces, doing different jobs. Guests are on neither: they live on the
+libvirt network defined in Step 6, and libvirt owns that bridge.
+
+| Interface | Kind | Address | Purpose |
+|---|---|---|---|
+| `enp4s0` | onboard RJ45 | `192.168.8.3/24`, gw `192.168.8.1`, DNS `8.8.8.8` | the LAN, and the route to the internet |
+| `enx9405bb143cf5` | USB-C ethernet | `192.168.124.1/30` | point-to-point to Silenus |
+
 Persisted through NetworkManager's own connection profiles with `nmcli`, not
 `/etc/network/interfaces`.
 
@@ -773,7 +807,17 @@ apt install -y network-manager
 systemctl enable --now NetworkManager
 ```
 
-#### 3. Clear the profiles the installer left
+#### 3. Confirm the interface names
+
+```bash
+ip -br link
+```
+
+Both names must match the table above before going further. `enp4s0` is fixed
+by its PCI slot. The USB adapter's name is derived from its MAC address, so it
+holds for that adapter and changes if the adapter is ever swapped.
+
+#### 4. Clear the profiles the installer left
 
 ```bash
 nmcli connection show
@@ -783,92 +827,72 @@ nmcli connection show
 nmcli connection delete <connection-name>
 ```
 
-Repeat the delete for each existing profile before laying down the bridges.
+Repeat the delete for each existing profile before laying down the two below.
 
-#### 4. Loopback
+#### 5. The LAN interface
 
-```bash
-nmcli con add type loopback ifname lo con-name lo autoconnect yes
-```
+Static, because the router runs no DHCP server:
 
 ```bash
-nmcli con up lo
-```
-
-#### 5. Management bridge
-
-Static, with `enp4s0` as the sole slave:
-
-```bash
-nmcli con add type bridge ifname br0 con-name br0 stp no \
+nmcli con add type ethernet ifname enp4s0 con-name lan \
   ipv4.method manual ipv4.addresses 192.168.8.3/24 ipv4.gateway 192.168.8.1 \
-  ipv4.dns "8.8.8.8,1.1.1.1"
+  ipv4.dns "8.8.8.8" ipv6.method disabled
 ```
 
 ```bash
-nmcli con mod br0 connection.autoconnect yes
+nmcli con mod lan connection.autoconnect yes
 ```
 
 ```bash
-nmcli con add type ethernet ifname enp4s0 con-name br0-slave master br0
+nmcli con up lan
 ```
 
 ```bash
-nmcli con mod br0-slave connection.autoconnect yes
+ip -br addr show enp4s0
 ```
 
-```bash
-nmcli con up br0
-```
-
-```bash
-nmcli con up br0-slave
-```
-
-```bash
-ip address
-```
-
-Expect `br0` holding `192.168.8.3/24` and `enp4s0` with no address of its own.
-
-```bash
-brctl show
-```
-
-Expect `br0` with `enp4s0` as a member.
+Expect `192.168.8.3/24`.
 
 ```bash
 ping -c4 192.168.8.1
 ```
 
-#### 6. Guest bridge
+#### 6. The point-to-point link to Silenus
 
-Same pattern, with no physical slave and no gateway or DNS, since it is not
-routed on its own. That is what Step 10's NAT rules are for.
+No gateway and no DNS: this link carries traffic between the two machines and
+nothing else, so it must not compete with `enp4s0` for the default route.
 
 ```bash
-nmcli con add type bridge ifname br-kvm con-name br-kvm stp no \
-  ipv4.method manual ipv4.addresses 192.168.24.1/24
+nmcli con add type ethernet ifname enx9405bb143cf5 con-name p2p-silenus \
+  ipv4.method manual ipv4.addresses 192.168.124.1/30 \
+  ipv4.never-default yes ipv6.method disabled
 ```
 
 ```bash
-nmcli con mod br-kvm connection.autoconnect yes
+nmcli con mod p2p-silenus connection.autoconnect yes
 ```
 
 ```bash
-nmcli con up br-kvm
+nmcli con up p2p-silenus
 ```
 
 ```bash
-ip address
+ip -br addr show enx9405bb143cf5
 ```
 
-Expect `br-kvm` holding `192.168.24.1/24`.
+Expect `192.168.124.1/30`.
+
+On Silenus, the other end of the same cable takes `192.168.124.2/30`, also with
+no gateway and no DNS. With both ends up:
+
+```bash
+ping -c4 192.168.124.2
+```
 
 #### 7. Enable IP forwarding
 
 ```bash
-vim /etc/sysctl.d/99-kvm-forward.conf
+vim /etc/sysctl.d/99-kvm.conf
 ```
 
 Put this in it:
@@ -889,74 +913,62 @@ Expect `net.ipv4.ip_forward = 1`.
 
 **Notes**
 
-- Changing the address of the interface you are connected over will drop your session. Run this from a console, or from `tmux` so the shell survives the disconnect, and know how to reach the machine physically before starting.
-- `br-kvm` is defined by hand rather than as a libvirt NAT network because libvirt rewrites its own iptables chains whenever `libvirtd` restarts, which conflicts with the hand-maintained ruleset in Step 10. That is also why Step 6 removed the `default` network.
-- Attach guest domain XML NICs to `br-kvm`.
-- **TBD — this host has two RJ45 interfaces, and Step 9 above is still written for one.** The names, which one carries management, and whether the second one hosts guests directly, is bonded with the first, or is left down, are all open. Confirm the names with `ip -br link`; `enp4s0` is a placeholder from the draft, not a reading from this machine.
-- **TBD — guest network.** The draft defines `br-kvm` by hand through NetworkManager. Silenus instead uses a libvirt network, `static_network_24`, defined from `kvm/static_network_24.xml`. Whichever this host uses, the reason the draft avoided libvirt still holds: libvirt rewrites its own iptables chains on restart, so a hand-maintained ruleset in Step 10 and a libvirt-managed network do not mix.
+- There is no `br-kvm` here and no bridge built by hand. The draft this document grew from built one, because it also hand-maintained the NAT rules. Defining the guest network in libvirt instead — the same choice Silenus made — means libvirt creates and owns `virbr1`, so a second hand-built bridge would only duplicate it.
+- `ipv4.never-default yes` on the point-to-point link is what keeps it from installing a default route. Without a gateway it would not install one anyway, but stating it means a later edit that adds a gateway by accident cannot silently steal the default route from `enp4s0`.
+- A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`-`.3`.
+- **Changing the address of `enp4s0` will drop your SSH session.** The address in the table is the one the machine already has as `Nyx`, so in practice this step re-creates the profile it is already using. Run it from a console, or from `tmux` so the shell survives, and know how to reach the box physically first.
+- The point-to-point link is a second way in when the LAN side is broken, which is worth having on a machine whose management interface you are about to reconfigure. Bring it up before touching `enp4s0`.
+- IPv6 is disabled on both profiles. Nothing in this build uses it, and leaving it on means a second address family to reason about in the firewall.
+- Reaching a guest on `192.168.32.0/24` from Silenus over the point-to-point link needs a route on Silenus pointing at `192.168.124.1`, and forwarding on this host, which Step 7 above enables. Whether to add that route is not decided here.
 
 ### Step 10 — Firewall
 
-#### 1. Become root
+`libvirt` installs the NAT and forwarding rules for `static_network_32` itself
+when the network starts. This step does not repeat them: a hand-written
+MASQUERADE for the same subnet would be a duplicate, and the draft's
+`iptables-persistent` ruleset existed only because the draft built its own
+bridge.
+
+#### 1. Read what libvirt installed
 
 ```bash
-sudo -i
-```
-
-#### 2. Install iptables-persistent
-
-```bash
-apt install -y iptables-persistent
-```
-
-#### 3. Add the rules
-
-NAT `192.168.24.0/24` out through `br0`, and permit forwarding between the two
-bridges:
-
-```bash
-iptables -t nat -A POSTROUTING -s 192.168.24.0/24 ! -d 192.168.24.0/24 -o br0 -j MASQUERADE
+sudo iptables -t nat -L LIBVIRT_PRT -n -v
 ```
 
 ```bash
-iptables -A FORWARD -i br-kvm -o br0 -j ACCEPT
+sudo iptables -L LIBVIRT_FWO -n -v
+```
+
+Expect a MASQUERADE for `192.168.32.0/24` and forwarding rules for `virbr1`.
+
+#### 2. Exposing a guest service, if any
+
+Guests reach the outside through NAT. The outside cannot open a connection into
+a guest without an explicit rule. Only if that is needed:
+
+```bash
+sudo apt install -y iptables-persistent
 ```
 
 ```bash
-iptables -A FORWARD -i br0 -o br-kvm -m state --state RELATED,ESTABLISHED -j ACCEPT
+sudo iptables -t nat -A PREROUTING -i enp4s0 -p tcp --dport 2222 -j DNAT --to-destination 192.168.32.10:22
 ```
 
 ```bash
-netfilter-persistent save
-```
-
-#### 4. Read the rules back
-
-```bash
-iptables -t nat -L POSTROUTING -n -v
+sudo iptables -A FORWARD -i enp4s0 -o virbr1 -p tcp -d 192.168.32.10 --dport 22 -j ACCEPT
 ```
 
 ```bash
-iptables -L FORWARD -n -v
-```
-
-```bash
-cat /etc/iptables/rules.v4
+sudo netfilter-persistent save
 ```
 
 **Notes**
 
-- What this gives you: any connection a guest starts outward reaches `192.168.8.0/24` and beyond, with return traffic flowing back through connection tracking. No extra rule is needed for that direction.
-- What it does **not** give you: a device on `192.168.8.0/24` cannot open a new connection into a guest's `192.168.24.x` address. That needs an explicit DNAT rule per exposed service, for example forwarding TCP 2222 on this host's LAN address to SSH on one guest:
+- Nothing in this step is required for a working build. A host whose guests only make outbound connections needs none of it, and installing `iptables-persistent` before that is true only creates a saved ruleset to keep in step with reality.
+- `libvirtd` rewrites its own chains when it restarts. Rules added by hand live outside those chains and survive, but the ordering between them is worth re-checking after a restart rather than assumed.
+- `iptables -A` appends, so running the DNAT sub-step twice adds a second copy of each rule. `netfilter-persistent save` then writes both.
+- The guest subnet is `192.168.32.0/24` here and `192.168.24.0/24` on Silenus. They differ on purpose: both hosts are reachable from each other, so overlapping guest ranges would make a guest on one indistinguishable from a guest on the other.
 
-```bash
-iptables -t nat -A PREROUTING -i br0 -p tcp --dport 2222 -j DNAT --to-destination 192.168.24.10:22
-iptables -A FORWARD -i br0 -o br-kvm -p tcp -d 192.168.24.10 --dport 22 -j ACCEPT
-netfilter-persistent save
-```
-
-- `iptables -A` appends. Running this step twice adds a second copy of each rule. They are harmless but confusing; `iptables -t nat -L POSTROUTING -n -v` shows the duplicates, and `netfilter-persistent save` then writes both.
-- That `netfilter-persistent save` exited cleanly is not proof the rules survive a reboot. Step 11 checks them after the boot.
 
 ### Step 11 — Reboot and final verification
 
@@ -1013,27 +1025,51 @@ dmesg | grep -i vfio
 
 Expect probe and bind messages for the GPU's PCI address.
 
-#### 6. The bridges came up on their own
+#### 6. Both interfaces came up on their own
 
 ```bash
-ip -br addr show br0 br-kvm
+ip -br addr show enp4s0 enx9405bb143cf5
 ```
 
-Expect `br0` on `192.168.8.3/24` and `br-kvm` on `192.168.24.1/24`.
+Expect `192.168.8.3/24` and `192.168.124.1/30`.
+
+```bash
+ip -4 route
+```
+
+Expect exactly one default route, via `192.168.8.1` on `enp4s0`. The
+point-to-point link must not have installed one.
 
 ```bash
 ping -c4 192.168.8.1
 ```
 
-#### 7. The firewall survived the reboot
-
 ```bash
-iptables -t nat -L POSTROUTING -n -v
+ping -c4 192.168.124.2
 ```
 
+The second needs Silenus up on the other end of the USB-C cable.
+
+#### 7. The guest network came back
+
 ```bash
-iptables -L FORWARD -n -v
+virsh -c qemu:///system net-list --all
 ```
+
+Expect `static_network_32` active with `Autostart yes`, and no `default`.
+
+```bash
+ip -br addr show virbr1
+```
+
+Expect `192.168.32.1/24`.
+
+```bash
+sudo iptables -t nat -L LIBVIRT_PRT -n -v
+```
+
+Expect libvirt's own MASQUERADE for `192.168.32.0/24`. Any DNAT rules added by
+hand in Step 10 should be checked here too.
 
 #### 8. Nested virtualization and quota persisted
 
@@ -1067,7 +1103,7 @@ virsh vol-create-as sssd-pool <vm-name>.qcow2 20G --format qcow2
 
 ```bash
 virt-install --name <vm-name> --memory 4096 --vcpus 2 \
-  --disk vol=sssd-pool/<vm-name>.qcow2 --network bridge=br-kvm \
+  --disk vol=sssd-pool/<vm-name>.qcow2 --network network=static_network_32 \
   --os-variant debian13 --cdrom /data-root/isos/debian-13-netinst.iso
 ```
 
@@ -1077,11 +1113,14 @@ Docker quota enforcement:
 docker run --rm --storage-opt size=5G alpine df -h /
 ```
 
-Cross-subnet reachability, run from inside a guest on `br-kvm`:
+Cross-subnet reachability, run from inside a guest on `static_network_32`:
 
 ```bash
 ping -c3 192.168.8.3
 ```
+
+The guest needs a static address on `192.168.32.0/24` with gateway
+`192.168.32.1` — nothing hands one out.
 
 GPU passthrough — attach the card to a VM by its PCI address in the domain XML,
 then:

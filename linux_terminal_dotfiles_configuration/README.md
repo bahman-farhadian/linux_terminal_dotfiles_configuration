@@ -47,6 +47,8 @@ linux_terminal_dotfiles_configuration/
 │   ├── tmux/
 │   ├── ssh/
 │   ├── hushlogin
+│   ├── kvm/
+│   │   └── static_network_32.xml   guest network, 192.168.32.0/24
 │   ├── install.sh         bash, tmux, ssh only — no GNOME
 │   └── Dionysus.md
 └── Hephaestus/            second headless host — outline only so far

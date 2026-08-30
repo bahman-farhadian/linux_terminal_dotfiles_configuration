@@ -1111,7 +1111,70 @@ anything falls outside the alphabet.
 - `--status` reads the settings back. If it disagrees with `--list`, the write failed rather than the sort being wrong.
 - To undo it completely: `gsettings reset org.gnome.desktop.app-folders folder-children` followed by `gsettings reset org.gnome.shell app-picker-layout`.
 
-### Step 13 — Check the whole setup
+### Step 13 — Point-to-point link to Dionysus
+
+A USB-C ethernet cable between this laptop and Dionysus, carrying traffic
+between the two machines and nothing else. Dionysus takes `192.168.124.1/30`;
+this end takes `192.168.124.2/30`. Configure it only when the cable is plugged
+in — the profile binds to the adapter's own name.
+
+#### 1. Find the adapter's name
+
+```bash
+ip -br link
+```
+
+A USB ethernet adapter appears as `enx` followed by its MAC address. It is
+stable for that adapter and changes if the adapter is swapped, so read it here
+rather than assuming one.
+
+#### 2. Create the profile
+
+Replace `enxXXXXXXXXXXXX` with the name from the previous sub-step:
+
+```bash
+nmcli con add type ethernet ifname enxXXXXXXXXXXXX con-name p2p-dionysus \
+  ipv4.method manual ipv4.addresses 192.168.124.2/30 \
+  ipv4.never-default yes ipv6.method disabled
+```
+
+```bash
+nmcli con mod p2p-dionysus connection.autoconnect yes
+```
+
+```bash
+nmcli con up p2p-dionysus
+```
+
+#### 3. Check it
+
+```bash
+ip -br addr show enxXXXXXXXXXXXX
+```
+
+Expect `192.168.124.2/30`.
+
+```bash
+ip -4 route
+```
+
+Expect the default route still on the wireless interface, not on this link.
+
+```bash
+ping -c4 192.168.124.1
+```
+
+Needs Dionysus up on the other end.
+
+**Notes**
+
+- No gateway and no DNS on this profile. `ipv4.never-default yes` states the same thing a second way, so a later edit that adds a gateway by accident cannot take the default route away from the interface that actually reaches the internet.
+- A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length, or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`–`.3`.
+- This is a second route to Dionysus when its LAN side is broken, which is worth having before reconfiguring that machine's management interface.
+- Reaching Dionysus's guests on `192.168.32.0/24` across this link needs a route here pointing at `192.168.124.1`, and IP forwarding on Dionysus. Whether to add that route is not decided here.
+- Unplugging the cable takes the profile down with it. `autoconnect yes` brings it back when it is plugged in again; nothing needs re-running.
+
+### Step 14 — Check the whole setup
 
 `check.sh` in this repository runs every check the steps above describe and
 prints `PASS` or `FAIL` for each one.
