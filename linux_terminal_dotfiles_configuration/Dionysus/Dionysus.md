@@ -156,30 +156,34 @@ sudo -l -U username
 
 #### 4. Add contrib and non-free
 
-Debian 13 defaults to the DEB822 source format
-(`/etc/apt/sources.list.d/debian.sources`) rather than the classic
-`sources.list`, and which one the installer wrote depends on how it was run.
-Handle whichever is actually present:
+The installer writes the classic file, not a `.sources` file:
 
 ```bash
-if [ -f /etc/apt/sources.list.d/debian.sources ]; then
-  sed -i -E 's/^Components:.*/Components: main contrib non-free non-free-firmware/' /etc/apt/sources.list.d/debian.sources
-elif [ -f /etc/apt/sources.list ]; then
-  sed -i -E 's/^(deb(-src)? .* trixie[a-zA-Z-]*) main.*/\1 main contrib non-free non-free-firmware/' /etc/apt/sources.list
-fi
+vim /etc/apt/sources.list
 ```
 
-```bash
-apt update
+Make the file read exactly this:
+
 ```
+deb http://deb.debian.org/debian/ trixie main contrib non-free non-free-firmware
+deb-src http://deb.debian.org/debian/ trixie main contrib non-free non-free-firmware
+
+deb http://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
+deb-src http://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
+
+deb http://deb.debian.org/debian/ trixie-updates main contrib non-free non-free-firmware
+deb-src http://deb.debian.org/debian/ trixie-updates main contrib non-free non-free-firmware
+```
+
+Only `contrib` and `non-free` are new. Keep the suite name — `trixie`,
+`trixie-security`, `trixie-updates` — between the URL and the components. If
+you drop it, `apt update` fails with a 404 on the Release file.
 
 Check the result:
 
 ```bash
-apt-cache policy | grep -i non-free
+grep ^deb /etc/apt/sources.list
 ```
-
-Expect `non-free` and `non-free-firmware` component lines.
 
 #### 5. Update the system
 
@@ -187,7 +191,13 @@ Expect `non-free` and `non-free-firmware` component lines.
 apt full-upgrade
 ```
 
-#### 6. Confirm ftype on all three XFS filesystems
+#### 6. Install the tools used for checking
+
+```bash
+apt install -y mokutil dmidecode efibootmgr
+```
+
+#### 7. Confirm ftype on all three XFS filesystems
 
 A hard requirement for both `overlay2` and project quotas. `partman`'s defaults
 are not guaranteed to match a manual `mkfs.xfs`, so check rather than assume:
@@ -206,13 +216,13 @@ xfs_info /data-root/lssd | grep ftype
 
 Expect `ftype=1` on all three.
 
-#### 7. Confirm what the installer mounted
+#### 8. Confirm what the installer mounted
 
 ```bash
 findmnt -no SOURCE,TARGET,OPTIONS /data-root /data-root/sssd /data-root/lssd
 ```
 
-#### 8. Add project quota to fstab
+#### 9. Add project quota to fstab
 
 ```bash
 vim /etc/fstab
@@ -221,52 +231,52 @@ vim /etc/fstab
 Append `,pquota` immediately after `defaults` in the options field of those
 three XFS entries. Leave every other line alone.
 
-#### 9. Remount so the quota initializes
+#### 10. Edit GRUB: IOMMU and the boot console
 
-XFS project quota cannot be toggled with `mount -o remount`: it only
-initializes on an actual mount. Unmount and mount fresh instead, children
-before the parent, since `sssd` and `lssd` nest inside `/data-root`:
+GPU passthrough needs the IOMMU on the kernel command line. This is the only
+place GRUB is edited: Step 8 stages the rest of the passthrough work but does
+not touch this file again.
 
 ```bash
-systemctl daemon-reload
+vim /etc/default/grub
 ```
 
-```bash
-umount /data-root/sssd
+These five lines are the whole active configuration. Make the uncommented lines
+in the file read exactly this, and leave every commented line below them alone:
+
+```
+GRUB_DEFAULT=0
+GRUB_TIMEOUT=9
+GRUB_DISTRIBUTOR=`( . /etc/os-release && echo ${NAME} )`
+GRUB_CMDLINE_LINUX_DEFAULT="quiet loglevel=3 systemd.show_status=auto udev.log_level=3 amd_iommu=on iommu=pt vfio-pci.disable_idle_d3=1"
+GRUB_CMDLINE_LINUX=""
 ```
 
+The whole set is written out rather than a list of lines to change, so a missing
+line is obvious. `GRUB_DEFAULT` and `GRUB_DISTRIBUTOR` come from the installer
+and are left as they are.
+
+Apply it:
+
 ```bash
-umount /data-root/lssd
+update-grub
 ```
 
+#### 11. Reboot
+
 ```bash
-umount /data-root
+systemctl reboot
 ```
 
-```bash
-mount -a
-```
+This reboot is what makes the quota live. XFS initializes project quota on an
+actual mount and refuses to do it on a remount, and every filesystem is mounted
+fresh here — so no unmount and remount sequence is needed. The machine has to
+come back for GRUB regardless.
 
-#### 10. Check the quota is active
-
-```bash
-xfs_quota -x -c 'state' /data-root
-```
+Log back in and become root again before the checks:
 
 ```bash
-xfs_quota -x -c 'state' /data-root/sssd
-```
-
-```bash
-xfs_quota -x -c 'state' /data-root/lssd
-```
-
-Expect `Accounting: ON` and `Enforcement: ON` on all three.
-
-#### 11. Install the tools used for checking
-
-```bash
-apt install -y mokutil dmidecode efibootmgr
+sudo -i
 ```
 
 #### 12. Check Secure Boot
@@ -305,7 +315,42 @@ swapon --show
 
 Expect no output.
 
-#### 15. Check the BIOS version
+#### 15. Check the quota is active
+
+```bash
+findmnt -no OPTIONS /data-root | tr ',' '\n' | grep quota
+```
+
+Expect `prjquota`.
+
+```bash
+xfs_quota -x -c 'state' /data-root
+```
+
+```bash
+xfs_quota -x -c 'state' /data-root/sssd
+```
+
+```bash
+xfs_quota -x -c 'state' /data-root/lssd
+```
+
+Expect `Accounting: ON` and `Enforcement: ON` on all three.
+
+#### 16. Check the IOMMU came up
+
+```bash
+grep -o 'amd_iommu=on' /proc/cmdline
+```
+
+```bash
+dmesg | grep -i 'AMD-Vi'
+```
+
+Expect the flag on the live command line and AMD-Vi lines in the log. The rest
+of the passthrough chain is checked in Step 11, after Step 8 has staged it.
+
+#### 17. Check the BIOS version
 
 ```bash
 dmidecode -s bios-version
@@ -342,7 +387,69 @@ sudo -i
 apt install -y bash-completion bridge-utils btop curl git jq lshw make openssl progress pwgen python3 rsync sshuttle sudo tmux tree unrar vim wget
 ```
 
-#### 3. Check the CPU exposes virtualization
+#### 3. Install what the Claude Code repository needs
+
+```bash
+apt install -y curl gnupg
+```
+
+#### 4. Create the keyring directory
+
+```bash
+install -m 0755 -d /etc/apt/keyrings
+```
+
+#### 5. Fetch the Claude Code signing key
+
+```bash
+curl -fsSL https://downloads.claude.ai/keys/claude-code.asc -o /etc/apt/keyrings/claude-code.asc
+```
+
+```bash
+chmod a+r /etc/apt/keyrings/claude-code.asc
+```
+
+Read the key before trusting it:
+
+```bash
+gpg --show-keys /etc/apt/keyrings/claude-code.asc
+```
+
+#### 6. Add the repository
+
+```bash
+vim /etc/apt/sources.list.d/claude-code.sources
+```
+
+Put this in it:
+
+```
+Types: deb
+URIs: https://downloads.claude.ai/claude-code/apt/stable
+Suites: stable
+Components: main
+Signed-By: /etc/apt/keyrings/claude-code.asc
+```
+
+```bash
+apt update
+```
+
+#### 7. Install Claude Code
+
+```bash
+apt install -y claude-code
+```
+
+#### 8. Check it
+
+```bash
+apt policy claude-code
+```
+
+The `Installed:` line must show a version, not `(none)`.
+
+#### 9. Check the CPU exposes virtualization
 
 ```bash
 grep -Ec '(vmx|svm)' /proc/cpuinfo
@@ -352,6 +459,10 @@ Expect a number above 0. This machine is AMD, so the flag is `svm`.
 
 **Notes**
 
+- Claude Code comes from Anthropic's own repository, not Debian's. The key is fetched separately and `Signed-By` limits it to that one repository.
+- `gpg --show-keys` prints the key before apt is told to trust it. Compare the fingerprint with the one Anthropic publishes.
+- Run `claude` as your own user, not root. Its settings and login live in your home directory, so as root they land in `/root`.
+- The keyring directory and the key fetch are done again in Step 7 for Docker. Both are safe to repeat: the directory is left alone if it exists, and the key file is overwritten with the same content.
 - This is Silenus's package list with everything desktop-only removed: no GNOME, no flatpak, no fonts, no media applications, none of which has anything to talk to on a headless host.
 - `bash-completion`, `python3` and `openssl` are here because `install.sh` in Step 5 checks for them and warns if they are missing. `tmux`, `vim`, `git`, `curl`, `jq` and `tree` are on the same list and already above.
 - `openssh-server` was installed by the Debian installer in Step 2 and is what you are connected over. It is not repeated here.
@@ -763,21 +874,17 @@ Nothing in this step is verified until then.
 sudo -i
 ```
 
-#### 2. Set the kernel command line
+#### 2. Confirm the kernel command line
+
+GRUB was written once in Step 3 and is not edited again here. Confirm the flags
+survived that reboot before staging anything on top of them:
 
 ```bash
-vim /etc/default/grub
+grep -o 'amd_iommu=on iommu=pt' /proc/cmdline
 ```
 
-Make the uncommented line read exactly this:
-
-```
-GRUB_CMDLINE_LINUX_DEFAULT="quiet loglevel=3 amd_iommu=on iommu=pt vfio-pci.disable_idle_d3=1"
-```
-
-```bash
-update-grub
-```
+If it prints nothing, redo Step 3 sub-step 10; the rest of this step is
+pointless without the IOMMU active.
 
 #### 3. Read the GPU's PCI IDs
 
@@ -840,6 +947,8 @@ update-initramfs -u -k all
 - `softdep` alone only orders module loading. It does not guarantee `vfio-pci` gets first claim on the device during early boot, which is why `vfio` also goes into the initramfs.
 - Appending to `/etc/initramfs-tools/modules` is not idempotent: running Step 6 twice writes the four module names twice. Duplicates are harmless to boot, but check the file before repeating it.
 - `iommu=pt` puts the IOMMU in passthrough mode for devices the host keeps, which avoids the translation cost on everything that is not being handed to a guest.
+- GRUB is written once, in Step 3, with the IOMMU flags already on the line. Two steps setting `GRUB_CMDLINE_LINUX_DEFAULT` would mean the second silently dropping whatever the first put there — the boot-console settings, in this case.
+- `GRUB_CMDLINE_LINUX` is empty on this host, where Silenus carries `rootflags=uquota,pquota`. Silenus needs it because its root filesystem is XFS with quota, and root is mounted before `/etc/fstab` is read. Here root is ext4 and the quota is on ordinary fstab mounts, so fstab is the right place and the kernel command line needs nothing.
 
 ### Step 9 — Networking
 
