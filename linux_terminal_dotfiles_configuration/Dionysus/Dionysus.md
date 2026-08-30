@@ -6,7 +6,7 @@ desktop environment, administered over SSH. The GNOME workstation is
 
 ASUS ROG STRIX B450-F GAMING, AMD Ryzen 9 3900X (12c/24t), 125 GiB RAM, an
 NVIDIA GeForce GTX 1080 reserved for guest passthrough, and two network
-interfaces — an onboard Intel I211 and a USB-C ethernet adapter, doing different
+interfaces — an onboard Intel I211 and an external USB NIC, doing different
 jobs. Three disks, sizes as `lsblk` reports them:
 
 | Role | Device | Model | Size |
@@ -105,7 +105,7 @@ environment task; this host stays headless.
 
 - The hostname is what makes this machine Dionysus rather than Nyx. The installer writes it to `/etc/hostname` and `/etc/hosts`; nothing later in this document sets it.
 - Without a working network the installer cannot reach the mirror, and Steps 3 to 8 have nothing to install from. `Network autoconfiguration failed` is the expected message on this LAN, not a fault.
-- Configure only the onboard interface here. The USB adapter has no carrier unless the cable to Silenus is plugged in, and Step 10 configures it properly; if the installer offers a choice, pick `enp4s0`.
+- Configure only the onboard interface here. The external USB NIC has no carrier unless the cable to Silenus is plugged in, and Step 10 configures it properly; if the installer offers a choice, pick `enp4s0`.
 - The installer counts in GB, `df -h` counts in GiB. The root partition is entered as `34360 MB`, shows as `34.4 GB`, and reports as `32G` once installed. Same partition.
 - For any other size: type `GiB x 1073.741824` MB, rounded. The EFI partition is entered as `1075 MB` rather than the 1074 the formula gives; that is the number Silenus uses for the same partition, and one megabyte over makes no difference.
 - The four partitions on `sda` come to 227 GiB of the 233 GiB the disk reports, leaving about 6 GiB unpartitioned. That free space is SSD over-provisioning, the same reasoning as Silenus: the drive uses it for wear levelling, which keeps write speed up as the disk fills. It is a smaller margin than Silenus keeps — 2.6% against 6.6% — so raise it by taking a few GiB off `/data-root` if this disk is expected to run close to full.
@@ -1062,10 +1062,10 @@ libvirt network defined in Step 7, and libvirt owns that bridge.
 | Interface | Kind | Address | Purpose |
 |---|---|---|---|
 | `enp4s0` | onboard RJ45 | `192.168.8.3/24`, gw `192.168.8.1`, DNS `8.8.8.8` | `wan` — the way out: default route and DNS |
-| `p2plink0` | USB-C ethernet | `192.168.124.1/30` | point-to-point to Silenus |
+| `p2plink0` | external USB NIC | `192.168.124.1/30` | point-to-point to Silenus |
 
-The USB adapter arrives as `enx9405bb143cf5` and is renamed in sub-step 4 below,
-before any profile is bound to it.
+The external USB NIC arrives as `enx9405bb143cf5` and is renamed in sub-step 4
+below, before any profile is bound to it.
 
 Persisted through NetworkManager's own connection profiles with `nmcli`, not
 `/etc/network/interfaces`.
@@ -1077,24 +1077,24 @@ graph TB
     INET --- R
 
     subgraph SIL ["Silenus &middot; ThinkPad T14 Gen 4"]
-        SW["wlp0s20f3 &middot; Huawei-Router<br/>192.168.8.2/24"]
-        SP["enp0s31f6 &middot; Dionysus<br/>192.168.124.2/30"]
+        SW["wlp0s20f3 &middot; WiFi<br/>connection: Huawei-Router<br/>192.168.8.2/24"]
+        SP["enp0s31f6 &middot; onboard RJ45<br/>connection: Dionysus<br/>192.168.124.2/30"]
         SB["virbr1 &middot; static_network_24<br/>192.168.24.1/24 &middot; NAT"]
         SG["guests<br/>192.168.24.2 &ndash; .254<br/>static, no DHCP"]
         SB --- SG
     end
 
     subgraph DIO ["Dionysus &middot; Ryzen 9 3900X"]
-        DW["enp4s0 &middot; wan<br/>192.168.8.3/24"]
-        DP["p2plink0 &middot; Dionysus<br/>192.168.124.1/30"]
+        DW["enp4s0 &middot; onboard Intel I211<br/>connection: wan<br/>192.168.8.3/24"]
+        DP["p2plink0 &middot; external USB NIC<br/>connection: Dionysus<br/>192.168.124.1/30"]
         DB["virbr1 &middot; static_network_32<br/>192.168.32.1/24 &middot; NAT"]
         DG["guests<br/>192.168.32.2 &ndash; .254<br/>static, no DHCP"]
         DB --- DG
     end
 
-    R ---|wifi| SW
-    R ---|Intel I211| DW
-    SP ===|USB-C ethernet cable| DP
+    R -.-|WiFi| SW
+    R ---|ethernet| DW
+    SP ===|ethernet cable| DP
 
     classDef wan fill:#1f6feb,stroke:#0b4fc0,color:#ffffff
     classDef p2p fill:#8957e5,stroke:#6a3fbf,color:#ffffff
@@ -1106,10 +1106,18 @@ graph TB
     class R,INET infra
 ```
 
-Blue is the way out, purple the point-to-point cable, green the guest networks
-each host NATs behind itself. The two guest subnets differ on purpose — the
-hosts can reach each other, so overlapping ranges would make a guest on one
-indistinguishable from a guest on the other.
+Blue is each host's way out, purple the point-to-point link, green the guest
+networks each host NATs behind itself. The dotted line is wireless; the solid
+ones are cable.
+
+The point-to-point link is not symmetric hardware. Dionysus reaches it through
+an **external USB NIC**, because its only onboard port is already the way out;
+Silenus uses its **onboard RJ45**, which is otherwise unused. Between them is an
+ordinary ethernet cable.
+
+The two guest subnets differ on purpose — the hosts can reach each other, so
+overlapping ranges would make a guest on one indistinguishable from a guest on
+the other.
 
 #### 1. Become root
 
@@ -1138,10 +1146,10 @@ Expect `active`.
 ip -br link
 ```
 
-`enp4s0` is fixed by its PCI slot and is already correct. The USB adapter comes
+`enp4s0` is fixed by its PCI slot and is already correct. The external USB NIC comes
 up as `enx9405bb143cf5`; the next sub-step renames it.
 
-#### 4. Rename the USB adapter
+#### 4. Rename the external USB NIC
 
 `enx9405bb143cf5` is what udev derives from the adapter's MAC address — stable,
 but it says nothing about what the link is for. A `.link` file renames it as
@@ -1281,7 +1289,7 @@ Expect `net.ipv4.ip_forward = 1`.
 - The rename binds to the MAC address, so it follows that one adapter. A replacement adapter needs its own MAC written into the `.link` file, or it comes up under its own `enx` name with no profile attached.
 - `p2plink0` is chosen to be a name nothing else generates. The kernel produces `en*`, `wl*` and `ww*`; `wpa_supplicant` produces `p2p0` and `p2p-dev-*` for Wi-Fi Direct. A rename that collides with an automatically assigned name can race with it, which is why both `eth0` and `p2p0` are avoided.
 - The file must sort before `99-default.link`, where the default naming policy lives. `10-` does.
-- `update-initramfs -u` puts the file in the initramfs too. A USB adapter is not needed that early, so this is precaution rather than requirement, but it costs nothing and means the name is the same whenever the interface does appear.
+- `update-initramfs -u` puts the file in the initramfs too. An external USB NIC is not needed that early, so this is precaution rather than requirement, but it costs nothing and means the name is the same whenever the interface does appear.
 - Rename first, in sub-step 4, and only then run the block. A profile bound to `enx9405bb143cf5` stops matching the moment the rename takes effect, so the order of the two sub-steps matters.
 - The two profiles are named for what they do, not for the interface underneath. `wan` is the way out; `Dionysus` is the point-to-point link, and Silenus's end of the same cable carries that same name, so the link reads the same from either side. Connection names are local to each host, so nothing collides.
 - `wan` is the router-and-firewall convention: the side facing outward, as against the inside. Worth knowing that this one holds a private address, `192.168.8.3`, because another router sits in front of it doing the real translation. `wan` here means *this host's* way out, not a public address.
@@ -1476,7 +1484,7 @@ ping -c4 192.168.8.1
 ping -c4 192.168.124.2
 ```
 
-The second needs Silenus up on the other end of the USB-C cable.
+The second needs Silenus up on the other end of the cable.
 
 #### 7. The guest network came back
 

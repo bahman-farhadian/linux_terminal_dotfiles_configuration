@@ -1120,9 +1120,8 @@ anything falls outside the alphabet.
 ### Step 13 — Point-to-point link to Dionysus
 
 A cable between this laptop and Dionysus, carrying traffic between the two
-machines and nothing else. It runs from a USB-C ethernet adapter at Dionysus's
-end into this laptop's built-in RJ45, so the two ends sit on different kinds of
-interface. Dionysus takes `192.168.124.1/30`; this end takes `192.168.124.2/30`.
+machines and nothing else. It runs from an external USB NIC at Dionysus's end
+into this laptop's onboard RJ45, so the two ends sit on different hardware. Dionysus takes `192.168.124.1/30`; this end takes `192.168.124.2/30`.
 Plug the cable in before starting: the profile binds to an interface name, and
 sub-step 1 reads which.
 
@@ -1133,24 +1132,24 @@ graph TB
     INET --- R
 
     subgraph SIL ["Silenus &middot; ThinkPad T14 Gen 4"]
-        SW["wlp0s20f3 &middot; Huawei-Router<br/>192.168.8.2/24"]
-        SP["enp0s31f6 &middot; Dionysus<br/>192.168.124.2/30"]
+        SW["wlp0s20f3 &middot; WiFi<br/>connection: Huawei-Router<br/>192.168.8.2/24"]
+        SP["enp0s31f6 &middot; onboard RJ45<br/>connection: Dionysus<br/>192.168.124.2/30"]
         SB["virbr1 &middot; static_network_24<br/>192.168.24.1/24 &middot; NAT"]
         SG["guests<br/>192.168.24.2 &ndash; .254<br/>static, no DHCP"]
         SB --- SG
     end
 
     subgraph DIO ["Dionysus &middot; Ryzen 9 3900X"]
-        DW["enp4s0 &middot; wan<br/>192.168.8.3/24"]
-        DP["p2plink0 &middot; Dionysus<br/>192.168.124.1/30"]
+        DW["enp4s0 &middot; onboard Intel I211<br/>connection: wan<br/>192.168.8.3/24"]
+        DP["p2plink0 &middot; external USB NIC<br/>connection: Dionysus<br/>192.168.124.1/30"]
         DB["virbr1 &middot; static_network_32<br/>192.168.32.1/24 &middot; NAT"]
         DG["guests<br/>192.168.32.2 &ndash; .254<br/>static, no DHCP"]
         DB --- DG
     end
 
-    R ---|wifi| SW
-    R ---|Intel I211| DW
-    SP ===|USB-C ethernet cable| DP
+    R -.-|WiFi| SW
+    R ---|ethernet| DW
+    SP ===|ethernet cable| DP
 
     classDef wan fill:#1f6feb,stroke:#0b4fc0,color:#ffffff
     classDef p2p fill:#8957e5,stroke:#6a3fbf,color:#ffffff
@@ -1162,10 +1161,18 @@ graph TB
     class R,INET infra
 ```
 
-Blue is the way out, purple the point-to-point cable, green the guest networks
-each host NATs behind itself. The two guest subnets differ on purpose — the
-hosts can reach each other, so overlapping ranges would make a guest on one
-indistinguishable from a guest on the other.
+Blue is each host's way out, purple the point-to-point link, green the guest
+networks each host NATs behind itself. The dotted line is wireless; the solid
+ones are cable.
+
+The point-to-point link is not symmetric hardware. Dionysus reaches it through
+an **external USB NIC**, because its only onboard port is already the way out;
+Silenus uses its **onboard RJ45**, which is otherwise unused. Between them is an
+ordinary ethernet cable.
+
+The two guest subnets differ on purpose — the hosts can reach each other, so
+overlapping ranges would make a guest on one indistinguishable from a guest on
+the other.
 
 ```mermaid
 flowchart LR
@@ -1175,8 +1182,8 @@ flowchart LR
     D["Dionysus<br/>forwards to virbr1"]
     G["guest<br/>192.168.32.x"]
 
-    S ==>|cable up| P
-    S -.->|cable down| W
+    S ==>|link up| P
+    S -.->|link down| W
     P ==> D
     W -.-> D
     D --> G
@@ -1205,11 +1212,11 @@ ip -br link
 cat /sys/class/net/enp0s31f6/carrier
 ```
 
-`enp0s31f6` is this laptop's built-in RJ45. `carrier: 1` means the cable is
+`enp0s31f6` is this laptop's onboard RJ45. `carrier: 1` means the cable is
 plugged in. Nothing is renamed at this end: `enp0s31f6` is a PCI-slot name, so
 it is already stable and already says what it is. Dionysus renames its end only
-because a USB adapter arrives as `enx` followed by its MAC address, which is
-stable but unreadable.
+because an external USB NIC arrives as `enx` followed by its MAC address, which
+is stable but unreadable.
 
 #### 2. Create the profile
 
@@ -1282,9 +1289,9 @@ Needs Dionysus up on the other end.
 
 **Notes**
 
-- The two ends sit on different kinds of interface. Dionysus reaches the cable through a USB-C ethernet adapter, renamed to `p2plink0`; this laptop has a built-in RJ45 and uses it as it comes, `enp0s31f6`. Only the connection name is shared — `Dionysus` at both ends — so the link reads the same from either side. Connection names are local to a host, so nothing collides.
+- The two ends sit on different hardware. Dionysus reaches the cable through an external USB NIC, renamed to `p2plink0`, because its only onboard port is already the way out; this laptop has an onboard RJ45 going spare and uses it as it comes, `enp0s31f6`. Only the connection name is shared — `Dionysus` at both ends — so the link reads the same from either side. Connection names are local to a host, so nothing collides.
 - A profile bound to an interface that does not exist fails with `No suitable device found for this connection ... mismatching interface name`, naming whichever ethernet device it did find. `nmcli con mod <name> connection.interface-name <iface>` repoints it without recreating it.
-- Nothing is renamed at this end, so none of the naming hazards apply here. On Dionysus, where the USB adapter does get renamed, `p2plink0` is chosen to be a name nothing else generates: the kernel produces `en*`, `wl*` and `ww*`, and `wpa_supplicant` produces `p2p0` and `p2p-dev-*` for Wi-Fi Direct.
+- Nothing is renamed at this end, so none of the naming hazards apply here. On Dionysus, where the external USB NIC does get renamed, `p2plink0` is chosen to be a name nothing else generates: the kernel produces `en*`, `wl*` and `ww*`, and `wpa_supplicant` produces `p2p0` and `p2p-dev-*` for Wi-Fi Direct.
 - No gateway and no DNS on this profile. `ipv4.never-default yes` states the same thing a second way, so a later edit that adds a gateway by accident cannot take the default route away from the interface that actually reaches the internet.
 - A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length, or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`–`.3`.
 - This is a second route to Dionysus when its LAN side is broken, which is worth having before reconfiguring that machine's management interface.
