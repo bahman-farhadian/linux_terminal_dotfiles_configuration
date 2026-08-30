@@ -230,11 +230,17 @@ client and a larger one fills the leftover area with dots. The tmux default,
 `latest`, resizes the session every time you use a different client, which makes
 the pane sizes move around as you switch between the terminal and SSH.
 
-Over SSH it attaches to a session named `ssh` instead, creating it if needed,
-and a local shell never picks that session up. Each session then follows its
-own terminal size. Sharing one session between a remote and a local client
-makes tmux size the windows for both, which crops the smaller one and leaves an
-unpainted band in the larger.
+Over SSH every login gets a session of its own — `ssh1`, `ssh2`, and so on —
+for whichever account is logging in, and a local shell never picks one of those
+up. One session shared between two connections mirrors them: both clients see
+the same windows, and tmux sizes them for the smaller, which crops one and
+leaves an unpainted band in the other.
+
+Reconnecting after a dropped link is the exception. If an `ssh` session is
+sitting detached, the next login attaches to it rather than opening another, so
+the work survives the drop — which is the reason for running tmux over SSH at
+all. Numbers are reused as sessions end, so they stay low rather than climbing
+forever.
 
 It also skips when `$TERM` is already `tmux-*` or `screen-*`. `sudo -i` and
 `su -` scrub `$TMUX` but keep `$TERM`, so without that check they would start a

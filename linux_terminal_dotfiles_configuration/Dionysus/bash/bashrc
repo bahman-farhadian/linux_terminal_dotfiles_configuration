@@ -10,20 +10,35 @@ esac
 # than exec'd so that a broken tmux config drops you at a usable shell instead
 # of closing the terminal.
 #
-# SSH gets its own session, named ssh. Sharing one session between a remote and
-# a local client makes tmux size the windows for both, which crops the smaller
-# and leaves an unpainted band in the larger. Separate sessions each follow
-# their own terminal.
+# Every SSH login lands in a tmux session of its own, ssh1, ssh2 and so on, for
+# whichever account is logging in. One session shared between two connections
+# mirrors them: both clients see the same windows, and tmux sizes them for the
+# smaller, which crops one and leaves an unpainted band in the other. The same
+# argument separates remote sessions from local ones.
+#
+# A dropped connection is the exception worth having. Reconnecting attaches to a
+# detached ssh session rather than opening yet another, so the work survives a
+# lost link — which is the reason for running tmux over SSH in the first place.
+#
 # sudo -i and su - scrub the environment, so $TMUX is gone even though the
 # shell is still inside a tmux pane. $TERM survives and reads tmux-256color
 # there, so it is the reliable test for "already multiplexed".
 case "$TERM" in tmux*|screen*) _in_mux=1 ;; *) _in_mux="" ;; esac
 if [ -z "$TMUX" ] && [ -z "$_in_mux" ] && [ -z "$NO_AUTO_TMUX" ] && command -v tmux &>/dev/null; then
     if [ -n "$SSH_CONNECTION" ]; then
-        tmux new-session -A -s ssh && exit
+        _tmux_orphan=$(tmux list-sessions -F '#{session_name} #{session_attached}' 2>/dev/null \
+                       | awk '$1 ~ /^ssh[0-9]+$/ && $2 == 0 { print $1; exit }')
+        if [ -n "$_tmux_orphan" ]; then
+            tmux attach-session -t "$_tmux_orphan" && exit
+        else
+            _n=1
+            while tmux has-session -t "=ssh$_n" 2>/dev/null; do _n=$((_n + 1)); done
+            tmux new-session -s "ssh$_n" && exit
+        fi
+        unset _tmux_orphan _n
     else
         _tmux_detached=$(tmux list-sessions -F '#{session_name} #{session_attached}' 2>/dev/null \
-                         | awk '$1 != "ssh" && $2 == 0 { print $1; exit }')
+                         | awk '$1 !~ /^ssh[0-9]*$/ && $2 == 0 { print $1; exit }')
         if [ -n "$_tmux_detached" ]; then
             tmux attach-session -t "$_tmux_detached" && exit
         else
