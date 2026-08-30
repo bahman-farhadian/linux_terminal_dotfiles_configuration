@@ -1169,17 +1169,15 @@ Expect `p2plink0`.
 #### 3. Create the profile
 
 ```bash
-nmcli con add type ethernet ifname p2plink0 con-name p2p-dionysus \
-  ipv4.method manual ipv4.addresses 192.168.124.2/30 \
-  ipv4.never-default yes ipv6.method disabled
+nmcli con add type ethernet ifname p2plink0 con-name Dionysus ipv4.method manual ipv4.addresses 192.168.124.2/30 ipv4.never-default yes ipv6.method disabled
 ```
 
 ```bash
-nmcli con mod p2p-dionysus connection.autoconnect yes
+nmcli con mod Dionysus connection.autoconnect yes
 ```
 
 ```bash
-nmcli con up p2p-dionysus
+nmcli con up Dionysus
 ```
 
 #### 4. Check it
@@ -1204,7 +1202,7 @@ Needs Dionysus up on the other end.
 
 **Notes**
 
-- Both ends carry the same interface name, `p2plink0`, and the same connection-name pattern. The `.link` file matches on MAC, so each machine renames its own adapter and the two never collide.
+- Both ends carry the same interface name, `p2plink0`, and the same connection name, `Dionysus` — the link is called the same thing from either side. The `.link` file matches on MAC, so each machine renames its own adapter, and connection names are local to a host, so nothing collides.
 - `p2plink0` is chosen to be a name nothing else generates. The kernel produces `en*`, `wl*` and `ww*`; `wpa_supplicant` produces `p2p0` and `p2p-dev-*` for Wi-Fi Direct, which matters here because this machine has Wi-Fi. Both `eth0` and `p2p0` are avoided for that reason.
 - Rename first, create the profile second. A profile bound to the `enx` name stops matching the moment the rename takes effect.
 - No gateway and no DNS on this profile. `ipv4.never-default yes` states the same thing a second way, so a later edit that adds a gateway by accident cannot take the default route away from the interface that actually reaches the internet.
