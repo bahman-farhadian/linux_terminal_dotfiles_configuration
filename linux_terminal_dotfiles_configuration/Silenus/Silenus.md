@@ -1328,3 +1328,4 @@ expected, so it points at the step to redo.
 - It exits `0` when everything passes and `1` otherwise.
 - `nested conf` reports `not needed` when the kernel already has nested virtualisation on. That is a pass, not a gap.
 - The Claude Code key check is pinned to the fingerprint published for the release key. If Anthropic rotates it, this fails on purpose and the new key needs checking by hand.
+- **Step 11 is the one step this does not check.** Visual Studio Code is not in the Debian archive and this guide does not install it, so the extension list is a suggestion rather than part of the build. `code --list-extensions` is the check, if you want one. Every other step in this document has at least one assertion here.

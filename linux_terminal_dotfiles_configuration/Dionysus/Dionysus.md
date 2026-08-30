@@ -1705,3 +1705,4 @@ expected, so it points at the step to redo.
 - It exits `0` when everything passes and `1` otherwise.
 - This is `Dionysus/check.sh`, not Silenus's. It asserts this host's disk sizes, both interfaces including the `p2plink0` rename, `static_network_32`, the GPU binding, and that no desktop and no Claude Code are installed. Silenus's would fail on almost all of it, and vice versa.
 - The GPU checks fail until Step 9 has been through the reboot in Step 12. That is the expected order, not a fault.
+- Every step from 1 to 11 has at least one assertion here, under a heading naming it. Steps 12 and 13 have none by design: Step 12 is itself a verification pass, and Step 13 is this script.
