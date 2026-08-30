@@ -249,9 +249,14 @@ the work survives the drop — which is the reason for running tmux over SSH at
 all. Numbers are reused as sessions end, so they stay low rather than climbing
 forever.
 
-It also skips when `$TERM` is already `tmux-*` or `screen-*`. `sudo -i` and
-`su -` scrub `$TMUX` but keep `$TERM`, so without that check they would start a
-second tmux inside the pane you are already in.
+It skips when the shell is already inside tmux on this machine. `$TMUX` says so
+directly; `sudo -i` and `su -` scrub it, so the check walks up the process tree
+as well, which those commands cannot change.
+
+`$TERM` is deliberately not used for this. `ssh` carries the client's `TERM`
+across, so a login from a tmux window on another machine arrives reading
+`tmux-256color` with no tmux running on the far end — and a test on `$TERM`
+then skips exactly the sessions it exists to serve.
 
 To open a terminal without tmux:
 

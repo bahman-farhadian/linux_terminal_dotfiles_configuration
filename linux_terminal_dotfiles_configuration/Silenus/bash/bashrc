@@ -20,10 +20,27 @@ esac
 # detached ssh session rather than opening yet another, so the work survives a
 # lost link — which is the reason for running tmux over SSH in the first place.
 #
-# sudo -i and su - scrub the environment, so $TMUX is gone even though the
-# shell is still inside a tmux pane. $TERM survives and reads tmux-256color
-# there, so it is the reliable test for "already multiplexed".
-case "$TERM" in tmux*|screen*) _in_mux=1 ;; *) _in_mux="" ;; esac
+# "Am I already inside tmux, on this machine?" $TMUX answers it outright, but
+# sudo -i and su - scrub the environment, so a shell that really is in a pane
+# can arrive with it unset. Walking up the process tree answers it anyway:
+# those commands change the environment, not who the parent is.
+#
+# $TERM is no help and was actively wrong here. ssh carries the client's TERM
+# across, so a login from a tmux window on another machine arrives reading
+# tmux-256color with no tmux running on this one — and a test on $TERM then
+# skips every SSH session it exists to serve.
+_in_mux=""
+if [ -n "$TMUX" ]; then
+    _in_mux=1
+else
+    _p=$PPID
+    while [ "${_p:-0}" -gt 1 ]; do
+        read -r _pcomm < "/proc/$_p/comm" 2>/dev/null || break
+        case "$_pcomm" in tmux*) _in_mux=1; break ;; esac
+        _p=$(awk '/^PPid:/{print $2}' "/proc/$_p/status" 2>/dev/null)
+    done
+    unset _p _pcomm
+fi
 if [ -z "$TMUX" ] && [ -z "$_in_mux" ] && [ -z "$NO_AUTO_TMUX" ] && command -v tmux &>/dev/null; then
     if [ -n "$SSH_CONNECTION" ]; then
         _tmux_orphan=$(tmux list-sessions -F '#{session_name} #{session_attached}' 2>/dev/null \
