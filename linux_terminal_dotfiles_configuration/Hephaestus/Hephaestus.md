@@ -529,7 +529,13 @@ exec bash
 - It writes `/etc/ssh/sshd_config.d/99-local.conf` so root can only reach SSH with a key, never a password. **On this host, open a second session and confirm it works before closing the first.** It is at another site and reached over WiFi; there is no console to fall back on.
 - Every SSH login lands in its own tmux session, `ssh1`, `ssh2` and so on, for whichever account is connecting. Two windows onto this host do not mirror each other. Reconnecting after a dropped link attaches to the session left behind rather than opening another, so work survives the drop — which matters on a host reached only over the network.
 - `.bashrc` adds `/usr/local/sbin`, `/usr/sbin` and `/sbin` to your PATH, so `sysctl`, `swapon` and `iptables` resolve for a non-root user.
+- Check it with `command -v sysctl`. It must print `/usr/sbin/sysctl`. If it prints nothing, the shell has not been reloaded yet.
+- A command typed with a leading space is not written to the history file. Use it for anything carrying a password or a token. One space is enough.
+- History is written at every prompt, not only when the shell exits. A tmux pane that is killed rather than closed keeps everything typed in it.
+- It also writes `/etc/profile.d/99-history.sh` so both rules apply to every account, not only yours.
+- `cpy` falls back to plain `tee` when there is no display, so it prints and copies nothing here rather than failing.
 - `Hephaestus/bash/bash_aliases` drops the `DE`, `EN` and `kbd` aliases. They call `gsettings` against the GNOME input-source schema, which does not exist on this host.
+- `README.md` at the top of the repository covers the prompt, the tmux keys, and what changes.
 
 ### Step 7 — KVM and libvirt
 
@@ -922,9 +928,10 @@ both up:
 ping -c4 192.168.124.6
 ```
 
-Whatever the installed system had on this interface before — a bridge named
-`br`, holding `192.168.48.2/30` — is replaced. Delete the old profiles first if
-they are still listed:
+After a clean install there is nothing else on this interface and the next two
+commands print nothing to delete. They matter only when reconfiguring the
+existing system in place, which had a bridge named `br` on `eno1` holding
+`192.168.48.2/30`. Check before deleting:
 
 ```bash
 nmcli connection show

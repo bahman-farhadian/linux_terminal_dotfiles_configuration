@@ -1120,11 +1120,15 @@ anything falls outside the alphabet.
 - `--status` reads the settings back. If it disagrees with `--list`, the write failed rather than the sort being wrong.
 - To undo it completely: `gsettings reset org.gnome.desktop.app-folders folder-children` followed by `gsettings reset org.gnome.shell app-picker-layout`.
 
-### Step 13 — Point-to-point link to Dionysus
+### Step 13 — Point-to-point links to Dionysus and Hephaestus
 
-A cable between this laptop and Dionysus, carrying traffic between the two
-machines and nothing else. It runs from an external USB NIC at Dionysus's end
-into this laptop's onboard RJ45, so the two ends sit on different hardware. Dionysus takes `192.168.124.1/30`; this end takes `192.168.124.2/30`.
+A cable between this laptop and one other machine, carrying traffic between the
+two and nothing else. There are two of them — Dionysus at home, Hephaestus at
+work — and they share this laptop's single onboard RJ45, so only one is up at a
+time. Sub-steps 1 to 3 build the link to Dionysus, which runs from an external
+USB NIC at Dionysus's end into this laptop's onboard socket, so the two ends sit
+on different hardware; Dionysus takes `192.168.124.1/30` and this end takes
+`192.168.124.2/30`. Sub-step 4 adds the second profile, for Hephaestus.
 Plug the cable in before starting: the profile binds to an interface name, and
 sub-step 1 reads which.
 
