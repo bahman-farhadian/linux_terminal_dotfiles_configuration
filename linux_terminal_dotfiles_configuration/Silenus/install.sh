@@ -510,6 +510,12 @@ if command -v gsettings >/dev/null 2>&1; then
 
     # Alt+Tab cycles windows rather than applications. The application switcher
     # holds Alt+Tab by default, so it has to be cleared or it wins.
+    # Volume keys move in 1% steps rather than GNOME's default. This has to come
+    # after the reset-recursively above, which puts every media-keys setting —
+    # this one included — back to its default.
+    gsettings set org.gnome.settings-daemon.plugins.media-keys volume-step 1
+    _ok "volume keys step by 1%"
+
     _wm=org.gnome.desktop.wm.keybindings
     gsettings set "$_wm" switch-applications          "[]"
     gsettings set "$_wm" switch-applications-backward "[]"

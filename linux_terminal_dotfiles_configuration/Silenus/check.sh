@@ -153,6 +153,7 @@ ck "3 registered"  "$(gsettings get org.gnome.settings-daemon.plugins.media-keys
 ck "alt-tab"       "$(gsettings get $w switch-windows)" "['<Alt>Tab']"
 ck "shift+alt-tab" "$(gsettings get $w switch-windows-backward)" "['<Shift><Alt>Tab']"
 ck "app switcher off" "$(gsettings get $w switch-applications)" "@as []"
+ck "volume step"   "$(gsettings get org.gnome.settings-daemon.plugins.media-keys volume-step)" "1"
 ok "app folders"   "$(gsettings get org.gnome.desktop.app-folders folder-children 2>/dev/null|cut -c1-40)"
 
 printf '\n--- Step 7: ssh server ---\n'

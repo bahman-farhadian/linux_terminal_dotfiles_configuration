@@ -334,10 +334,14 @@ your login, so none of it applies to a root shell.
 | `Super+I` | Settings |
 | `Alt+Tab` | switch windows |
 | `Shift+Alt+Tab` | switch windows, backwards |
+| volume keys | move in 1% steps, not GNOME's default |
 
 `Alt+Tab` normally switches *applications*, grouping every window of one
 program behind a single icon. Moving it to `switch-windows` gives one entry per
 window. The application switcher has to be cleared first, or it keeps the key.
+
+`volume-step` lives in the same `media-keys` schema that is reset just before
+these are written, so it has to be set after the reset or the reset undoes it.
 
 Both schemas are reset to GNOME's defaults before these are applied, so the
 result never depends on what was bound previously. Anything you bound by hand
