@@ -1341,37 +1341,84 @@ and most builds never need it.
 sudo apt install -y iptables-persistent
 ```
 
-#### 4. Add the required rules
+Needed for the optional rule in sub-step 6. The required rules do not use it,
+for the reason the next sub-step gives.
 
-Every RFC 1918 range may open connections into the guest network. Safe to run
-again: each rule is checked before it is inserted, and the two narrower rules an
-earlier version of this step used are removed if they are still there.
+#### 4. Add the required rules, as a service
 
-```bash
-sudo iptables -D FORWARD -s 192.168.8.2/32 -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null || true
-sudo iptables -D FORWARD -s 192.168.124.2/32 -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null || true
-for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do sudo iptables -C FORWARD -s "$net" -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null || sudo iptables -I FORWARD -s "$net" -d 192.168.32.0/24 -o virbr1 -j ACCEPT; done
-sudo netfilter-persistent save
-```
+The rules have to sit **above** the jump to `LIBVIRT_FWI`, whose last rule is
+`-o virbr1 -j REJECT`. `REJECT` terminates, so a rule below that jump is never
+reached however correct it looks.
 
-#### 5. Test that the required rules are there
+Position cannot be saved and restored. `libvirtd` inserts its jumps at the head
+of `FORWARD` every time it starts, so whatever order a saved ruleset had, a
+`libvirtd` restart — or a reboot — puts libvirt's chains back on top. A saved
+copy of these rules would come back permanently underneath the `REJECT`.
 
-```bash
-for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do sudo iptables -C FORWARD -s "$net" -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null && printf '  PASS  %s\n' "$net" || printf '  FAIL  %s\n' "$net"; done
-```
-
-Three `PASS` lines. Then check they were written to disk, so they come back
-after a reboot:
+So they are re-applied by a unit ordered after both daemons instead:
 
 ```bash
-grep -c 'd 192.168.32.0/24 -o virbr1 -j ACCEPT' /etc/iptables/rules.v4
+sudo tee /usr/local/sbin/guest-net-access >/dev/null <<'EOF'
+#!/bin/sh
+# Let private networks open connections into the libvirt guest network.
+#
+# These must precede the jump to LIBVIRT_FWI, whose final rule rejects anything
+# inbound to virbr1 that conntrack does not already know. libvirtd re-inserts
+# its own jumps at the head of FORWARD on every start, so this deletes and
+# re-inserts rather than assuming a position it once had.
+set -e
+for net in 192.168.0.0/16 172.16.0.0/12 10.0.0.0/8; do
+    iptables -D FORWARD -s "$net" -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null || true
+done
+for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+    iptables -I FORWARD 1 -s "$net" -d 192.168.32.0/24 -o virbr1 -j ACCEPT
+done
+EOF
+sudo chmod +x /usr/local/sbin/guest-net-access
+sudo tee /etc/systemd/system/guest-net-access.service >/dev/null <<'EOF'
+[Unit]
+Description=Allow private networks into the libvirt guest network
+After=libvirtd.service docker.service
+Wants=libvirtd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/guest-net-access
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now guest-net-access.service
 ```
 
-Expect `3`.
+#### 5. Test the rules, and their position
 
-**This tests the rules, not reachability.** Pinging a guest address proves
-nothing while no guest holds that address — the ping would fail with a perfect
-ruleset. The reachability test belongs in Step 12, once a guest exists.
+```bash
+sudo iptables -S FORWARD
+```
+
+The three `ACCEPT` rules must come out **before** `-j LIBVIRT_FWI`. Read it, then
+have the shell decide:
+
+```bash
+ours=$(sudo iptables -S FORWARD | grep -n 'd 192.168.32.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1); libv=$(sudo iptables -S FORWARD | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1); if [ -n "$ours" ] && [ -n "$libv" ] && [ "$ours" -lt "$libv" ]; then echo "  PASS  rules precede LIBVIRT_FWI ($ours < $libv)"; else echo "  FAIL  ours=$ours libvirt=$libv"; fi
+```
+
+```bash
+systemctl is-enabled guest-net-access.service
+```
+
+Expect `enabled`, so it runs again on the next boot.
+
+**Existence is not enough, and that is the whole point of this test.**
+`iptables -C` finds a rule wherever it sits and reports success, including from
+below the `REJECT` that stops the packet. Only the position tells you whether
+the rule does anything.
+
+**This still tests the rules, not reachability.** Pinging a guest address proves
+nothing while no guest holds that address. Reachability is tested in Step 12.
 
 #### 6. Optional — publish a guest service to the LAN
 
@@ -1389,10 +1436,12 @@ sudo netfilter-persistent save
 - The required rule names the three RFC 1918 ranges rather than one machine, so anything on a private network that has a route to `192.168.32.0/24` can reach a guest. That is a deliberate widening from an earlier version, which named Silenus's two addresses and nothing else.
 - A route is still needed at the other end. These rules permit the traffic; they do not tell any machine how to get here. Silenus.md Step 13 adds the routes; a host without one never sends the packets at all.
 - `172.16.0.0/12` includes `172.17.0.0/16`, which is `docker0` on this machine, so containers can reach guests too. Drop that range if you would rather they could not.
-- `-I` inserts at the head of `FORWARD`, ahead of the jumps into libvirt's and Docker's chains. That position is what makes the rules take effect; appended with `-A` they would sit after `LIBVIRT_FWI` has already rejected the packet.
+- `-I FORWARD 1` inserts at the head. That position is the whole thing: appended with `-A`, or inserted before `libvirtd` next starts, the rules end up after `LIBVIRT_FWI` has already rejected the packet, and every existence check still passes.
+- `netfilter-persistent` cannot hold this. It restores a ruleset at boot, and `libvirtd` starts afterwards and inserts its jumps on top — so the required rules would come back permanently below the `REJECT`. A unit ordered `After=libvirtd.service docker.service` runs once both have settled, which is the only point at which the head of `FORWARD` means what it looks like it means.
+- The script deletes before inserting, so running it again — by hand, or at the next boot — leaves three rules rather than six.
 - Return traffic needs no rule. Conntrack matches the replies to the connection that was opened, and libvirt's `MASQUERADE` only applies to traffic a guest itself starts towards something outside its own subnet.
-- `netfilter-persistent save` writes `/etc/iptables/rules.v4`. Without it the rules are lost at the next boot, and sub-step 5 checks the file rather than trusting that `save` exited cleanly.
-- `libvirtd` rewrites its own chains when it restarts. These rules live in `FORWARD` itself, outside those chains, and survive — but their position relative to the jumps is worth re-checking after a `libvirtd` restart rather than assumed.
+- `netfilter-persistent save` is still what carries the optional DNAT in sub-step 6, which sits in the `nat` table and is not subject to this ordering problem.
+- `systemctl restart guest-net-access` puts the rules back at the head after any `libvirtd` restart, which is worth knowing when a `virsh net-destroy`/`net-start` or a package upgrade has moved them.
 - The guest subnet is `192.168.32.0/24` here and `192.168.24.0/24` on Silenus. They differ on purpose: both hosts are reachable from each other, so overlapping guest ranges would make a guest on one indistinguishable from a guest on the other.
 
 ### Step 12 — Reboot and final verification
@@ -1499,11 +1548,17 @@ Step 11's rules have to be back as well — this boot is what proves
 `netfilter-persistent` really restores them:
 
 ```bash
-for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do sudo iptables -C FORWARD -s "$net" -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null && printf '  PASS  %s\n' "$net" || printf '  FAIL  %s\n' "$net"; done
+sudo systemctl is-active guest-net-access.service
 ```
 
-Three `PASS` lines. A `FAIL` here with a `PASS` in Step 11 means the rules were
-added but never saved.
+```bash
+ours=$(sudo iptables -S FORWARD | grep -n 'd 192.168.32.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1); libv=$(sudo iptables -S FORWARD | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1); if [ -n "$ours" ] && [ -n "$libv" ] && [ "$ours" -lt "$libv" ]; then echo "  PASS  rules precede LIBVIRT_FWI ($ours < $libv)"; else echo "  FAIL  ours=$ours libvirt=$libv"; fi
+```
+
+This boot is the only thing that proves the ordering holds. `libvirtd` inserts
+its jumps at the head of `FORWARD` when it starts, and `guest-net-access` runs
+after it to put the three rules back in front. A `FAIL` here means the unit did
+not run, or ran too early.
 
 #### 8. Nested virtualization and quota persisted
 

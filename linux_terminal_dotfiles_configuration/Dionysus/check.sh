@@ -135,7 +135,12 @@ ck "ip_forward"      "$(sysctl -n net.ipv4.ip_forward)" "1"
 for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
   ck "guests reachable from $net" "$(sudo iptables -C FORWARD -s "$net" -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null && echo yes || echo no)" "yes"
 done
-ck "fw rules persisted" "$(grep -c 'd 192.168.32.0/24 -o virbr1 -j ACCEPT' /etc/iptables/rules.v4 2>/dev/null)" "3"
+# Existence is not enough: a rule below the jump to LIBVIRT_FWI, whose last rule
+# rejects anything inbound to virbr1, is never reached and still passes -C.
+_ours=$(sudo iptables -S FORWARD 2>/dev/null | grep -n 'd 192.168.32.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1)
+_libv=$(sudo iptables -S FORWARD 2>/dev/null | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1)
+ck "rules precede LIBVIRT_FWI" "$([ -n "$_ours" ] && [ -n "$_libv" ] && [ "$_ours" -lt "$_libv" ] && echo yes || echo no)" "yes"
+ck "guest-net-access enabled" "$(systemctl is-enabled guest-net-access.service 2>/dev/null)" "enabled"
 ck "ip_forward conf" "$(grep -c 'net.ipv4.ip_forward = 1' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
 ck "gateway reachable" "$(ping -c1 -W2 192.168.8.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
 
