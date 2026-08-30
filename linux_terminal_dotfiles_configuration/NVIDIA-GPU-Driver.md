@@ -1,9 +1,17 @@
-# NVIDIA driver on Debian 13
+# NVIDIA GPU Driver on Debian 13
 
-For any Debian 13 "trixie" machine with an NVIDIA card — a bare-metal server, or
-a virtual machine with one passed through to it. The steps are the same; the two
-places they differ are called out where they arise, and both are about Secure
-Boot, which a server ships with enabled and a VM usually does not.
+For any Debian 13 "trixie" **server** with an NVIDIA graphics card — bare metal,
+or a virtual machine with one passed through. Reached over SSH, with no display
+attached and no desktop installed: nothing here installs an X server, and the
+package that would is named only to say why it is not used.
+
+NVIDIA ships drivers for more than graphics — ConnectX and BlueField networking
+among them, from an entirely separate stack. This is the GPU one: the module
+`nvidia-smi` talks to, and what CUDA runs on.
+
+The steps are the same on metal and in a VM. The two places they differ are
+called out where they arise, and both are about Secure Boot, which a server
+ships with enabled and a VM usually does not.
 
 This document stands alone. Nothing here refers to Silenus, Dionysus or
 Hephaestus, and nothing there refers to this.
@@ -32,20 +40,19 @@ lspci -nnk | grep -i nvidia -A3
 expected state before the proprietary driver is installed, and it is what the
 next steps replace.
 
-## Which set of packages
+## Which packages, and which to avoid
 
-Two different builds, and the choice is about what the machine is for.
+Three packages, and one to leave alone.
 
-| | Headless — compute, containers, CUDA | With a desktop |
+| Package | Section | What it is |
 |---|---|---|
-| Install | `nvidia-kernel-dkms`, `nvidia-smi` | `nvidia-driver` |
-| Pulls in an X server driver | no | yes, `xserver-xorg-video-nvidia` |
-| `nvidia-smi` works | yes | yes |
-| CUDA userspace | add `nvidia-driver-libs` | included |
+| `nvidia-kernel-dkms` | non-free | the kernel module, built by DKMS against the running kernel |
+| `nvidia-smi` | non-free | the tool that reports the card, its memory, its temperature and what is using it |
+| `nvtop` | **main** | a live per-process view of the card — `htop` for the GPU |
+| `nvidia-driver` | non-free | **not used here.** The meta-package most guides name; it depends on `xserver-xorg-video-nvidia` and drags an X stack onto a machine with no display |
 
-`nvidia-driver` is the meta-package most guides name, and on a headless machine
-it drags in the X stack for nothing. Start from the headless column unless the
-machine actually renders something — a server almost never does.
+Add `nvidia-driver-libs` if something on the machine needs the CUDA userspace
+libraries directly rather than through a container.
 
 ## Step 1 — Enable contrib, non-free and non-free-firmware
 
@@ -131,16 +138,8 @@ sudo apt install -y linux-headers-amd64
 
 #### 2. The driver
 
-Headless — compute, containers, CUDA:
-
 ```bash
 sudo apt install -y nvidia-kernel-dkms nvidia-smi nvtop
-```
-
-With a desktop:
-
-```bash
-sudo apt install -y nvidia-driver nvidia-smi nvtop
 ```
 
 #### 3. Watch the build finish
@@ -156,7 +155,7 @@ Expect a line for `nvidia` against your running kernel, ending `installed`.
 
 **Notes**
 
-- `nvidia-smi` is a separate package from the driver and is what reports the card, its memory, its temperature and the processes using it. It is worth installing on a headless machine even though nothing else from the X stack is.
+- `nvidia-smi` is a separate package from the module, which is why it is named explicitly. Installing the module alone leaves a working card and no way to look at it.
 - `nvtop` is in `main`, needs nothing non-free, and gives a live per-process view of GPU use — `htop` for the card. It reads from the driver, so install it after, not instead.
 - With Secure Boot enabled, the install finishes and the module will still not load until Step 4. That is expected at this point, not a failure.
 - `nvidia-detect` names the driver branch a given card needs, which is worth running when the card is older than the packaged driver: `sudo apt install -y nvidia-detect && nvidia-detect`.

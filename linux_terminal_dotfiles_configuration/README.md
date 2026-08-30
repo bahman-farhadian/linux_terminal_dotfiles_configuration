@@ -12,11 +12,11 @@ and Docker host; and [Hephaestus/Hephaestus.md](Hephaestus/Hephaestus.md), a
 second headless KVM host with no GPU, on WiFi with a point-to-point cable to
 the laptop.
 
-Separately, [NVIDIA-driver.md](NVIDIA-driver.md) covers installing the NVIDIA
-driver, `nvidia-smi` and `nvtop` on any Debian 13 machine with a card — a
-bare-metal server, or a VM with one passed through. It includes enrolling a
-Machine Owner Key, which a server with Secure Boot needs and a VM usually does
-not. It stands on its own and refers to no host here.
+Separately, [NVIDIA-GPU-Driver.md](NVIDIA-GPU-Driver.md) covers the NVIDIA
+graphics driver, `nvidia-smi` and `nvtop` on any Debian 13 server with a card —
+bare metal, or a VM with one passed through. SSH-only, no display, no X server.
+It includes enrolling a Machine Owner Key, which a server with Secure Boot needs
+and a VM usually does not. It stands on its own and refers to no host here.
 
 All three follow one outline: Part 1 for the OS install (BIOS, partitioning,
 repositories and quota), Part 2 for the configuration, each step carrying
@@ -94,7 +94,7 @@ it belongs to.
 ```
 linux_terminal_dotfiles_configuration/
 ├── README.md              this file, covering all three hosts
-├── NVIDIA-driver.md       NVIDIA driver on bare metal or a VM
+├── NVIDIA-GPU-Driver.md   GPU driver on a headless server, metal or VM
 ├── Silenus/               ThinkPad T14 Gen 4 (Intel) workstation
 │   ├── bash/
 │   │   ├── bash_profile   → ~/.bash_profile
