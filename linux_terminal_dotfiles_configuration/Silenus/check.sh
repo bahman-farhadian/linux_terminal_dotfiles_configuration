@@ -154,6 +154,16 @@ ck "p2p interface"    "$(nmcli -g connection.interface-name connection show Dion
 ck "p2p address"      "$(nmcli -g ipv4.addresses connection show Dionysus 2>/dev/null)" "192.168.124.2/30"
 ck "p2p never-default" "$(nmcli -g ipv4.never-default connection show Dionysus 2>/dev/null)" "yes"
 ck "guest route cable" "$(nmcli -g ipv4.routes connection show Dionysus 2>/dev/null|grep -c '192.168.32.0/24 192.168.124.1 100')" "1"
+# Everything above reads the stored profile, which proves the configuration
+# survives. This asks the kernel what it would actually do, which is a
+# different question and the one a reboot answers.
+if [ "$(cat /sys/class/net/enp0s31f6/carrier 2>/dev/null)" = "1" ]; then
+  ck "kernel routes via cable" "$(ip -4 route get 192.168.32.10 2>/dev/null|grep -c 'via 192.168.124.1 dev enp0s31f6')" "1"
+  ck "p2p installs no default" "$(ip -4 route show default|grep -c 'dev enp0s31f6')" "0"
+else
+  na "kernel routes via cable" "no cable in enp0s31f6. With it plugged in, ip -4 route get 192.168.32.10 must answer via 192.168.124.1"
+  ck "kernel routes via LAN"  "$(ip -4 route get 192.168.32.10 2>/dev/null|grep -c 'via 192.168.8.3')" "1"
+fi
 ck "guest route fallback" "$(nmcli -t -g NAME connection show|while IFS= read -r c; do nmcli -g ipv4.routes connection show "$c" 2>/dev/null; done|grep -c '192.168.32.0/24 192.168.8.3 200')" "1"
 if nmcli -g connection.id connection show Hephaestus >/dev/null 2>&1; then
   ck "hephaestus profile" "$(nmcli -g connection.id connection show Hephaestus 2>/dev/null)" "Hephaestus"
