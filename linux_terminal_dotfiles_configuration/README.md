@@ -6,9 +6,16 @@ removed.
 
 The repository also carries a Debian 13 build guide per machine, named for the
 host: [Silenus/Silenus.md](Silenus/Silenus.md), the Lenovo ThinkPad T14 Gen 4
-(Intel) GNOME workstation these dotfiles were built on, and
+(Intel) GNOME workstation these dotfiles were built on;
 [Dionysus/Dionysus.md](Dionysus/Dionysus.md), a headless AMD Ryzen 9 3900X KVM
-and Docker host with no desktop environment.
+and Docker host; and [Hephaestus/Hephaestus.md](Hephaestus/Hephaestus.md), a
+second headless host whose guide is still an outline awaiting that machine's
+hardware and address facts.
+
+All three follow one outline: Part 1 for the OS install (BIOS, partitioning,
+repositories and quota), Part 2 for the configuration, each step carrying
+numbered sub-steps and a Notes block. The headless guides drop the steps that
+need a desktop and keep the rest in the same order.
 
 Each host has its own directory holding a complete, self-contained copy of what
 it installs. Deploy by running the installer inside the directory for that
@@ -33,13 +40,17 @@ linux_terminal_dotfiles_configuration/
 │   ├── check.sh
 │   ├── gnome-app-folders.py
 │   └── Silenus.md
-└── Dionysus/              headless Ryzen 9 3900X KVM host
-    ├── bash/              same three files, without the DE/EN/kbd aliases
-    ├── tmux/
-    ├── ssh/
-    ├── hushlogin
-    ├── install.sh         bash, tmux, ssh only — no GNOME
-    └── Dionysus.md
+├── Dionysus/              headless Ryzen 9 3900X KVM host
+│   ├── bash/              same three files, without the DE/EN/kbd aliases
+│   ├── tmux/
+│   ├── ssh/
+│   ├── hushlogin
+│   ├── install.sh         bash, tmux, ssh only — no GNOME
+│   └── Dionysus.md
+└── Hephaestus/            second headless host — outline only so far
+    ├── bash/  tmux/  ssh/  hushlogin
+    ├── install.sh         identical to Dionysus/install.sh
+    └── Hephaestus.md
 ```
 
 ## Prerequisites
@@ -51,7 +62,7 @@ sudo apt install tmux vim git curl jq tree python3 openssl bash-completion xclip
 ## Deploy
 
 ```bash
-cd Silenus     # or: cd Dionysus
+cd Silenus     # or: cd Dionysus, cd Hephaestus
 ./install.sh
 ```
 
