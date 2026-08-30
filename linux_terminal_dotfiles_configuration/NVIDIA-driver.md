@@ -34,7 +34,7 @@ next steps replace.
 
 ## Which set of packages
 
-Two different builds, and the choice is about what the guest is for.
+Two different builds, and the choice is about what the machine is for.
 
 | | Headless — compute, containers, CUDA | With a desktop |
 |---|---|---|
