@@ -121,7 +121,11 @@ hf "vfio.conf"       /etc/modprobe.d/vfio.conf
 hf "gpu blacklist"   /etc/modprobe.d/blacklist-gpu.conf
 
 printf '\n--- Step 10: networking ---\n'
-ck "lan address"     "$(ip -4 -br addr show enp4s0 2>/dev/null|awk '{print $3}')" "192.168.8.3/24"
+ck "wan profile"     "$(nmcli -g connection.id connection show wan 2>/dev/null)" "wan"
+ck "wan interface"   "$(nmcli -g connection.interface-name connection show wan 2>/dev/null)" "enp4s0"
+ck "wan address"     "$(ip -4 -br addr show enp4s0 2>/dev/null|awk '{print $3}')" "192.168.8.3/24"
+ck "p2p profile"     "$(nmcli -g connection.id connection show Dionysus 2>/dev/null)" "Dionysus"
+ck "p2p never-default" "$(nmcli -g ipv4.never-default connection show Dionysus 2>/dev/null)" "yes"
 ck "p2p renamed"     "$([ -e /sys/class/net/p2plink0 ] && echo yes || echo no)" "yes"
 ck "p2p address"     "$(ip -4 -br addr show p2plink0 2>/dev/null|awk '{print $3}')" "192.168.124.1/30"
 hf "rename .link"    /etc/systemd/network/10-p2plink0.link
