@@ -722,21 +722,39 @@ groups
 
 Expect `libvirt` and `kvm` in the list.
 
-#### 10. Start the default network
+#### 10. Remove the default network
 
-It is defined by the package but left stopped, and it does not start at boot
-until told to. Virtual machines on the default network have no connectivity
-without it.
+`libvirtd` defines a `default` NAT network on `192.168.122.0/24`, with its own
+DHCP server, when the package is installed. This host uses one network only, so
+`default` is removed rather than left stopped.
 
 ```bash
-virsh -c qemu:///system net-autostart default
+virsh -c qemu:///system net-destroy default
 ```
 
 ```bash
-virsh -c qemu:///system net-start default
+virsh -c qemu:///system net-undefine default
 ```
 
-#### 11. Verify as your own user
+#### 11. Define the one network this host uses
+
+`static_network_24` — NAT on `192.168.24.0/24`, no DHCP, guests configured
+statically. The definition is `kvm/static_network_24.xml` in this repository,
+and its comment block carries the address plan.
+
+```bash
+virsh -c qemu:///system net-define kvm/static_network_24.xml
+```
+
+```bash
+virsh -c qemu:///system net-start static_network_24
+```
+
+```bash
+virsh -c qemu:///system net-autostart static_network_24
+```
+
+#### 12. Verify as your own user
 
 ```bash
 virsh -c qemu:///system list --all
@@ -746,8 +764,14 @@ virsh -c qemu:///system list --all
 virsh -c qemu:///system net-list --all
 ```
 
-Both must run without a permission error. `default` must show `active` and
-`Autostart yes`.
+Both must run without a permission error. `static_network_24` must show
+`active` with `Autostart yes`, and `default` must not be listed at all.
+
+```bash
+ip -br addr show virbr1
+```
+
+Expect `192.168.24.1/24`. `virbr0` belonged to `default` and should be gone.
 
 **Notes**
 
@@ -761,6 +785,11 @@ Both must run without a permission error. `default` must show `active` and
 - `osinfo-db` comes from the Debian archive and is refreshed by `apt upgrade`. Do not use `osinfo-db-import --latest`; it fetches from a third-party host.
 - `/etc/security/limits.d` applies to login sessions, not to systemd services. If libvirtd itself needs a higher limit, add a `LimitNOFILE` drop-in under `/etc/systemd/system/libvirtd.service.d/`.
 - libvirt raises `net.ipv4.ip_forward` itself for its NAT network, but setting it here makes it explicit and survives for bridged or routed setups.
+- Run `net-define` from the repository directory, or give the file an absolute path. libvirt reads the file at define time and stores a copy of its own, so the repository file is not consulted again afterwards; editing it later means running `net-define` again.
+- Guests get no address by themselves. With no `<dhcp>` section there is nothing handing them one, so each guest is configured by hand: address in `192.168.24.2`–`192.168.24.254`, netmask `255.255.255.0`, gateway `192.168.24.1`, DNS of your choosing. A guest left on DHCP simply comes up with no address.
+- Sub-step 10 is the one part of this step that errors on a second run: `net-destroy` reports the network is not active and `net-undefine` that it does not exist. Both are harmless and mean the work is already done. `net-define` is safe to repeat — it replaces the stored definition — and `net-start` errors the same harmless way once the network is running.
+- The bridge is `virbr1`, not `virbr0`. `virbr0` was `default`'s and disappears with it. Nothing else on this host claims `virbr1`, and the name is fixed in the XML rather than left to libvirt so it stays predictable across rebuilds.
+- NAT means guests reach the outside and the outside cannot reach them. Exposing a guest service needs an explicit port forward on the host.
 
 ### Step 9 — Docker
 
