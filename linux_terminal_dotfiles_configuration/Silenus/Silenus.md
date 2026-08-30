@@ -1289,6 +1289,16 @@ nmcli con mod Hephaestus connection.autoconnect no
 nmcli con mod Hephaestus +ipv4.routes "192.168.40.0/24 192.168.124.5 100"
 ```
 
+The cable is first choice. The fallback is the work WiFi, and it goes on that
+profile rather than this one — replace `<work-wifi-profile>` with its name:
+
+```bash
+nmcli con mod <work-wifi-profile> +ipv4.routes "192.168.40.0/24 192.168.88.212 200"
+```
+
+That route belongs there and nowhere else, for a reason worth knowing before
+trying it anywhere else — see the notes.
+
 `Dionysus` keeps `autoconnect yes` and comes up on its own at home. `Hephaestus`
 is brought up by hand on arrival, which takes the port from `Dionysus`:
 
@@ -1346,7 +1356,10 @@ Needs Dionysus up on the other end.
 - This is a second route to Dionysus when its LAN side is broken, which is worth having before reconfiguring that machine's management interface.
 - Two point-to-point links share this one port, because the laptop has only one spare ethernet socket and is never at both sites at once. Neither can autoconnect blindly: with a `/30` there is no way to tell from carrier alone which peer is on the far end, so `Dionysus` autoconnects for the common case and `Hephaestus` is a deliberate `nmcli con up` on arrival. Activating either releases the port from the other.
 - The two subnets are adjacent `/30`s out of the same `/29`: `192.168.124.0/30` for Dionysus, hosts `.1` and `.2`, and `192.168.124.4/30` for Hephaestus, hosts `.5` and `.6`. One range covers every point-to-point link in the estate with no two colliding.
-- Hephaestus's guests get a route the same way Dionysus's do, `192.168.40.0/24` via `192.168.124.5`, but no LAN fallback: that machine is at another site and unreachable from here when the cable is out.
+- Hephaestus's guests are reached by cable first, `192.168.40.0/24` via `192.168.124.5` at metric 100, and by the work LAN second, via `192.168.88.212` at metric 200. Same shape as Dionysus, different second hop.
+- **The fallback works on the work WiFi and cannot work over the VPN, and that is a property of Linux routing rather than a configuration mistake.** A next hop has to be directly reachable. On the work WiFi, `192.168.88.212` is on-link and the route installs. Over the office VPN the table reads `192.168.88.0/24 via 192.168.88.1 dev tun1` — the address is behind a gateway, so `ip route add ... via 192.168.88.212` is refused outright with `Nexthop has invalid gateway`.
+- Nor would forcing it help. A packet for `192.168.40.0/24` entering the tunnel arrives at the office router, which drops it unless *that* router has been told to send the range to `192.168.88.212`. Reaching those guests from home is a change on the office side, not on this laptop.
+- **`sshuttle` is the way round it, and it is already installed.** `sshuttle -r hephaestus 192.168.40.0/24` carries the range over an existing SSH session with no route on either side, which is exactly the case the VPN cannot cover.
 - Both routes are permanent, and NetworkManager withdraws a connection's routes when that connection goes down. Unplugging the cable therefore removes the metric-100 route on its own and the metric-200 one takes over, with no manual step. Plugging it back restores the preference.
 - The metrics are what express "prefer the cable". Same destination, two next hops, lower metric wins. `ip -4 route get 192.168.32.10` is the way to ask the kernel which it would actually use, rather than reading the table and inferring.
 - **The route alone does not make guests reachable.** A libvirt NAT network permits outbound traffic and `RELATED,ESTABLISHED` return traffic; a connection opened from outside into `192.168.32.0/24` is not in either category and is dropped on Dionysus. Dionysus.md Step 11 carries the forwarding rule that allows it. Test with `ping` to a guest, not by reading the routing table.
