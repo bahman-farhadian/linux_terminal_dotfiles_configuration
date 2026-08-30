@@ -122,6 +122,8 @@ ck "both functions"  "$(lspci -nn|grep -ci nvidia)" "2"
 ck "vfio bound"      "$(lspci -nnk|grep -A3 -i nvidia|grep -c 'Kernel driver in use: vfio-pci')" "2"
 hf "vfio.conf"       /etc/modprobe.d/vfio.conf
 hf "gpu blacklist"   /etc/modprobe.d/blacklist-gpu.conf
+ck "vfio ids set"    "$(grep -c '^options vfio-pci ids=[0-9a-f]' /etc/modprobe.d/vfio.conf 2>/dev/null)" "1"
+ck "vfio in initramfs" "$(grep -c '^vfio' /etc/initramfs-tools/modules 2>/dev/null)" "4"
 
 printf '\n--- Step 10: networking ---\n'
 ck "wan profile"     "$(nmcli -g connection.id connection show wan 2>/dev/null)" "wan"
@@ -144,6 +146,10 @@ _ours=$(sudo iptables -S FORWARD 2>/dev/null | grep -n 'd 192.168.32.0/24 -o vir
 _libv=$(sudo iptables -S FORWARD 2>/dev/null | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1)
 ck "rules precede LIBVIRT_FWI" "$([ -n "$_ours" ] && [ -n "$_libv" ] && [ "$_ours" -lt "$_libv" ] && echo yes || echo no)" "yes"
 ck "guest-net-access enabled" "$(systemctl is-enabled guest-net-access.service 2>/dev/null)" "enabled"
+ck "guest-net-access active"  "$(systemctl is-active guest-net-access.service 2>/dev/null)" "active"
+hf "guest-net-access script"  /usr/local/sbin/guest-net-access
+hf "guest-net-access unit"    /etc/systemd/system/guest-net-access.service
+ck "unit follows libvirtd"    "$(systemctl show -p PartOf --value guest-net-access.service 2>/dev/null|grep -c libvirtd)" "1"
 ck "ip_forward conf" "$(grep -c 'net.ipv4.ip_forward = 1' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
 ck "gateway reachable" "$(ping -c1 -W2 192.168.8.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
 
