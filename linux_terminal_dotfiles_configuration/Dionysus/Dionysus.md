@@ -1202,6 +1202,10 @@ NetworkManager with `[ifupdown] managed=false`, so it will not touch an
 interface defined there: `nmcli con up wan` fails with the device reported
 `unmanaged` until that stanza is gone.
 
+**Run this from the console, in a `tmux` session.** It takes `enp4s0` down and
+back up, so a shell reached over that interface goes with it. In a pane on the
+physical console the shell survives and the whole block runs to the end.
+
 See what the installer wrote:
 
 ```bash
@@ -1212,56 +1216,30 @@ cat /etc/network/interfaces
 ls /etc/network/interfaces.d/
 ```
 
-Back it up and write the handover as a script, so it runs as one piece:
+Then, as one block:
 
 ```bash
 cp /etc/network/interfaces /root/interfaces.bak
-```
-
-```bash
-cat > /root/lan-handover.sh <<'EOF'
-#!/bin/sh
-# Hand enp4s0 from ifupdown to NetworkManager, then activate the profile.
-set -e
 printf 'source /etc/network/interfaces.d/*\n\nauto lo\niface lo inet loopback\n' > /etc/network/interfaces
 grep -rl enp4s0 /etc/network/interfaces.d/ 2>/dev/null | xargs -r rm -f
 systemctl restart NetworkManager
 sleep 5
+nmcli con up Dionysus
 nmcli con up wan
-EOF
 ```
 
-```bash
-chmod +x /root/lan-handover.sh
-```
-
-Arm a rollback **before** running it. If you cannot get back in, this restores
-the old configuration and reboots into it after ten minutes:
-
-```bash
-systemd-run --on-active=10min --unit=net-rollback /bin/sh -c 'cp /root/interfaces.bak /etc/network/interfaces; systemctl disable --now NetworkManager; reboot'
-```
-
-Now run the handover detached from your login session:
-
-```bash
-systemd-run --unit=lan-handover --collect /root/lan-handover.sh
-```
-
-The session will drop. Wait about fifteen seconds and reconnect.
-
-#### 8. Confirm, then cancel the rollback
+#### 8. Confirm
 
 ```bash
 nmcli device status
 ```
 
 Expect `enp4s0` `connected` on `wan`, and `p2plink0` `connected` on
-`Dionysus`. `unmanaged` against `enp4s0` means an ifupdown definition is
-still in place somewhere under `interfaces.d/`.
+`Dionysus`.  `unmanaged` against `enp4s0` means an ifupdown definition is still
+in place somewhere under `interfaces.d/`.
 
 ```bash
-ip -br addr show enp4s0 p2plink0
+ip -br addr show | grep -E 'enp4s0|p2plink0'
 ```
 
 ```bash
@@ -1274,17 +1252,8 @@ Exactly one default route, via `192.168.8.1` on `enp4s0`.
 ping -c4 192.168.8.1
 ```
 
-Only once all of that is right:
-
-```bash
-systemctl stop net-rollback.timer
-```
-
-```bash
-systemctl list-timers net-rollback.timer --all
-```
-
-Nothing listed.
+`/root/interfaces.bak` is the way back if any of that is wrong: copy it over
+`/etc/network/interfaces`, `systemctl disable --now NetworkManager`, reboot.
 
 #### 9. Enable IP forwarding
 
@@ -1321,12 +1290,9 @@ Expect `net.ipv4.ip_forward = 1`.
 - `ipv4.never-default yes` on the point-to-point link is what keeps it from installing a default route. Without a gateway it would not install one anyway, but stating it means a later edit that adds a gateway by accident cannot silently steal the default route from `enp4s0`.
 - A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`-`.3`.
 - `managed=false` is Debian's default, not NetworkManager's own. It exists so that a machine configured through `/etc/network/interfaces` does not have NetworkManager fight it. The consequence here is that removing the stanza is what hands the interface over — installing NetworkManager alone does nothing.
-- The address does not change across the handover: ifupdown and the new profile both hold `192.168.8.3/24`. The interface still goes down and up, so an SSH session over it does not survive.
-- Sub-step 7 is built for doing this over SSH. The handover runs under `systemd-run`, detached from the login session, so the session dropping part-way cannot leave the interface owned by neither ifupdown nor NetworkManager — which is exactly what happens if the commands are pasted one at a time and the connection goes at the wrong moment. As one detached unit it either completes or never starts.
-- `--collect` removes the transient unit once it exits, so a second attempt is not blocked by the first still being listed. `systemctl status lan-handover` shows what it did while it is still there, `journalctl -u lan-handover` afterwards.
-- **Cancel the rollback timer once you are back in.** Forgetting means the machine restores the old configuration and reboots ten minutes after a handover that worked, which looks exactly like an unexplained crash.
-- Ten minutes is a starting point. Raise it to have longer to notice a problem, lower it if you would rather the machine recover quickly while you are watching.
-- The point-to-point link is the better safety net of the two, because it does not depend on the interface being changed. The rollback timer is what covers a host with no second path — Hephaestus, when its turn comes.
+- The address does not change across the handover: ifupdown and the new profile both hold `192.168.8.3/24`. The interface still goes down and up, so a session reached over it does not survive — which is why sub-step 7 says console, in `tmux`.
+- The point-to-point link is the other way back. Bring it up first, as sub-step 6 does, and a machine whose `enp4s0` refuses to come back is still reachable on `192.168.124.1` from Silenus.
+- `ip addr show` takes one device, not a list. `ip -br addr show enp4s0 p2plink0` fails with `either "dev" is duplicate, or "p2plink0" is garbage`; filtering the full listing is the way to see both at once.
 - IPv6 is disabled on both profiles. Nothing in this build uses it, and leaving it on means a second address family to reason about in the firewall.
 - Reaching a guest on `192.168.32.0/24` from Silenus over the point-to-point link needs a route on Silenus pointing at `192.168.124.1`, and forwarding on this host, which sub-step 9 enables. Whether to add that route is not decided here.
 
@@ -1350,7 +1316,36 @@ sudo iptables -L LIBVIRT_FWO -n -v
 
 Expect a MASQUERADE for `192.168.32.0/24` and forwarding rules for `virbr1`.
 
-#### 2. Exposing a guest service, if any
+#### 2. Let Silenus reach the guests
+
+A libvirt NAT network permits guests outbound and lets the replies back. A
+connection opened from outside *into* `192.168.32.0/24` is neither, so it is
+dropped — the routes on Silenus put the packets at Dionysus's door and this is
+what opens it. Needed for both paths, the cable and the LAN:
+
+```bash
+sudo apt install -y iptables-persistent
+```
+
+```bash
+sudo iptables -I FORWARD -s 192.168.124.2 -d 192.168.32.0/24 -o virbr1 -j ACCEPT
+```
+
+```bash
+sudo iptables -I FORWARD -s 192.168.8.2 -d 192.168.32.0/24 -o virbr1 -j ACCEPT
+```
+
+```bash
+sudo netfilter-persistent save
+```
+
+Test it from Silenus, against a guest that is actually running:
+
+```bash
+ping -c3 192.168.32.10
+```
+
+#### 3. Exposing a guest service, if any
 
 Guests reach the outside through NAT. The outside cannot open a connection into
 a guest without an explicit rule. Only if that is needed:
@@ -1373,7 +1368,10 @@ sudo netfilter-persistent save
 
 **Notes**
 
-- Nothing in this step is required for a working build. A host whose guests only make outbound connections needs none of it, and installing `iptables-persistent` before that is true only creates a saved ruleset to keep in step with reality.
+- The two rules name Silenus's two addresses rather than whole subnets, so this opens the guest network to one machine and not to everything on `192.168.8.0/24`. Widen to `-s 192.168.8.0/24` only if you mean to.
+- `-I` inserts at the head of `FORWARD`, ahead of the jump into libvirt's own chains, which is what lets these take effect. Running the sub-step twice inserts a second copy of each; `iptables -L FORWARD -n --line-numbers` shows them and `iptables -D FORWARD <n>` removes one.
+- Return traffic needs no rule. Connection tracking matches the replies to the connection Silenus opened, and libvirt's MASQUERADE only applies to traffic a guest itself starts towards somewhere outside its own subnet.
+- Nothing else in this step is required for a working build. A host whose guests only make outbound connections needs none of it, and installing `iptables-persistent` before that is true only creates a saved ruleset to keep in step with reality.
 - `libvirtd` rewrites its own chains when it restarts. Rules added by hand live outside those chains and survive, but the ordering between them is worth re-checking after a restart rather than assumed.
 - `iptables -A` appends, so running the DNAT sub-step twice adds a second copy of each rule. `netfilter-persistent save` then writes both.
 - The guest subnet is `192.168.32.0/24` here and `192.168.24.0/24` on Silenus. They differ on purpose: both hosts are reachable from each other, so overlapping guest ranges would make a guest on one indistinguishable from a guest on the other.
@@ -1437,7 +1435,7 @@ Expect probe and bind messages for the GPU's PCI address.
 #### 6. Both interfaces came up on their own
 
 ```bash
-ip -br addr show enp4s0 p2plink0
+ip -br addr show | grep -E 'enp4s0|p2plink0'
 ```
 
 Expect `192.168.8.3/24` and `192.168.124.1/30`.
