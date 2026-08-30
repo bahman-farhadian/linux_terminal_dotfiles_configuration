@@ -50,9 +50,9 @@ ASUS ROG STRIX B450-F GAMING, BIOS 5502.
 - The GTX 1080 is Pascal and does not implement Resizable BAR, so `Auto` changes nothing for it. `Above 4G Decoding` is the one of the pair that matters here: it is what lets the card's BARs be mapped above the 4 GB boundary, which passthrough needs.
 - Turning the 3rd party CA on may switch `Secure Boot Mode` from `Standard` to `Custom`. That is expected. Custom only means the key set is no longer the factory default; Secure Boot still checks every signature.
 - Never use `Reset to Setup Mode` or `Clear All Secure Boot Keys`. They cause the failure above and Debian does not need them.
-- Secure Boot does not conflict with GPU passthrough. `vfio-pci` ships inside Debian's signed kernel, so binding the card in Step 8 is unaffected. What Secure Boot blocks is loading an *unsigned out-of-tree* module — the proprietary NVIDIA driver on the host being the usual one, which this build blacklists anyway.
+- Secure Boot does not conflict with GPU passthrough. `vfio-pci` ships inside Debian's signed kernel, so binding the card in Step 9 is unaffected. What Secure Boot blocks is loading an *unsigned out-of-tree* module — the proprietary NVIDIA driver on the host being the usual one, which this build blacklists anyway.
 - `SVM` is AMD's name for the virtualization extensions. Without it KVM cannot start a guest at all, and `/proc/cpuinfo` shows no `svm` flag.
-- `IOMMU`, `Above 4G Decoding` and `Resizable BAR` are what make the VFIO groups in Step 8 usable. All three must be set before the OS can see the groups, which is why they are here rather than alongside the passthrough work.
+- `IOMMU`, `Above 4G Decoding` and `Resizable BAR` are what make the VFIO groups in Step 9 usable. All three must be set before the OS can see the groups, which is why they are here rather than alongside the passthrough work.
 - There is no swap anywhere in this build, so the hibernation caveat that applies to Silenus does not arise here.
 
 ### Step 2 — Disk partitioning
@@ -104,8 +104,8 @@ environment task; this host stays headless.
 **Notes**
 
 - The hostname is what makes this machine Dionysus rather than Nyx. The installer writes it to `/etc/hostname` and `/etc/hosts`; nothing later in this document sets it.
-- Without a working network the installer cannot reach the mirror, and Steps 3 to 7 have nothing to install from. `Network autoconfiguration failed` is the expected message on this LAN, not a fault.
-- Configure only the onboard interface here. The USB adapter has no carrier unless the cable to Silenus is plugged in, and Step 9 configures it properly; if the installer offers a choice, pick `enp4s0`.
+- Without a working network the installer cannot reach the mirror, and Steps 3 to 8 have nothing to install from. `Network autoconfiguration failed` is the expected message on this LAN, not a fault.
+- Configure only the onboard interface here. The USB adapter has no carrier unless the cable to Silenus is plugged in, and Step 10 configures it properly; if the installer offers a choice, pick `enp4s0`.
 - The installer counts in GB, `df -h` counts in GiB. The root partition is entered as `34360 MB`, shows as `34.4 GB`, and reports as `32G` once installed. Same partition.
 - For any other size: type `GiB x 1073.741824` MB, rounded. The EFI partition is entered as `1075 MB` rather than the 1074 the formula gives; that is the number Silenus uses for the same partition, and one megabyte over makes no difference.
 - The four partitions on `sda` come to 227 GiB of the 233 GiB the disk reports, leaving about 6 GiB unpartitioned. That free space is SSD over-provisioning, the same reasoning as Silenus: the drive uses it for wear levelling, which keeps write speed up as the disk fills. It is a smaller margin than Silenus keeps — 2.6% against 6.6% — so raise it by taking a few GiB off `/data-root` if this disk is expected to run close to full.
@@ -114,7 +114,7 @@ environment task; this host stays headless.
 - 960 GiB does not fit on `nvme1n1`. The drive is sold as 1 TB, which is 10^12 bytes and therefore 931.5 GiB, so 960 GiB overruns it by 28.5. 888 GiB is the size Silenus uses for its own root partition, and enters as the same `953483 MB`.
 - Sizes on the installed system: `lsblk` reports `1023M`, `2G`, `32G` and `192G` on `sda`, `192G` on `nvme0n1p1` and `888G` on `nvme1n1p1`. The EFI partition reads as `1023M` rather than `1G` because the entered `1075 MB` is decimal; `df -h` reports it smaller still, about `1022M`, because the FAT filesystem uses a little of it. All correct.
 - `sda4` mounts at `/data-root` first and the two NVMe partitions mount as nested points beneath it. The installer creates the parent directory and orders the mounts itself, so no separate top-level mountpoints are needed.
-- OS install ISOs live on the SATA SSD under `/data-root/isos`, referenced by the functional tests in Step 11.
+- OS install ISOs live on the SATA SSD under `/data-root/isos`, referenced by the functional tests in Step 12.
 - No swap partition. Omit it from the table entirely rather than adding one and disabling it later.
 - The installer warns that no swap space is selected. Continue.
 - XFS project quota (`pquota`/`prjquota`) is the one thing `partman`'s mount-options list does not expose. It is added to `/etc/fstab` after first boot, in Step 3. Formatting and mounting are handled by the installer.
@@ -275,7 +275,7 @@ three XFS entries. Leave every other line alone.
 #### 10. Edit GRUB: IOMMU and the boot console
 
 GPU passthrough needs the IOMMU on the kernel command line. This is the only
-place GRUB is edited: Step 8 stages the rest of the passthrough work but does
+place GRUB is edited: Step 9 stages the rest of the passthrough work but does
 not touch this file again.
 
 ```bash
@@ -389,7 +389,7 @@ dmesg | grep -i 'AMD-Vi'
 ```
 
 Expect the flag on the live command line and AMD-Vi lines in the log. The rest
-of the passthrough chain is checked in Step 11, after Step 8 has staged it.
+of the passthrough chain is checked in Step 12, after Step 9 has staged it.
 
 #### 17. Check the BIOS version
 
@@ -414,7 +414,88 @@ The installation is done.
 
 ## Part 2 — Configuration
 
-### Step 4 — Packages
+### Step 4 — Firmware updates
+
+Everything on this machine that publishes firmware to LVFS can be updated from
+Linux. The motherboard is the exception and is handled separately, in the notes.
+
+#### 1. Become root
+
+```bash
+sudo -i
+```
+
+#### 2. Install fwupd
+
+```bash
+apt install -y fwupd fwupd-amd64-signed
+```
+
+#### 3. Refresh the firmware list
+
+```bash
+fwupdmgr refresh --force
+```
+
+#### 4. See what the machine has
+
+```bash
+fwupdmgr get-devices
+```
+
+#### 5. See what is available
+
+```bash
+fwupdmgr get-updates
+```
+
+#### 6. Apply
+
+```bash
+fwupdmgr update
+```
+
+#### 7. Reboot to apply
+
+```bash
+systemctl reboot
+```
+
+Log back in and become root again before continuing:
+
+```bash
+sudo -i
+```
+
+#### 8. Check nothing is left
+
+```bash
+fwupdmgr get-updates
+```
+
+The last line must read `No updates available`. If it does not, repeat from the
+Apply sub-step.
+
+#### 9. Check Secure Boot survived
+
+```bash
+mokutil --sb-state
+```
+
+Expect `SecureBoot enabled`.
+
+**Notes**
+
+- `fwupd-amd64-signed` holds the Debian-signed EFI file. Without it firmware updates stop working once Secure Boot is on, which it is on this host.
+- Never power off during a firmware update.
+- Firmware is written during the reboot, not by `fwupdmgr update`. Apply, reboot and re-check are one round. Repeat until the check is clean.
+- `Devices with no available firmware updates` and `Devices with the latest available firmware version` both mean nothing to do. Only the last line decides.
+- **This is a desktop board, not a Lenovo laptop, and that changes what to expect.** Lenovo publishes to LVFS, which is why Silenus updates its BIOS this way. ASUS does not generally publish consumer motherboard firmware there, so do not be surprised if the B450-F itself never appears in `get-devices`. Its BIOS is updated from the firmware's own **EZ Flash** utility, with the `.CAP` file on a FAT32 USB stick — the same route that got this board to 5502. Verify against ASUS's own support page rather than assuming either way.
+- The NVMe disks may or may not appear. Samsung consumer drives are largely absent from LVFS; `fwupdmgr get-devices` is the honest answer for this machine, not a list written in advance.
+- The AC-power caveat that applies to Silenus does not apply here. This machine has no battery, so nothing is skipped for want of mains power.
+- A BIOS update resets BIOS settings on many boards, `SVM` and `IOMMU` included. After one, redo Step 1 and re-run the checks in Step 3.
+
+### Step 5 — Packages
 
 #### 1. Become root
 
@@ -430,69 +511,7 @@ sudo -i
 apt install -y bash-completion bridge-utils btop curl git jq lshw make network-manager openssl progress pwgen python3 rsync sshuttle sudo tmux tree unrar vim wget
 ```
 
-#### 3. Install what the Claude Code repository needs
-
-```bash
-apt install -y curl gnupg
-```
-
-#### 4. Create the keyring directory
-
-```bash
-install -m 0755 -d /etc/apt/keyrings
-```
-
-#### 5. Fetch the Claude Code signing key
-
-```bash
-curl -fsSL https://downloads.claude.ai/keys/claude-code.asc -o /etc/apt/keyrings/claude-code.asc
-```
-
-```bash
-chmod a+r /etc/apt/keyrings/claude-code.asc
-```
-
-Read the key before trusting it:
-
-```bash
-gpg --show-keys /etc/apt/keyrings/claude-code.asc
-```
-
-#### 6. Add the repository
-
-```bash
-vim /etc/apt/sources.list.d/claude-code.sources
-```
-
-Put this in it:
-
-```
-Types: deb
-URIs: https://downloads.claude.ai/claude-code/apt/stable
-Suites: stable
-Components: main
-Signed-By: /etc/apt/keyrings/claude-code.asc
-```
-
-```bash
-apt update
-```
-
-#### 7. Install Claude Code
-
-```bash
-apt install -y claude-code
-```
-
-#### 8. Check it
-
-```bash
-apt policy claude-code
-```
-
-The `Installed:` line must show a version, not `(none)`.
-
-#### 9. Check the CPU exposes virtualization
+#### 3. Check the CPU exposes virtualization
 
 ```bash
 grep -Ec '(vmx|svm)' /proc/cpuinfo
@@ -502,22 +521,19 @@ Expect a number above 0. This machine is AMD, so the flag is `svm`.
 
 **Notes**
 
-- Claude Code comes from Anthropic's own repository, not Debian's. The key is fetched separately and `Signed-By` limits it to that one repository.
-- `gpg --show-keys` prints the key before apt is told to trust it. Compare the fingerprint with the one Anthropic publishes.
-- Run `claude` as your own user, not root. Its settings and login live in your home directory, so as root they land in `/root`.
-- The keyring directory and the key fetch are done again in Step 7 for Docker. Both are safe to repeat: the directory is left alone if it exists, and the key file is overwritten with the same content.
 - This is Silenus's package list with everything desktop-only removed: no GNOME, no flatpak, no fonts, no media applications, none of which has anything to talk to on a headless host.
-- `bash-completion`, `python3` and `openssl` are here because `install.sh` in Step 5 checks for them and warns if they are missing.
-- `network-manager` is here because a headless Debian install does not have it. It arrives on a desktop machine as a dependency of `gnome-core`, which is why Silenus has it without ever asking; no task a base install selects pulls it in. Step 9 needs `nmcli`, so it is installed with everything else rather than in the middle of reconfiguring the network.
-- Installing it here changes nothing on its own. Debian ships NetworkManager with `[ifupdown] managed=false`, so it will not touch `enp4s0` while the installer's stanza is still in `/etc/network/interfaces`. Handing that interface over is a deliberate act in Step 9. `tmux`, `vim`, `git`, `curl`, `jq` and `tree` are on the same list and already above.
+- Claude Code is not installed here either, though Silenus has it. It is a developer tool for the machine you work at; a server has no use for it, and its repository and signing key are two more things to keep trusted for no return. Reach this host over SSH from Silenus instead.
+- `bash-completion`, `python3` and `openssl` are here because `install.sh` in Step 6 checks for them and warns if they are missing.
+- `network-manager` is here because a headless Debian install does not have it. It arrives on a desktop machine as a dependency of `gnome-core`, which is why Silenus has it without ever asking; no task a base install selects pulls it in. Step 10 needs `nmcli`, so it is installed with everything else rather than in the middle of reconfiguring the network.
+- Installing it here changes nothing on its own. Debian ships NetworkManager with `[ifupdown] managed=false`, so it will not touch `enp4s0` while the installer's stanza is still in `/etc/network/interfaces`. Handing that interface over is a deliberate act in Step 10. `tmux`, `vim`, `git`, `curl`, `jq` and `tree` are on the same list and already above.
 - `openssh-server` was installed by the Debian installer in Step 2 and is what you are connected over. It is not repeated here.
 - `net-tools` provides `netstat`, `ifconfig` and `route`. They are superseded by `ss` and `ip` from `iproute2`, which is already installed. Add it if the old names are what your muscle memory reaches for.
-- `bridge-utils` supplies `brctl`, used by the verification in Step 9. `ip link` shows the same information; `brctl show` is kept because it prints the bridge-to-member mapping more compactly.
+- `bridge-utils` supplies `brctl`, used by the verification in Step 10. `ip link` shows the same information; `brctl show` is kept because it prints the bridge-to-member mapping more compactly.
 
-### Step 5 — Bash, tmux, and SSH configuration
+### Step 6 — Bash, tmux, and SSH configuration
 
 The bash, tmux, and SSH configuration is in this repository, in this host's own
-directory. Everything it needs was installed in Step 4.
+directory. Everything it needs was installed in Step 5.
 
 #### 1. Get the repository onto this machine
 
@@ -531,7 +547,7 @@ git clone <repository-url> ~/dotfiles
 cd ~/dotfiles/linux_terminal_dotfiles_configuration/Dionysus
 ```
 
-Keep it. `install.sh` needs the directory to re-run, and Step 6 reads
+Keep it. `install.sh` needs the directory to re-run, and Step 7 reads
 `kvm/static_network_32.xml` from it.
 
 #### 2. Leave the root shell
@@ -569,7 +585,7 @@ exec bash
 - `cpy` falls back to plain `tee` when there is no display, so it prints and copies nothing here rather than failing.
 - `README.md` at the top of the repository covers the prompt, the tmux keys, and what changes.
 
-### Step 6 — KVM and libvirt
+### Step 7 — KVM and libvirt
 
 #### 1. Become root
 
@@ -733,7 +749,7 @@ ip -br addr show virbr1
 ```
 
 Expect `192.168.32.1/24`. libvirt creates and owns this bridge, which is why
-Step 9 builds no bridge of its own.
+Step 10 builds no bridge of its own.
 
 #### 9. Leave the root shell
 
@@ -767,9 +783,9 @@ Expect `libvirt` and `kvm` in the list.
 - `/etc/security/limits.d` applies to login sessions, not to systemd services. If `libvirtd` itself needs a higher limit, add a `LimitNOFILE` drop-in under `/etc/systemd/system/libvirtd.service.d/`.
 - `net-define` reads the file at define time and stores a copy of its own, so the repository file is not consulted again afterwards. Editing it later means running `net-define` again.
 - The path is relative to the host directory. Give it an absolute path instead if you would rather not change directory, but do not leave it relative while sitting in `/root`, where the file does not exist.
-- IP forwarding is set in Step 9 alongside the bridges, since that is what needs it.
+- IP forwarding is set in Step 10 alongside the bridges, since that is what needs it.
 
-### Step 7 — Docker
+### Step 8 — Docker
 
 Docker Engine from Docker's own repository, not Debian's `docker.io`.
 
@@ -932,9 +948,9 @@ docker run --rm hello-world
 - `Suites: trixie` is written out rather than derived from `/etc/os-release`, so the file says which release it is pinned to. Change it when the machine is upgraded.
 - `--rm` deletes the container when it exits, so these checks leave nothing behind.
 
-### Step 8 — GPU passthrough
+### Step 9 — GPU passthrough
 
-Everything here is staged and takes effect on the single reboot in Step 11.
+Everything here is staged and takes effect on the single reboot in Step 12.
 Nothing in this step is verified until then.
 
 #### 1. Become root
@@ -1025,15 +1041,15 @@ update-initramfs -u -k all
 - Both PCI functions must be bound. A GTX 1080 presents the VGA controller at `09:00.0` and an HDMI audio device at `09:00.1`; handing a guest one without the other does not work. Deriving the IDs with `grep -i nvidia` catches both, which is why it is written that way rather than picking the VGA line out.
 - Blacklisting only `nouveau` is the usual reason passthrough silently fails. A stray `nvidia`, `radeon` or `amdgpu` autoload racing `vfio-pci` for the device is what actually causes it, so all four are listed.
 - `softdep` alone only orders module loading. It does not guarantee `vfio-pci` gets first claim on the device during early boot, which is why `vfio` also goes into the initramfs.
-- Appending to `/etc/initramfs-tools/modules` is not idempotent: running Step 6 twice writes the four module names twice. Duplicates are harmless to boot, but check the file before repeating it.
+- Appending to `/etc/initramfs-tools/modules` is not idempotent: running sub-step 6 twice writes the four module names twice. Duplicates are harmless to boot, but check the file before repeating it.
 - `iommu=pt` puts the IOMMU in passthrough mode for devices the host keeps, which avoids the translation cost on everything that is not being handed to a guest.
 - GRUB is written once, in Step 3, with the IOMMU flags already on the line. Two steps setting `GRUB_CMDLINE_LINUX_DEFAULT` would mean the second silently dropping whatever the first put there — the boot-console settings, in this case.
 - `GRUB_CMDLINE_LINUX` is empty on this host, where Silenus carries `rootflags=uquota,pquota`. Silenus needs it because its root filesystem is XFS with quota, and root is mounted before `/etc/fstab` is read. Here root is ext4 and the quota is on ordinary fstab mounts, so fstab is the right place and the kernel command line needs nothing.
 
-### Step 9 — Networking
+### Step 10 — Networking
 
 Two interfaces, doing different jobs. Guests are on neither: they live on the
-libvirt network defined in Step 6, and libvirt owns that bridge.
+libvirt network defined in Step 7, and libvirt owns that bridge.
 
 | Interface | Kind | Address | Purpose |
 |---|---|---|---|
@@ -1054,7 +1070,7 @@ sudo -i
 
 #### 2. Confirm NetworkManager is running
 
-It was installed in Step 4, with everything else. This only makes sure it is up
+It was installed in Step 5, with everything else. This only makes sure it is up
 and will come up at boot:
 
 ```bash
@@ -1309,7 +1325,7 @@ Expect `net.ipv4.ip_forward = 1`.
 - IPv6 is disabled on both profiles. Nothing in this build uses it, and leaving it on means a second address family to reason about in the firewall.
 - Reaching a guest on `192.168.32.0/24` from Silenus over the point-to-point link needs a route on Silenus pointing at `192.168.124.1`, and forwarding on this host, which sub-step 9 enables. Whether to add that route is not decided here.
 
-### Step 10 — Firewall
+### Step 11 — Firewall
 
 `libvirt` installs the NAT and forwarding rules for `static_network_32` itself
 when the network starts. This step does not repeat them: a hand-written
@@ -1358,9 +1374,9 @@ sudo netfilter-persistent save
 - The guest subnet is `192.168.32.0/24` here and `192.168.24.0/24` on Silenus. They differ on purpose: both hosts are reachable from each other, so overlapping guest ranges would make a guest on one indistinguishable from a guest on the other.
 
 
-### Step 11 — Reboot and final verification
+### Step 12 — Reboot and final verification
 
-Nested virtualization's module option, the whole of Step 8's passthrough work,
+Nested virtualization's module option, the whole of Step 9's passthrough work,
 and the bridges' autoconnect all need this one boot to take hold together. The
 quota from Step 3 is already live.
 
@@ -1457,7 +1473,7 @@ sudo iptables -t nat -L LIBVIRT_PRT -n -v
 ```
 
 Expect libvirt's own MASQUERADE for `192.168.32.0/24`. Any DNAT rules added by
-hand in Step 10 should be checked here too.
+hand in Step 11 should be checked here too.
 
 #### 8. Nested virtualization and quota persisted
 
@@ -1523,6 +1539,6 @@ virsh domdisplay <gpu-vm-name>
 
 **Notes**
 
-- Verification is gathered here rather than spread through Steps 8 to 10 because every one of those changes only takes effect on this boot. Checking them earlier reports the state before the change, which reads as a pass and is not one.
+- Verification is gathered here rather than spread through Steps 9 to 11 because every one of those changes only takes effect on this boot. Checking them earlier reports the state before the change, which reads as a pass and is not one.
 - `virt-install` with `--cdrom` expects a console. Add `--noautoconsole` and connect afterwards with `virsh console <vm-name>`, or run it from a `tmux` session, since there is no display on this host.
-- If `lspci -nnk` shows `nouveau` or `nvidia` in use rather than `vfio-pci`, the blacklist did not take. Check that `update-initramfs` ran after the file was written in Step 8.
+- If `lspci -nnk` shows `nouveau` or `nvidia` in use rather than `vfio-pci`, the blacklist did not take. Check that `update-initramfs` ran after the file was written in Step 9.
