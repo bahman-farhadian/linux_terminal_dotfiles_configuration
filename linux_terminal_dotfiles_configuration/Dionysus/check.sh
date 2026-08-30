@@ -57,7 +57,7 @@ ck "no pending firmware" "$(sudo fwupdmgr get-updates 2>&1|grep -qi 'No updates 
 
 printf '\n--- Step 5: every package the document installs ---\n'
 miss=""
-for p in bash-completion bridge-utils btop curl git jq lshw make openssl progress \
+for p in bash-completion bridge-utils btop curl git iptables iputils-ping jq lshw make openssl pciutils progress \
   pwgen python3 rsync sshuttle sudo tmux tree unrar vim wget \
   openssh-server mokutil dmidecode efibootmgr network-manager fwupd fwupd-amd64-signed \
   qemu-system-x86 qemu-utils ovmf virtinst libosinfo-bin osinfo-db osinfo-db-tools \
@@ -98,6 +98,7 @@ ck "no default net"  "$(virsh -c qemu:///system net-list --all --name 2>/dev/nul
 ck "static_network_32" "$(virsh -c qemu:///system net-list --name 2>/dev/null|grep -cx static_network_32)" "1"
 ck "net autostart"   "$(virsh -c qemu:///system net-info static_network_32 2>/dev/null|awk '/^Autostart/{print $2}')" "yes"
 ck "virbr1 address"  "$(ip -4 -br addr show virbr1 2>/dev/null|awk '{print $3}')" "192.168.32.1/24"
+ck "libvirt fw backend" "$(sudo iptables -t nat -L LIBVIRT_PRT -n 2>/dev/null|grep -c MASQUERADE|awk '{print ($1>0)?"iptables":"not iptables"}')" "iptables"
 ck "groups"          "$(id -nG|tr ' ' '\n'|grep -cE '^(libvirt|kvm|docker)$')" "3"
 
 printf '\n--- Step 8: Docker ---\n'
