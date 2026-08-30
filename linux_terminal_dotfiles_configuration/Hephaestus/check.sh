@@ -142,6 +142,7 @@ else
 fi
 ck "one default route" "$(ip -4 route show default|wc -l|tr -d ' ')" "1"
 ck "default via wan" "$(ip -4 route show default|grep -c 'dev wlp2s0')" "1"
+ck "p2p installs no default" "$(ip -4 route show default|grep -c 'dev eno1')" "0"
 ck "ip_forward"      "$(sysctl -n net.ipv4.ip_forward)" "1"
 ck "ip_forward conf" "$(grep -c 'net.ipv4.ip_forward = 1' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
 ck "default gw reachable" "$(ip -4 route show default|awk '{print $3}'|head -1|xargs -r -I{} ping -c1 -W2 {} >/dev/null 2>&1 && echo yes || echo no)" "yes"
