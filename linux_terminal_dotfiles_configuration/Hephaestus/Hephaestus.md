@@ -119,8 +119,9 @@ virtualizes anything.
 2. `./install.sh` from `Hephaestus/`, as your own user.
 3. `exec bash`.
 
-It also writes `/etc/motd`, the same host-agnostic login banner as the other
-two, and disables the kernel line Debian prints above it.
+It also writes `/etc/ssh/banner.txt` and points sshd at it, the same
+host-agnostic notice as the other two, shown before authentication so every
+account sees it.
 
 Everything the Dionysus notes say applies unchanged: the root question is asked
 once and recorded in `/etc/dotfiles-root-configured`; the SSH block is replaced

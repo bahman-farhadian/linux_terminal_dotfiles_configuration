@@ -597,8 +597,8 @@ exec bash
 - A command typed with a leading space is not written to the history file. Use it for anything carrying a password or a token. One space is enough.
 - History is written at every prompt, not only when the shell exits. A tmux pane that is killed rather than closed keeps everything typed in it.
 - It also writes `/etc/profile.d/99-history.sh` so both rules apply to every account, not only yours.
-- It also writes `/etc/motd`, the banner shown after login. It carries a name and a short notice and no hostname or kernel version, so the same file is correct on every host — which is why `install.sh` writes it rather than the repository keeping one per machine. Debian's own two paragraphs of licence boilerplate are replaced outright.
-- `/etc/update-motd.d/10-uname` reprints the kernel version at every login. Its execute bit is dropped rather than the file deleted, so a package upgrade can restore it and the next `install.sh` run turns it off again. `Last login` is left alone: it is worth seeing.
+- It also writes `/etc/ssh/banner.txt` and points sshd at it with `Banner`, so it is shown **before authentication** and to **every account**. That is the right place for a notice telling someone they are not welcome — after login it is addressed to a person who is already in — and it is the only place that works here, because `~/.hushlogin` suppresses the motd for any account that has one. The file carries a name and a short notice and no hostname or kernel version, so it is correct unchanged on every host.
+- `/etc/motd` is emptied and `/etc/update-motd.d/10-uname` has its execute bit dropped, which removes Debian's licence paragraphs and the kernel line for any account without a `.hushlogin` — root, in practice. The file is not deleted, so a package upgrade can restore it and the next `install.sh` run turns it off again. `Last login` is left alone: it is worth seeing.
 - `cpy` falls back to plain `tee` when there is no display, so it prints and copies nothing here rather than failing.
 - `README.md` at the top of the repository covers the prompt, the tmux keys, and what changes.
 
