@@ -23,60 +23,69 @@ Step 3, which is a manual edit and is noted there.
 
 ## Part 1 — OS installation
 
-### Step 1 — BIOS: virtualization and PCIe addressing
+### Step 1 — BIOS: Secure Boot, virtualization, PCIe addressing
 
 | # | Step | How |
 |---|------|-----|
 | 1 | Enter BIOS | Power off fully, power on, tap the setup key at the vendor splash |
 | 2 | Note BIOS version | Write it down before changing anything |
-| 3 | Enable SVM | `SVM Mode` = **Enabled** |
-| 4 | Enable IOMMU | `IOMMU` = **Enabled** |
-| 5 | Above 4G Decoding | **Enabled** |
-| 6 | Resizable BAR | **Auto**, or **Enabled** |
-| 7 | Save and exit | Save changes and reboot |
+| 3 | Allow the 3rd party CA | `Allow Microsoft 3rd Party UEFI CA` = **On** |
+| 4 | Check Secure Boot | `Secure Boot` = **On** |
+| 5 | Enable SVM | `SVM Mode` = **Enabled** |
+| 6 | Enable IOMMU | `IOMMU` = **Enabled** |
+| 7 | Above 4G Decoding | **Enabled** |
+| 8 | Resizable BAR | **Auto**, or **Enabled** |
+| 9 | Save and exit | Save changes and reboot |
+| 10 | Boot the installer | Open the boot menu, pick the USB device |
 
 **Notes**
 
-- The setup key differs by motherboard — commonly **Del** or **F2**. This build does not name one because the board model is not fixed by this document.
+- **TBD — the board model.** The setup key and the exact wording of every line above depend on it: `SVM Mode` may sit under `Advanced → CPU Configuration`, `IOMMU` under `Advanced → AMD CBS` or `NBIO`, and the 3rd party CA under `Boot → Secure Boot → Key Management`. This table names the settings, not the menu paths, until the board is known.
+- Debian's bootloader is signed by Microsoft's 3rd party UEFI CA. With that **Off** the machine will not boot and shows `Invalid signature detected`. Some desktop boards call it `Other OS` versus `Windows UEFI mode` in the CSM or Secure Boot menu; that is the same switch.
+- Turning the 3rd party CA on may switch `Secure Boot Mode` from `Standard` to `Custom`. That is expected. Custom only means the key set is no longer the factory default; Secure Boot still checks every signature.
+- Never use `Reset to Setup Mode` or `Clear All Secure Boot Keys`. They cause the failure above and Debian does not need them.
+- Secure Boot does not conflict with GPU passthrough. `vfio-pci` ships inside Debian's signed kernel, so binding the card in Step 8 is unaffected. What Secure Boot blocks is loading an *unsigned out-of-tree* module — the proprietary NVIDIA driver on the host being the usual one, which this build blacklists anyway.
 - `SVM` is AMD's name for the virtualization extensions. Without it KVM cannot start a guest at all, and `/proc/cpuinfo` shows no `svm` flag.
 - `IOMMU`, `Above 4G Decoding` and `Resizable BAR` are what make the VFIO groups in Step 8 usable. All three must be set before the OS can see the groups, which is why they are here rather than alongside the passthrough work.
-- Secure Boot is not part of this build. Silenus needs it for a laptop that travels; a headless host in a rack does not gain the same thing from it, and it complicates the out-of-tree module path that passthrough sometimes needs.
+- There is no swap anywhere in this build, so the hibernation caveat that applies to Silenus does not arise here.
 
 ### Step 2 — Disk partitioning
 
 Choose **Manual** partitioning. `partman` supports XFS natively, so the layout
-is created at install time rather than rebuilt afterwards.
+is created at install time rather than rebuilt afterwards. The installer counts
+in decimal, so `MB` means 1,000,000 bytes. Type the **Enter as** value. The
+installer will then display the **Shows as** value.
 
 **SATA SSD (`sda`)**
 
-| # | Partition | Size | Format | Mount |
-|---|-----------|------|--------|-------|
-| 1 | EFI | 1 GB | EFI System Partition | `/boot/efi` |
-| 2 | Boot | 2 GB | ext4 | `/boot` |
-| 3 | Root | 30 GB | ext4 | `/` |
-| 4 | Data | remainder, about 199.9 GB | xfs | `/data-root` |
+| # | Partition | Size | Enter as | Shows as | Format | Mount |
+|---|-----------|------|----------|----------|--------|-------|
+| 1 | EFI | 1 GiB | `1075 MB` | 1.1 GB | EFI System Partition | `/boot/efi` |
+| 2 | Boot | 2 GiB | `2147 MB` | 2.1 GB | ext4 | `/boot` |
+| 3 | Root | 30 GiB | `32212 MB` | 32.2 GB | ext4 | `/` |
+| 4 | Data | remainder | `max` | about 199.9 GB | xfs | `/data-root` |
 
-**NVMe 250 GB (`nvme0n1`)** — single partition, xfs, mounted at `/data-root/sssd`
+**NVMe 250 GB (`nvme0n1`)**
 
-**NVMe 1 TB (`nvme1n1`)** — single partition, xfs, mounted at `/data-root/lssd`
+| # | Partition | Size | Enter as | Shows as | Format | Mount |
+|---|-----------|------|----------|----------|--------|-------|
+| 1 | sssd | whole disk | `max` | about 250 GB | xfs | `/data-root/sssd` |
+
+**NVMe 1 TB (`nvme1n1`)**
+
+| # | Partition | Size | Enter as | Shows as | Format | Mount |
+|---|-----------|------|----------|----------|--------|-------|
+| 1 | lssd | whole disk | `max` | about 1.0 TB | xfs | `/data-root/lssd` |
 
 Package selection: base system and `openssh-server` only. Deselect the desktop
 environment task; this host stays headless.
 
-**Verify after first boot**
-
-```bash
-lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS
-```
-
-```bash
-swapon --show
-```
-
-Expect no output from the second command.
-
 **Notes**
 
+- The installer counts in GB, `df -h` counts in GiB. The root partition is entered as `32212 MB`, shows as `32.2 GB`, and reports as `30G` once installed. Same partition.
+- For any other size: type `GiB x 1073.741824` MB, rounded. The EFI partition is entered as `1075 MB` rather than the 1074 the formula gives; that is the number Silenus uses for the same partition, and one megabyte over makes no difference.
+- `max` fills the rest of the disk. It is used for `sda4` and for both NVMe disks, which take one partition each and no over-provisioning: unlike Silenus's root disk, these are not the disk the OS runs from.
+- Sizes on the installed system: `lsblk` reports `1G`, `2G`, `30G` on `sda`. `df -h` reports the EFI partition as about `1022M`, because the FAT filesystem uses a little of it. Both are correct.
 - `sda4` mounts at `/data-root` first and the two NVMe partitions mount as nested points beneath it. The installer creates the parent directory and orders the mounts itself, so no separate top-level mountpoints are needed.
 - OS install ISOs live on the SATA SSD under `/data-root/isos`, referenced by the functional tests in Step 11.
 - No swap partition. Omit it from the table entirely rather than adding one and disabling it later.
@@ -252,8 +261,60 @@ xfs_quota -x -c 'state' /data-root/lssd
 
 Expect `Accounting: ON` and `Enforcement: ON` on all three.
 
+#### 11. Install the tools used for checking
+
+```bash
+apt install -y mokutil dmidecode efibootmgr
+```
+
+#### 12. Check Secure Boot
+
+```bash
+mokutil --sb-state
+```
+
+Expect `SecureBoot enabled`.
+
+```bash
+dmesg | grep -i "secure boot"
+```
+
+Expect `secureboot: Secure boot enabled`.
+
+#### 13. Check the machine booted through shim
+
+```bash
+efibootmgr -v | grep -i shim
+```
+
+Expect `\EFI\debian\shimx64.efi`.
+
+#### 14. Check the disk
+
+```bash
+lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS
+```
+
+Expect `1G`, `2G` and `30G` on `sda`, with `sda4` and both NVMe disks XFS.
+
+```bash
+swapon --show
+```
+
+Expect no output.
+
+#### 15. Check the BIOS version
+
+```bash
+dmidecode -s bios-version
+```
+
+Compare with what you wrote down in Step 1.
+
 **Notes**
 
+- If the Secure Boot check says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the BIOS. Turn it back on and redo Step 1.
+- A BIOS update can reset BIOS settings, `SVM` and `IOMMU` included. Re-read this whole block after one, not only the Secure Boot line.
 - Use `state`, not `report -p`. With no projects assigned yet, `report -p` prints nothing whether quota is on or off, which hides exactly the failure this check exists to catch.
 - The quota goes in `/etc/fstab` here, not on the kernel command line. That is the opposite of Silenus, where the quota is on `/` — root is mounted before `/etc/fstab` is read, so it has to go in `GRUB_CMDLINE_LINUX` there. On this host the quota is on `/data-root`, an ordinary fstab mount, so fstab is the right place.
 - The kernel renames the options: `pquota` shows as `prjquota` in `findmnt`.
@@ -786,7 +847,10 @@ libvirt network defined in Step 6, and libvirt owns that bridge.
 | Interface | Kind | Address | Purpose |
 |---|---|---|---|
 | `enp4s0` | onboard RJ45 | `192.168.8.3/24`, gw `192.168.8.1`, DNS `8.8.8.8` | the LAN, and the route to the internet |
-| `enx9405bb143cf5` | USB-C ethernet | `192.168.124.1/30` | point-to-point to Silenus |
+| `p2plink0` | USB-C ethernet | `192.168.124.1/30` | point-to-point to Silenus |
+
+The USB adapter arrives as `enx9405bb143cf5` and is renamed in sub-step 4 below,
+before any profile is bound to it.
 
 Persisted through NetworkManager's own connection profiles with `nmcli`, not
 `/etc/network/interfaces`.
@@ -813,11 +877,45 @@ systemctl enable --now NetworkManager
 ip -br link
 ```
 
-Both names must match the table above before going further. `enp4s0` is fixed
-by its PCI slot. The USB adapter's name is derived from its MAC address, so it
-holds for that adapter and changes if the adapter is ever swapped.
+`enp4s0` is fixed by its PCI slot and is already correct. The USB adapter comes
+up as `enx9405bb143cf5`; the next sub-step renames it.
 
-#### 4. Clear the profiles the installer left
+#### 4. Rename the USB adapter
+
+`enx9405bb143cf5` is what udev derives from the adapter's MAC address — stable,
+but it says nothing about what the link is for. A `.link` file renames it as
+udev sets the device up, which is before anything can bind to the old name.
+
+The MAC is the old name read back in pairs: `enx9405bb143cf5` is
+`94:05:bb:14:3c:f5`.
+
+```bash
+vim /etc/systemd/network/10-p2plink0.link
+```
+
+Put this in it:
+
+```
+[Match]
+MACAddress=94:05:bb:14:3c:f5
+
+[Link]
+Name=p2plink0
+```
+
+```bash
+update-initramfs -u
+```
+
+Unplug the adapter and plug it back in, or reboot, then:
+
+```bash
+ip -br link
+```
+
+Expect `p2plink0` and no `enx9405bb143cf5`.
+
+#### 5. Clear the profiles the installer left
 
 ```bash
 nmcli connection show
@@ -829,7 +927,7 @@ nmcli connection delete <connection-name>
 
 Repeat the delete for each existing profile before laying down the two below.
 
-#### 5. The LAN interface
+#### 6. The LAN interface
 
 Static, because the router runs no DHCP server:
 
@@ -857,13 +955,13 @@ Expect `192.168.8.3/24`.
 ping -c4 192.168.8.1
 ```
 
-#### 6. The point-to-point link to Silenus
+#### 7. The point-to-point link to Silenus
 
 No gateway and no DNS: this link carries traffic between the two machines and
 nothing else, so it must not compete with `enp4s0` for the default route.
 
 ```bash
-nmcli con add type ethernet ifname enx9405bb143cf5 con-name p2p-silenus \
+nmcli con add type ethernet ifname p2plink0 con-name p2p-silenus \
   ipv4.method manual ipv4.addresses 192.168.124.1/30 \
   ipv4.never-default yes ipv6.method disabled
 ```
@@ -877,7 +975,7 @@ nmcli con up p2p-silenus
 ```
 
 ```bash
-ip -br addr show enx9405bb143cf5
+ip -br addr show p2plink0
 ```
 
 Expect `192.168.124.1/30`.
@@ -889,7 +987,7 @@ no gateway and no DNS. With both ends up:
 ping -c4 192.168.124.2
 ```
 
-#### 7. Enable IP forwarding
+#### 8. Enable IP forwarding
 
 ```bash
 vim /etc/sysctl.d/99-kvm.conf
@@ -914,6 +1012,11 @@ Expect `net.ipv4.ip_forward = 1`.
 **Notes**
 
 - There is no `br-kvm` here and no bridge built by hand. The draft this document grew from built one, because it also hand-maintained the NAT rules. Defining the guest network in libvirt instead — the same choice Silenus made — means libvirt creates and owns `virbr1`, so a second hand-built bridge would only duplicate it.
+- The rename binds to the MAC address, so it follows that one adapter. A replacement adapter needs its own MAC written into the `.link` file, or it comes up under its own `enx` name with no profile attached.
+- `p2plink0` is chosen to be a name nothing else generates. The kernel produces `en*`, `wl*` and `ww*`; `wpa_supplicant` produces `p2p0` and `p2p-dev-*` for Wi-Fi Direct. A rename that collides with an automatically assigned name can race with it, which is why both `eth0` and `p2p0` are avoided.
+- The file must sort before `99-default.link`, where the default naming policy lives. `10-` does.
+- `update-initramfs -u` puts the file in the initramfs too. A USB adapter is not needed that early, so this is precaution rather than requirement, but it costs nothing and means the name is the same whenever the interface does appear.
+- Rename first, create the profile second. A profile bound to `enx9405bb143cf5` stops matching the moment the rename takes effect.
 - `ipv4.never-default yes` on the point-to-point link is what keeps it from installing a default route. Without a gateway it would not install one anyway, but stating it means a later edit that adds a gateway by accident cannot silently steal the default route from `enp4s0`.
 - A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`-`.3`.
 - **Changing the address of `enp4s0` will drop your SSH session.** The address in the table is the one the machine already has as `Nyx`, so in practice this step re-creates the profile it is already using. Run it from a console, or from `tmux` so the shell survives, and know how to reach the box physically first.
@@ -1028,7 +1131,7 @@ Expect probe and bind messages for the GPU's PCI address.
 #### 6. Both interfaces came up on their own
 
 ```bash
-ip -br addr show enp4s0 enx9405bb143cf5
+ip -br addr show enp4s0 p2plink0
 ```
 
 Expect `192.168.8.3/24` and `192.168.124.1/30`.
