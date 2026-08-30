@@ -247,11 +247,21 @@ xfs_info /data-root/lssd | grep ftype
 
 Expect `ftype=1` on all three.
 
+`xfs_info: cannot open /data-root/...: Is a directory` does not mean the path is
+missing. It means that path is not an XFS mount, so `xfs_info` fell through to
+treating the argument as a device file. The usual cause is the wrong filesystem
+type being picked for that partition in the installer — the next sub-step names
+it outright.
+
 #### 8. Confirm what the installer mounted
 
 ```bash
-findmnt -no SOURCE,TARGET,OPTIONS /data-root /data-root/sssd /data-root/lssd
+findmnt -no SOURCE,TARGET,FSTYPE,OPTIONS /data-root /data-root/sssd /data-root/lssd
 ```
+
+All three must read `xfs`. Anything else has to be reformatted before going on:
+the project quota this build rests on is an XFS feature, and Docker's
+`--storage-opt size=` rests on the quota.
 
 #### 9. Add project quota to fstab
 
@@ -393,6 +403,8 @@ Compare with what you wrote down in Step 1.
 
 - If the Secure Boot check says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the BIOS. Turn it back on and redo Step 1.
 - A BIOS update can reset BIOS settings, `SVM` and `IOMMU` included. Re-read this whole block after one, not only the Secure Boot line.
+- A partition created as the wrong type is worth catching here rather than by its symptoms later. `lost+found` in the root of a mount is a good tell: ext4 creates it, XFS never does. So is a gap between `Size` and `Avail` in `df` on an almost-empty filesystem — ext4 reserves 5% of its blocks for root, XFS reserves none.
+- Reformatting one of these is cheap while they are empty: `umount`, `mkfs.xfs -f <device>`, then fix `/etc/fstab`. `mkfs.xfs` writes a **new UUID**, so the `UUID=` in fstab has to be replaced with `blkid -s UUID -o value <device>` — left stale, the next boot waits for a device that no longer exists. Set the type to `xfs` and the fsck pass to `0` in the same edit: XFS has no boot-time fsck, and a pass of `2` makes it fail on every boot.
 - Use `state`, not `report -p`. With no projects assigned yet, `report -p` prints nothing whether quota is on or off, which hides exactly the failure this check exists to catch.
 - The quota goes in `/etc/fstab` here, not on the kernel command line. That is the opposite of Silenus, where the quota is on `/` — root is mounted before `/etc/fstab` is read, so it has to go in `GRUB_CMDLINE_LINUX` there. On this host the quota is on `/data-root`, an ordinary fstab mount, so fstab is the right place.
 - The kernel renames the options: `pquota` shows as `prjquota` in `findmnt`.

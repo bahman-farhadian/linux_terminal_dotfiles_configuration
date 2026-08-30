@@ -63,7 +63,7 @@ layout of fact 3 changes which filesystems are involved:
 3. Add your user to sudoers with `visudo` — the one step that is not safe to repeat blindly.
 4. Add `contrib` and `non-free`, handling DEB822 or the classic `sources.list`, whichever the installer wrote.
 5. `apt full-upgrade`.
-6. Confirm `ftype=1` on every XFS filesystem — a hard requirement for `overlay2` and project quota alike.
+6. Confirm `ftype=1` on every XFS filesystem — a hard requirement for `overlay2` and project quota alike. `xfs_info: cannot open <path>: Is a directory` means that path is not XFS at all, usually a filesystem type picked wrongly in the installer.
 7. Confirm what the installer actually mounted.
 8. Add `,pquota` to the XFS entries in `/etc/fstab`. **TBD**: which entries, per fact 3.
 9. Edit GRUB if this host needs anything on the kernel command line, then reboot. The reboot is what makes the quota live: XFS initializes project quota on a real mount and refuses on a remount, so no unmount sequence is needed.
