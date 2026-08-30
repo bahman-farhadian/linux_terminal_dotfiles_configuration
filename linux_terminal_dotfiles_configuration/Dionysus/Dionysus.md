@@ -1276,10 +1276,13 @@ Expect `net.ipv4.ip_forward = 1`.
 - A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`-`.3`.
 - `managed=false` is Debian's default, not NetworkManager's own. It exists so that a machine configured through `/etc/network/interfaces` does not have NetworkManager fight it. The consequence here is that removing the stanza is what hands the interface over — installing NetworkManager alone does nothing.
 - The address does not change across the handover: ifupdown and the new profile both hold `192.168.8.3/24`. The interface still goes down and up, so an SSH session over it does not survive.
-- **Changing the address of `enp4s0` will drop your SSH session.** The address in the table is the one the machine already has as `Nyx`, so in practice this step re-creates the profile it is already using. Run it from a console, or from `tmux` so the shell survives, and know how to reach the box physically first.
-- The point-to-point link is a second way in when the LAN side is broken, which is worth having on a machine whose management interface you are about to reconfigure. Bring it up before touching `enp4s0`.
+- Sub-step 7 is built for doing this over SSH. The handover runs under `systemd-run`, detached from the login session, so the session dropping part-way cannot leave the interface owned by neither ifupdown nor NetworkManager — which is exactly what happens if the commands are pasted one at a time and the connection goes at the wrong moment. As one detached unit it either completes or never starts.
+- `--collect` removes the transient unit once it exits, so a second attempt is not blocked by the first still being listed. `systemctl status lan-handover` shows what it did while it is still there, `journalctl -u lan-handover` afterwards.
+- **Cancel the rollback timer once you are back in.** Forgetting means the machine restores the old configuration and reboots ten minutes after a handover that worked, which looks exactly like an unexplained crash.
+- Ten minutes is a starting point. Raise it to have longer to notice a problem, lower it if you would rather the machine recover quickly while you are watching.
+- The point-to-point link is the better safety net of the two, because it does not depend on the interface being changed. The rollback timer is what covers a host with no second path — Hephaestus, when its turn comes.
 - IPv6 is disabled on both profiles. Nothing in this build uses it, and leaving it on means a second address family to reason about in the firewall.
-- Reaching a guest on `192.168.32.0/24` from Silenus over the point-to-point link needs a route on Silenus pointing at `192.168.124.1`, and forwarding on this host, which Step 7 above enables. Whether to add that route is not decided here.
+- Reaching a guest on `192.168.32.0/24` from Silenus over the point-to-point link needs a route on Silenus pointing at `192.168.124.1`, and forwarding on this host, which sub-step 9 enables. Whether to add that route is not decided here.
 
 ### Step 10 — Firewall
 
