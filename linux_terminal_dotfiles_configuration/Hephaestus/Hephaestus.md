@@ -527,6 +527,7 @@ exec bash
 - It writes `/etc/ssh/banner.txt` and points sshd at it with `Banner`, so the notice is shown **before authentication** and to **every account**. That is the only place that works, because `~/.hushlogin` — which these dotfiles also install — suppresses the motd for any account that has one.
 - `/etc/motd` is emptied and `/etc/update-motd.d/10-uname` has its execute bit dropped, which removes Debian's licence paragraphs and the kernel line.
 - It writes `/etc/ssh/sshd_config.d/99-local.conf` so root can only reach SSH with a key, never a password. **On this host, open a second session and confirm it works before closing the first.** It is at another site and reached over WiFi; there is no console to fall back on.
+- Every SSH login lands in its own tmux session, `ssh1`, `ssh2` and so on, for whichever account is connecting. Two windows onto this host do not mirror each other. Reconnecting after a dropped link attaches to the session left behind rather than opening another, so work survives the drop — which matters on a host reached only over the network.
 - `.bashrc` adds `/usr/local/sbin`, `/usr/sbin` and `/sbin` to your PATH, so `sysctl`, `swapon` and `iptables` resolve for a non-root user.
 - `Hephaestus/bash/bash_aliases` drops the `DE`, `EN` and `kbd` aliases. They call `gsettings` against the GNOME input-source schema, which does not exist on this host.
 
