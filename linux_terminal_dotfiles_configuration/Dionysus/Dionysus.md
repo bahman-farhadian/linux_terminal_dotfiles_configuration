@@ -508,7 +508,7 @@ sudo -i
 #### 2. Install the packages
 
 ```bash
-apt install -y bash-completion bridge-utils btop curl git jq lshw make network-manager openssl progress pwgen python3 rsync sshuttle sudo tmux tree unrar vim wget
+apt install -y bash-completion bridge-utils btop curl git iptables iputils-ping jq lshw make network-manager openssl pciutils progress pwgen python3 rsync sshuttle sudo tmux tree unrar vim wget
 ```
 
 #### 3. Check the CPU exposes virtualization
@@ -528,6 +528,9 @@ Expect a number above 0. This machine is AMD, so the flag is `svm`.
 - Installing it here changes nothing on its own. Debian ships NetworkManager with `[ifupdown] managed=false`, so it will not touch `enp4s0` while the installer's stanza is still in `/etc/network/interfaces`. Handing that interface over is a deliberate act in Step 10. `tmux`, `vim`, `git`, `curl`, `jq` and `tree` are on the same list and already above.
 - `openssh-server` was installed by the Debian installer in Step 2 and is what you are connected over. It is not repeated here.
 - `net-tools` provides `netstat`, `ifconfig` and `route`. They are superseded by `ss` and `ip` from `iproute2`, which is already installed. Add it if the old names are what your muscle memory reaches for.
+- `pciutils` supplies `lspci`, which the whole of Step 9 depends on to find the GPU and confirm what driver holds it. Its Debian priority is `standard`, so a default install has it — but this build deselects tasks, and a package Step 9 cannot work without is not worth leaving to chance.
+- `iptables` is here to make libvirt's choice deterministic. `/etc/libvirt/network.conf` documents the default as the first available of `[iptables, nftables]`, and `libvirt-daemon-system` depends on neither, so the backend would otherwise be decided by whatever else happened to pull one in. Steps 11 and 12 read libvirt's `LIBVIRT_PRT` and `LIBVIRT_FWO` chains with `iptables`; under the nftables backend those chains do not exist and the commands would show nothing while everything was in fact working.
+- `iputils-ping` is priority `important` and present on every Debian install, so this is belt and braces. It costs nothing and the verification steps lean on `ping` throughout.
 - `bridge-utils` supplies `brctl`, used by the verification in Step 10. `ip link` shows the same information; `brctl show` is kept because it prints the bridge-to-member mapping more compactly.
 
 ### Step 6 — Bash, tmux, and SSH configuration
@@ -535,7 +538,17 @@ Expect a number above 0. This machine is AMD, so the flag is `svm`.
 The bash, tmux, and SSH configuration is in this repository, in this host's own
 directory. Everything it needs was installed in Step 5.
 
-#### 1. Get the repository onto this machine
+#### 1. Leave the root shell
+
+Step 5 ended as root. Everything in this step runs as your own user, the clone
+included — a repository cloned by root lands in `/root`, which is mode `0700`,
+so your account could not even read it afterwards.
+
+```bash
+exit
+```
+
+#### 2. Get the repository onto this machine
 
 A freshly installed host does not have it yet:
 
@@ -548,13 +561,8 @@ cd ~/dotfiles/linux_terminal_dotfiles_configuration/Dionysus
 ```
 
 Keep it. `install.sh` needs the directory to re-run, and Step 7 reads
-`kvm/static_network_32.xml` from it.
-
-#### 2. Leave the root shell
-
-```bash
-exit
-```
+`kvm/static_network_32.xml` from it — by way of your home directory, which is
+why it has to be cloned there.
 
 #### 3. Run the installer
 
@@ -1542,3 +1550,33 @@ virsh domdisplay <gpu-vm-name>
 - Verification is gathered here rather than spread through Steps 9 to 11 because every one of those changes only takes effect on this boot. Checking them earlier reports the state before the change, which reads as a pass and is not one.
 - `virt-install` with `--cdrom` expects a console. Add `--noautoconsole` and connect afterwards with `virsh console <vm-name>`, or run it from a `tmux` session, since there is no display on this host.
 - If `lspci -nnk` shows `nouveau` or `nvidia` in use rather than `vfio-pci`, the blacklist did not take. Check that `update-initramfs` ran after the file was written in Step 9.
+
+### Step 13 — Check the whole setup
+
+`check.sh` in this host's directory runs every check the steps above describe
+and prints `PASS` or `FAIL` for each one.
+
+#### 1. Run it
+
+```bash
+cd ~/dotfiles/linux_terminal_dotfiles_configuration/Dionysus
+```
+
+```bash
+./check.sh
+```
+
+#### 2. Read the totals
+
+The last line gives the counts. Any failure names what it found and what it
+expected, so it points at the step to redo.
+
+**Notes**
+
+- Run it as your own user over SSH. It refuses to start as root, because the dotfiles, group membership and `~/.ssh/config` all live in your account.
+- It asks for your sudo password once. Some checks read files only root can see, and one reads libvirt's firewall chains.
+- It needs network. It pulls the `busybox` and `hello-world` images to prove the Docker storage quota is really enforced.
+- It only reads. Nothing on the machine is changed, so it is safe to run at any time.
+- It exits `0` when everything passes and `1` otherwise.
+- This is `Dionysus/check.sh`, not Silenus's. It asserts this host's disk sizes, both interfaces including the `p2plink0` rename, `static_network_32`, the GPU binding, and that no desktop and no Claude Code are installed. Silenus's would fail on almost all of it, and vice versa.
+- The GPU checks fail until Step 9 has been through the reboot in Step 12. That is the expected order, not a fault.
