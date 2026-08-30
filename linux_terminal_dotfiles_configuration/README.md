@@ -255,7 +255,7 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 | `DE` | keyboard: German only |
 | `EN` | keyboard: US English and Persian |
 | `kbd` | show the current input sources |
-| `pubkey` | print the first SSH public key |
+| `pubkey` | print the first SSH public key, and copy it to the clipboard |
 | `password` | random base64-48 string |
 | `pubip` / `privip` | external IP / every private address, by interface |
 | `ports` | listening TCP and UDP sockets, with the process holding each |
