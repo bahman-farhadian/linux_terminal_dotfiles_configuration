@@ -61,17 +61,22 @@ Everything in this step is run as root.
 su -
 ```
 
-#### 2. Install vim
+#### 2. Install vim and sudo
 
 ```bash
 apt update
 ```
 
 ```bash
-apt install -y vim
+apt install -y vim sudo
 ```
 
-Make it the default editor for `visudo` and friends:
+`visudo`, used in the next sub-step, comes from the `sudo` package rather than
+from vim. The installer only installs `sudo` when the root password is left
+empty; setting one leaves the package out altogether, and `visudo` reports
+`command not found`.
+
+Make vim the default editor for `visudo` and friends:
 
 ```bash
 update-alternatives --config editor
@@ -80,7 +85,8 @@ update-alternatives --config editor
 #### 3. Add your user to sudoers
 
 The installer only grants `sudo` when the root password is left empty. If you
-set a root password, the user has none.
+set a root password, the user has none — and, as the previous sub-step notes,
+the package is not installed either.
 
 ```bash
 visudo
