@@ -1385,6 +1385,7 @@ sudo tee /etc/systemd/system/guest-net-access.service >/dev/null <<'EOF'
 Description=Allow private networks into the libvirt guest network
 After=libvirtd.service docker.service
 Wants=libvirtd.service
+PartOf=libvirtd.service
 
 [Service]
 Type=oneshot
@@ -1455,7 +1456,8 @@ sudo netfilter-persistent save
 - The script deletes before inserting, so running it again — by hand, or at the next boot — leaves three rules rather than six.
 - Return traffic needs no rule. Conntrack matches the replies to the connection that was opened, and libvirt's `MASQUERADE` only applies to traffic a guest itself starts towards something outside its own subnet.
 - `netfilter-persistent save` is still what carries the optional DNAT in sub-step 5, which sits in the `nat` table and is not subject to this ordering problem.
-- `systemctl restart guest-net-access` puts the rules back at the head after any `libvirtd` restart, which is worth knowing when a `virsh net-destroy`/`net-start` or a package upgrade has moved them.
+- `PartOf=libvirtd.service` is what makes a `libvirtd` restart carry this unit with it. Without it the rules stay where they were while libvirt re-inserts its jumps on top, and the host silently stops accepting connections into the guest network until the next boot — which is precisely the failure this whole arrangement exists to prevent, arriving by a different route. `After=` then orders the two, so the rules go back in front rather than behind.
+- `systemctl restart guest-net-access` does the same by hand, for a `virsh net-destroy`/`net-start` that shuffled the chains without restarting the daemon.
 - The guest subnet is `192.168.32.0/24` here and `192.168.24.0/24` on Silenus. They differ on purpose: both hosts are reachable from each other, so overlapping guest ranges would make a guest on one indistinguishable from a guest on the other.
 
 ### Step 12 — Reboot and final verification
