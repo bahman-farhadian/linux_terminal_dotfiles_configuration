@@ -961,6 +961,13 @@ docker run --rm hello-world
 Everything here is staged and takes effect on the single reboot in Step 12.
 Nothing in this step is verified until then.
 
+**This machine loses its display when it does.** The Ryzen 9 3900X has no
+integrated graphics, so the GTX 1080 is the only adapter in the box. Once
+`vfio-pci` holds it, nothing drives a monitor: a blank screen after the Step 12
+reboot is the passthrough working, not a failure. Read the consequences in the
+notes before running the step — from here on the machine is reachable over the
+network or not at all.
+
 #### 1. Become root
 
 ```bash
@@ -1039,6 +1046,9 @@ Expect `4`, not `8`. Eight means the append ran twice.
 - Blacklisting only `nouveau` is the usual reason passthrough silently fails. A stray `nvidia`, `radeon` or `amdgpu` autoload racing `vfio-pci` for the device is what actually causes it, so all four are listed.
 - `softdep` alone only orders module loading. It does not guarantee `vfio-pci` gets first claim on the device during early boot, which is why `vfio` also goes into the initramfs.
 - The append to `/etc/initramfs-tools/modules` is guarded by `grep -q`, so running the block twice does not write the four module names twice. Sub-step 4 counts them as well.
+- **After this step there is no local console.** The card that was showing it now belongs to `vfio-pci`, and a 3900X has no integrated graphics to fall back on. Step 10 says to run the network handover from the console; that is possible because Step 10 comes first. Re-running it after this step has taken effect is not — there is nothing to run it on.
+- The firmware and GRUB still draw, because they use the UEFI framebuffer before the kernel claims the card. That is the recovery path: interrupt GRUB, edit the kernel line, and add `module_blacklist=vfio_pci` to boot once with the card on `nouveau` and a console back. Worth trying deliberately once, while the machine is on your desk, rather than discovering it at the point you need it.
+- The point-to-point link to Silenus matters more from here on. It is the second way in on a host that no longer has a first one.
 - `iommu=pt` puts the IOMMU in passthrough mode for devices the host keeps, which avoids the translation cost on everything that is not being handed to a guest.
 - GRUB is written once, in Step 3, with the IOMMU flags already on the line. Two steps setting `GRUB_CMDLINE_LINUX_DEFAULT` would mean the second silently dropping whatever the first put there — the boot-console settings, in this case.
 - `GRUB_CMDLINE_LINUX` is empty on this host, where Silenus carries `rootflags=uquota,pquota`. Silenus needs it because its root filesystem is XFS with quota, and root is mounted before `/etc/fstab` is read. Here root is ext4 and the quota is on ordinary fstab mounts, so fstab is the right place and the kernel command line needs nothing.
@@ -1480,6 +1490,9 @@ done | grep -i vga -A1
 ```
 
 #### 5. The GPU is bound to vfio-pci
+
+The monitor went dark on this boot. That is the expected result, not a fault —
+see the notes to Step 9.
 
 ```bash
 lsmod | grep nouveau
