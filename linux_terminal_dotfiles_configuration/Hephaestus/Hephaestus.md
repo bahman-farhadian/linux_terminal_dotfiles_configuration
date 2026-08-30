@@ -87,10 +87,11 @@ The headless list: Silenus's with every desktop package removed. Starting point
 is Dionysus's line, which is already the right shape:
 
 ```
-bash-completion bridge-utils btop curl git jq lshw make openssl progress pwgen python3 rsync sshuttle sudo tmux tree unrar vim wget
+bash-completion bridge-utils btop curl git jq lshw make network-manager openssl progress pwgen python3 rsync sshuttle sudo tmux tree unrar vim wget
 ```
 
 - `bash-completion`, `python3` and `openssl` are here because `install.sh` checks for them in Step 5.
+- `network-manager` is here because a headless Debian install does not have it — it arrives on a desktop as a dependency of `gnome-core`. Step 9 needs `nmcli`, so it goes in with everything else rather than in the middle of reconfiguring the network.
 - `openssh-server` came from the installer and is what you are connected over.
 - **TBD**: anything this machine's role adds, per fact 4.
 
