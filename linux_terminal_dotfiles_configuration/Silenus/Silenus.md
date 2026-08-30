@@ -1118,22 +1118,52 @@ between the two machines and nothing else. Dionysus takes `192.168.124.1/30`;
 this end takes `192.168.124.2/30`. Configure it only when the cable is plugged
 in — the profile binds to the adapter's own name.
 
-#### 1. Find the adapter's name
+#### 1. Find the adapter's name and MAC
 
 ```bash
 ip -br link
 ```
 
-A USB ethernet adapter appears as `enx` followed by its MAC address. It is
-stable for that adapter and changes if the adapter is swapped, so read it here
-rather than assuming one.
+A USB ethernet adapter appears as `enx` followed by its MAC address with the
+colons removed, so `enx001122334455` is `00:11:22:33:44:55`. Read it here rather
+than assuming one; it differs per adapter.
 
-#### 2. Create the profile
+#### 2. Rename it
 
-Replace `enxXXXXXXXXXXXX` with the name from the previous sub-step:
+That name is stable but says nothing about what the link is for. A `.link` file
+renames it as udev sets the device up, which is before any profile can bind to
+the old name. Use the MAC from the previous sub-step:
 
 ```bash
-nmcli con add type ethernet ifname enxXXXXXXXXXXXX con-name p2p-dionysus \
+sudo vim /etc/systemd/network/10-p2plink0.link
+```
+
+Put this in it:
+
+```
+[Match]
+MACAddress=00:11:22:33:44:55
+
+[Link]
+Name=p2plink0
+```
+
+```bash
+sudo update-initramfs -u
+```
+
+Unplug the adapter and plug it back in, then:
+
+```bash
+ip -br link
+```
+
+Expect `p2plink0`.
+
+#### 3. Create the profile
+
+```bash
+nmcli con add type ethernet ifname p2plink0 con-name p2p-dionysus \
   ipv4.method manual ipv4.addresses 192.168.124.2/30 \
   ipv4.never-default yes ipv6.method disabled
 ```
@@ -1146,10 +1176,10 @@ nmcli con mod p2p-dionysus connection.autoconnect yes
 nmcli con up p2p-dionysus
 ```
 
-#### 3. Check it
+#### 4. Check it
 
 ```bash
-ip -br addr show enxXXXXXXXXXXXX
+ip -br addr show p2plink0
 ```
 
 Expect `192.168.124.2/30`.
@@ -1168,6 +1198,9 @@ Needs Dionysus up on the other end.
 
 **Notes**
 
+- Both ends carry the same interface name, `p2plink0`, and the same connection-name pattern. The `.link` file matches on MAC, so each machine renames its own adapter and the two never collide.
+- `p2plink0` is chosen to be a name nothing else generates. The kernel produces `en*`, `wl*` and `ww*`; `wpa_supplicant` produces `p2p0` and `p2p-dev-*` for Wi-Fi Direct, which matters here because this machine has Wi-Fi. Both `eth0` and `p2p0` are avoided for that reason.
+- Rename first, create the profile second. A profile bound to the `enx` name stops matching the moment the rename takes effect.
 - No gateway and no DNS on this profile. `ipv4.never-default yes` states the same thing a second way, so a later edit that adds a gateway by accident cannot take the default route away from the interface that actually reaches the internet.
 - A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length, or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`–`.3`.
 - This is a second route to Dionysus when its LAN side is broken, which is worth having before reconfiguring that machine's management interface.
