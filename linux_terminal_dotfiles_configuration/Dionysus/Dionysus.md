@@ -409,7 +409,7 @@ sudo -i
 #### 2. Install the packages
 
 ```bash
-apt install -y bash-completion bridge-utils btop curl git jq lshw make openssl progress pwgen python3 rsync sshuttle sudo tmux tree unrar vim wget
+apt install -y bash-completion bridge-utils btop curl git jq lshw make network-manager openssl progress pwgen python3 rsync sshuttle sudo tmux tree unrar vim wget
 ```
 
 #### 3. Install what the Claude Code repository needs
@@ -489,7 +489,9 @@ Expect a number above 0. This machine is AMD, so the flag is `svm`.
 - Run `claude` as your own user, not root. Its settings and login live in your home directory, so as root they land in `/root`.
 - The keyring directory and the key fetch are done again in Step 7 for Docker. Both are safe to repeat: the directory is left alone if it exists, and the key file is overwritten with the same content.
 - This is Silenus's package list with everything desktop-only removed: no GNOME, no flatpak, no fonts, no media applications, none of which has anything to talk to on a headless host.
-- `bash-completion`, `python3` and `openssl` are here because `install.sh` in Step 5 checks for them and warns if they are missing. `tmux`, `vim`, `git`, `curl`, `jq` and `tree` are on the same list and already above.
+- `bash-completion`, `python3` and `openssl` are here because `install.sh` in Step 5 checks for them and warns if they are missing.
+- `network-manager` is here because a headless Debian install does not have it. It arrives on a desktop machine as a dependency of `gnome-core`, which is why Silenus has it without ever asking; no task a base install selects pulls it in. Step 9 needs `nmcli`, so it is installed with everything else rather than in the middle of reconfiguring the network.
+- Installing it here changes nothing on its own. Debian ships NetworkManager with `[ifupdown] managed=false`, so it will not touch `enp4s0` while the installer's stanza is still in `/etc/network/interfaces`. Handing that interface over is a deliberate act in Step 9. `tmux`, `vim`, `git`, `curl`, `jq` and `tree` are on the same list and already above.
 - `openssh-server` was installed by the Debian installer in Step 2 and is what you are connected over. It is not repeated here.
 - `net-tools` provides `netstat`, `ifconfig` and `route`. They are superseded by `ss` and `ip` from `iproute2`, which is already installed. Add it if the old names are what your muscle memory reaches for.
 - `bridge-utils` supplies `brctl`, used by the verification in Step 9. `ip link` shows the same information; `brctl show` is kept because it prints the bridge-to-member mapping more compactly.
@@ -1032,15 +1034,20 @@ Persisted through NetworkManager's own connection profiles with `nmcli`, not
 sudo -i
 ```
 
-#### 2. Install NetworkManager
+#### 2. Confirm NetworkManager is running
 
-```bash
-apt install -y network-manager
-```
+It was installed in Step 4, with everything else. This only makes sure it is up
+and will come up at boot:
 
 ```bash
 systemctl enable --now NetworkManager
 ```
+
+```bash
+systemctl is-active NetworkManager
+```
+
+Expect `active`.
 
 #### 3. Confirm the interface names
 
