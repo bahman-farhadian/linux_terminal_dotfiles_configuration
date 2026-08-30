@@ -153,6 +153,10 @@ ck "guest route fallback" "$(nmcli -t -g NAME connection show|while IFS= read -r
 ck "hephaestus profile" "$(nmcli -g connection.id connection show Hephaestus 2>/dev/null)" "Hephaestus"
 ck "hephaestus address" "$(nmcli -g ipv4.addresses connection show Hephaestus 2>/dev/null)" "192.168.124.6/30"
 ck "hephaestus route"   "$(nmcli -g ipv4.routes connection show Hephaestus 2>/dev/null|grep -c '192.168.40.0/24 192.168.124.5 100')" "1"
+# The fallback lives on the work WiFi profile, which only exists once that
+# network has been joined. Informational: it does not fail on a laptop that has
+# not been to the office yet.
+ok "hephaestus fallback" "$(nmcli -t -g NAME connection show|while IFS= read -r c; do nmcli -g ipv4.routes connection show "$c" 2>/dev/null; done|grep -o '192.168.40.0/24 192.168.88.212 200'|head -1||echo 'not set — work WiFi profile absent')"
 ck "one link autoconnects" "$(for c in Dionysus Hephaestus; do nmcli -g connection.autoconnect connection show "$c" 2>/dev/null; done|grep -c '^yes$')" "1"
 
 printf '\n--- Step 7/10: keyboard and lid ---\n'

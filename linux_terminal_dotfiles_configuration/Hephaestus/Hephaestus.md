@@ -28,14 +28,13 @@ right. Every block is written to be run again.
 
 ## Facts to confirm before starting
 
-Three things this document could not read from the machine. Each is marked at
-the step that uses it.
+Two things this document could not read from the machine. Each is marked at the
+step that uses it.
 
 | # | Fact | Used by |
 |---|------|---------|
 | 1 | Motherboard, for the BIOS setup key and menu paths | Step 1 |
-| 2 | Whether the WiFi network hands out addresses, or `192.168.88.212` is static | Step 9 |
-| 3 | Whether `sda` is an SSD or a spinning disk. It changes nothing here, since no over-provisioning is left on it either way, but it belongs in the record | Step 2 |
+| 2 | Whether `sda` is an SSD or a spinning disk. It changes nothing here, since no over-provisioning is left on it either way, but it belongs in the record | Step 2 |
 
 Everything else is settled. The CPU vendor is deliberately not on the list: the
 steps that care read it from the machine rather than being told.
@@ -78,20 +77,29 @@ indistinguishable from a guest on another.
 
 ### Step 1 — BIOS: Secure Boot and virtualization
 
+The same settings as Dionysus, including the ones passthrough would need. Every
+host in this estate leaves the BIOS in the same state, so a machine that later
+gains a card needs no trip back into firmware.
+
 | # | Step | How |
 |---|------|-----|
 | 1 | Enter BIOS | Power off fully, power on, tap the setup key at the vendor splash |
 | 2 | Note BIOS version | Write it down before changing anything |
-| 3 | Secure Boot | On, against the shipped key set |
+| 3 | Secure Boot | `OS Type` = **Windows UEFI mode**, or the vendor's equivalent |
 | 4 | Enable virtualization | `SVM Mode` on AMD, `Intel VT-x` on Intel |
-| 5 | Save and exit | Save changes and reboot |
-| 6 | Boot the installer | Open the boot menu, pick the USB device |
+| 5 | Enable IOMMU | `IOMMU` = **Enabled** — `AMD-Vi` or `Intel VT-d` |
+| 6 | Above 4G Decoding | **Enabled** |
+| 7 | Resizable BAR | **Auto**, or **Enabled** |
+| 8 | Save and exit | Save changes and reboot |
+| 9 | Boot the installer | Open the boot menu, pick the USB device |
 
 **Notes**
 
 - **Fact 1.** The setup key and the exact wording of each line depend on the board — commonly **Del** or **F2**. This table names the settings, not the menu paths, until the board is recorded.
 - Debian's bootloader is signed by Microsoft's 3rd party UEFI CA. The key set has to include it or the machine will not boot and shows `Invalid signature detected`. On ASUS boards the switch is `OS Type` = **Windows UEFI mode**; other vendors name it after the CA directly.
-- No IOMMU settings here, and no `Above 4G Decoding` or `Resizable BAR`. Those exist on Dionysus to make VFIO groups usable for GPU passthrough; this machine has no card to hand over, so that whole chain is absent.
+- **The IOMMU lines are set even though nothing here uses them.** They cost nothing when idle, and the alternative is a trip back into firmware — on a machine at another site — the day this host is given a card. What is absent is the *operating system* side of passthrough: no `amd_iommu=on` on the kernel command line, no `vfio-pci` binding, no driver blacklist, no `vfio` in the initramfs. Dionysus.md Step 9 is where that lives if it is ever wanted here.
+- Turning the 3rd party CA on may switch `Secure Boot Mode` from `Standard` to `Custom`. That is expected. Custom only means the key set is no longer the factory default; Secure Boot still checks every signature.
+- Never use `Reset to Setup Mode` or `Clear All Secure Boot Keys`. They cause the boot failure above and Debian does not need them.
 - There is no swap anywhere in this build, so the hibernation caveat that applies to Silenus does not arise.
 
 ### Step 2 — Disk partitioning
@@ -121,7 +129,7 @@ installer will then display the **Shows as** value.
 | Field | Value |
 |---|---|
 | Interface | the onboard WiFi, `wlp2s0` — the installer asks for the network and its key |
-| Addressing | **fact 2**: accept DHCP, or enter `192.168.88.212/24` by hand |
+| Addressing | DHCP. The work network hands out addresses; `192.168.88.212` is what it has been giving this machine |
 | Hostname | `hephaestus` |
 | Domain | leave empty |
 
@@ -132,7 +140,7 @@ environment task; this host stays headless.
 
 - The OS disk here is the NVMe and the bulk disk is the SATA drive, which is the reverse of Dionysus. The four sizes on `nvme0n1` are identical to Dionysus's `sda` because the two disks are the same size, so the same numbers apply unchanged.
 - The four partitions on `nvme0n1` come to 227 GiB of the 232.9 the disk reports, leaving about 5.9 GiB unpartitioned as SSD over-provisioning — the drive uses it for wear levelling, which keeps write speed up as it fills.
-- `sda` takes the whole disk with `max` and keeps no such margin, which is the one deliberate difference from how Dionysus treats its bulk disks. **Fact 3**: if it turns out to be an SSD that will run close to full, taking 4% off it is worth more than the capacity.
+- `sda` takes the whole disk with `max` and keeps no such margin, which is the one deliberate difference from how Dionysus treats its bulk disks. **Fact 2**: if it turns out to be an SSD that will run close to full, taking 4% off it is worth more than the capacity.
 - There is one bulk disk here where Dionysus has two, so there is one pool rather than two. `sssd` does not exist on this host; anything Dionysus would put there goes on `lssd`.
 - The installer counts in GB, `df -h` counts in GiB. The root partition is entered as `34360 MB`, shows as `34.4 GB`, and reports as `32G` once installed. Same partition.
 - For any other size: type `GiB x 1073.741824` MB, rounded. The EFI partition is entered as `1075 MB` rather than the 1074 the formula gives; that is the number the other two hosts use for the same partition, and one megabyte over makes no difference.
@@ -370,7 +378,7 @@ Compare with what you wrote down in Step 1.
 
 **Notes**
 
-- `GRUB_CMDLINE_LINUX_DEFAULT` carries only the boot-console settings here. Dionysus adds `amd_iommu=on iommu=pt vfio-pci.disable_idle_d3=1` for passthrough; with no card to hand over, none of that applies.
+- `GRUB_CMDLINE_LINUX_DEFAULT` carries only the boot-console settings here. Dionysus adds `amd_iommu=on iommu=pt vfio-pci.disable_idle_d3=1` for passthrough. The BIOS has the IOMMU on either way — Step 1 sets the same firmware state on every host — but the kernel is not told to use it, because nothing here does.
 - `GRUB_CMDLINE_LINUX` is empty, as on Dionysus and unlike Silenus. Silenus needs `rootflags=uquota,pquota` because its root filesystem is XFS with quota and root is mounted before `/etc/fstab` is read. Here root is ext4 and the quota is on ordinary fstab mounts, so fstab is the right place.
 - A partition created as the wrong type is worth catching here rather than by its symptoms later. `lost+found` in the root of a mount is a good tell: ext4 creates it, XFS never does. So is a gap between `Size` and `Avail` in `df` on an almost-empty filesystem — ext4 reserves 5% of its blocks for root, XFS reserves none.
 - Reformatting one of these is cheap while they are empty: `umount`, `mkfs.xfs -f <device>`, then fix `/etc/fstab`. `mkfs.xfs` writes a **new UUID**, so the `UUID=` in fstab has to be replaced with `blkid -s UUID -o value <device>` — left stale, the next boot waits for a device that no longer exists. Set the type to `xfs` and the fsck pass to `0` in the same edit: XFS has no boot-time fsck, and a pass of `2` makes it fail on every boot.
@@ -869,16 +877,19 @@ nmcli connection show
 nmcli con mod <existing-wifi-profile> connection.id wan
 ```
 
-**Fact 2** decides the rest. If the network hands out addresses, nothing more is
-needed. If `192.168.88.212` is meant to be fixed, replace `<gateway>` and run:
-
-```bash
-nmcli con mod wan ipv4.method manual ipv4.addresses 192.168.88.212/24 ipv4.gateway <gateway> ipv4.dns "8.8.8.8" ipv6.method disabled
-```
+The work network runs DHCP, so the addressing needs nothing further:
 
 ```bash
 nmcli con up wan
 ```
+
+```bash
+ip -br addr show wlp2s0
+```
+
+Expect an address on `192.168.88.0/24`. It has been `192.168.88.212`; a DHCP
+lease is not a guarantee, so anything that has to reach this host by address
+either wants a reservation on the work DHCP server or should use the cable.
 
 #### 5. The point-to-point link to Silenus
 
@@ -966,6 +977,7 @@ Expect `net.ipv4.ip_forward = 1`.
 - Nothing is renamed on this host. Both interfaces have stable hardware-derived names already, which is exactly why Dionysus renames its USB adapter and this machine renames nothing.
 - Whether `wlp2s0` needs the `[ifupdown] managed=false` handover Dionysus's ethernet needed depends on what the installer wrote. Check `/etc/network/interfaces`: if it carries a stanza for `wlp2s0`, remove all but the loopback lines and restart NetworkManager, exactly as Dionysus.md Step 10 sub-step 5 does. A WiFi install usually leaves NetworkManager in charge already.
 - The two point-to-point links do not overlap. Silenus reaches Dionysus on `192.168.124.0/30` — hosts `.1` and `.2` — and this machine on `192.168.124.4/30` — hosts `.5` and `.6`. Adjacent `/30`s out of the same `/29`, deliberately, so one range covers every point-to-point link in the estate without any two colliding.
+- `wan` takes its address by DHCP, which is the one place this host differs from the other two — both of those are static because their router hands out nothing. A lease can change, so the cable at `192.168.124.5` is the address to rely on, and Silenus reaches the guest network across it first for exactly that reason.
 - The cable is the second way in when WiFi fails, which matters more here than on Dionysus: this machine is at another site and has no console you can walk to. Bring `Hephaestus` up before touching `wan`, and make any change to `wan` from a `tmux` session so a dropped connection does not leave a command half-done.
 - Silenus has one spare ethernet port and two point-to-point links to make with it, so it carries a profile per peer on the same interface and only one is up at a time. Which one depends on which cable is plugged in, and it is chosen by hand there.
 
