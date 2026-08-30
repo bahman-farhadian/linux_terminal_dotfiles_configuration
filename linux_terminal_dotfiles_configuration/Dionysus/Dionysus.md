@@ -4,8 +4,8 @@ Hostname `Dionysus`. Purely headless: base system and `openssh-server` only, no
 desktop environment, administered over SSH. The GNOME workstation is
 [Silenus.md](../Silenus/Silenus.md).
 
-AMD Ryzen 9 3900X (12c/24t), 128 GB RAM, single GbE NIC (Intel I211), NVIDIA GPU
-reserved for guest passthrough. Three disks:
+AMD Ryzen 9 3900X (12c/24t), 128 GB RAM, **two RJ45 network interfaces**, NVIDIA
+GPU reserved for guest passthrough. Three disks:
 
 | Role | Interface | Size |
 |---|---|---|
@@ -892,7 +892,8 @@ Expect `net.ipv4.ip_forward = 1`.
 - Changing the address of the interface you are connected over will drop your session. Run this from a console, or from `tmux` so the shell survives the disconnect, and know how to reach the machine physically before starting.
 - `br-kvm` is defined by hand rather than as a libvirt NAT network because libvirt rewrites its own iptables chains whenever `libvirtd` restarts, which conflicts with the hand-maintained ruleset in Step 10. That is also why Step 6 removed the `default` network.
 - Attach guest domain XML NICs to `br-kvm`.
-- `enp4s0` is the interface name for this build's Intel I211. Confirm it with `ip -br link` before running the bridge commands; a different NIC enumerates differently.
+- **TBD — this host has two RJ45 interfaces, and Step 9 above is still written for one.** The names, which one carries management, and whether the second one hosts guests directly, is bonded with the first, or is left down, are all open. Confirm the names with `ip -br link`; `enp4s0` is a placeholder from the draft, not a reading from this machine.
+- **TBD — guest network.** The draft defines `br-kvm` by hand through NetworkManager. Silenus instead uses a libvirt network, `static_network_24`, defined from `kvm/static_network_24.xml`. Whichever this host uses, the reason the draft avoided libvirt still holds: libvirt rewrites its own iptables chains on restart, so a hand-maintained ruleset in Step 10 and a libvirt-managed network do not mix.
 
 ### Step 10 — Firewall
 
