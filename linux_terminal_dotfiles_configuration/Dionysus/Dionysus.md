@@ -1070,6 +1070,47 @@ before any profile is bound to it.
 Persisted through NetworkManager's own connection profiles with `nmcli`, not
 `/etc/network/interfaces`.
 
+```mermaid
+graph TB
+    INET(("Internet"))
+    R["Router<br/>192.168.8.1<br/>no DHCP"]
+    INET --- R
+
+    subgraph SIL ["Silenus &middot; ThinkPad T14 Gen 4"]
+        SW["wlp0s20f3 &middot; Huawei-Router<br/>192.168.8.2/24"]
+        SP["enp0s31f6 &middot; Dionysus<br/>192.168.124.2/30"]
+        SB["virbr1 &middot; static_network_24<br/>192.168.24.1/24 &middot; NAT"]
+        SG["guests<br/>192.168.24.2 &ndash; .254<br/>static, no DHCP"]
+        SB --- SG
+    end
+
+    subgraph DIO ["Dionysus &middot; Ryzen 9 3900X"]
+        DW["enp4s0 &middot; wan<br/>192.168.8.3/24"]
+        DP["p2plink0 &middot; Dionysus<br/>192.168.124.1/30"]
+        DB["virbr1 &middot; static_network_32<br/>192.168.32.1/24 &middot; NAT"]
+        DG["guests<br/>192.168.32.2 &ndash; .254<br/>static, no DHCP"]
+        DB --- DG
+    end
+
+    R ---|wifi| SW
+    R ---|Intel I211| DW
+    SP ===|USB-C ethernet cable| DP
+
+    classDef wan fill:#1f6feb,stroke:#0b4fc0,color:#ffffff
+    classDef p2p fill:#8957e5,stroke:#6a3fbf,color:#ffffff
+    classDef guest fill:#2da44e,stroke:#1a7f37,color:#ffffff
+    classDef infra fill:#57606a,stroke:#424a53,color:#ffffff
+    class SW,DW wan
+    class SP,DP p2p
+    class SB,SG,DB,DG guest
+    class R,INET infra
+```
+
+Blue is the way out, purple the point-to-point cable, green the guest networks
+each host NATs behind itself. The two guest subnets differ on purpose — the
+hosts can reach each other, so overlapping ranges would make a guest on one
+indistinguishable from a guest on the other.
+
 #### 1. Become root
 
 ```bash
@@ -1256,84 +1297,106 @@ Expect `net.ipv4.ip_forward = 1`.
 
 ### Step 11 — Firewall
 
-`libvirt` installs the NAT and forwarding rules for `static_network_32` itself
-when the network starts. This step does not repeat them: a hand-written
-MASQUERADE for the same subnet would be a duplicate, and the draft's
-`iptables-persistent` ruleset existed only because the draft built its own
-bridge.
+`libvirt` writes the rules for `static_network_32` itself when the network
+starts. This step does not repeat any of them. It adds the one thing libvirt
+deliberately does not do: letting a machine outside the guest network open a
+connection into it.
 
 #### 1. Read what libvirt installed
 
 ```bash
-sudo iptables -t nat -L LIBVIRT_PRT -n -v
+sudo iptables -L LIBVIRT_FWI -n -v
 ```
 
 ```bash
 sudo iptables -L LIBVIRT_FWO -n -v
 ```
 
-Expect a MASQUERADE for `192.168.32.0/24` and forwarding rules for `virbr1`.
+```bash
+sudo iptables -t nat -L LIBVIRT_PRT -n -v
+```
 
-#### 2. Let Silenus reach the guests
+Three rules explain the whole situation:
 
-A libvirt NAT network permits guests outbound and lets the replies back. A
-connection opened from outside *into* `192.168.32.0/24` is neither, so it is
-dropped — the routes on Silenus put the packets at Dionysus's door and this is
-what opens it. Needed for both paths, the cable and the LAN:
+```
+-A LIBVIRT_FWO -s 192.168.32.0/24 -i virbr1 -j ACCEPT
+-A LIBVIRT_FWI -d 192.168.32.0/24 -o virbr1 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A LIBVIRT_FWI -o virbr1 -j REJECT --reject-with icmp-port-unreachable
+```
+
+A guest reaches the outside, and the replies come back because conntrack knows
+about them. A connection *started* from outside matches neither `ACCEPT` and
+falls to the `REJECT`. That is the gap this step closes.
+
+#### 2. What this step adds, and what is optional
+
+| # | Rule | Required | Why |
+|---|------|----------|-----|
+| 1 | `FORWARD` accept, private ranges → `192.168.32.0/24` | **yes** | without it nothing on your network can reach a guest at all |
+| 2 | `DNAT` on a port to one guest | no | only to publish a guest service to the LAN |
+
+Rule 1 is the whole point of the step. Rule 2 is a convenience for one service
+and most builds never need it.
+
+#### 3. Install iptables-persistent
 
 ```bash
 sudo apt install -y iptables-persistent
 ```
 
-```bash
-sudo iptables -I FORWARD -s 192.168.124.2 -d 192.168.32.0/24 -o virbr1 -j ACCEPT
-```
+#### 4. Add the required rules
+
+Every RFC 1918 range may open connections into the guest network. Safe to run
+again: each rule is checked before it is inserted, and the two narrower rules an
+earlier version of this step used are removed if they are still there.
 
 ```bash
-sudo iptables -I FORWARD -s 192.168.8.2 -d 192.168.32.0/24 -o virbr1 -j ACCEPT
-```
-
-```bash
+sudo iptables -D FORWARD -s 192.168.8.2/32 -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null || true
+sudo iptables -D FORWARD -s 192.168.124.2/32 -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null || true
+for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do sudo iptables -C FORWARD -s "$net" -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null || sudo iptables -I FORWARD -s "$net" -d 192.168.32.0/24 -o virbr1 -j ACCEPT; done
 sudo netfilter-persistent save
 ```
 
-Test it from Silenus, against a guest that is actually running:
+#### 5. Test that the required rules are there
 
 ```bash
-ping -c3 192.168.32.10
+for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do sudo iptables -C FORWARD -s "$net" -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null && printf '  PASS  %s\n' "$net" || printf '  FAIL  %s\n' "$net"; done
 ```
 
-#### 3. Exposing a guest service, if any
-
-Guests reach the outside through NAT. The outside cannot open a connection into
-a guest without an explicit rule. Only if that is needed:
+Three `PASS` lines. Then check they were written to disk, so they come back
+after a reboot:
 
 ```bash
-sudo apt install -y iptables-persistent
+grep -c 'd 192.168.32.0/24 -o virbr1 -j ACCEPT' /etc/iptables/rules.v4
 ```
+
+Expect `3`.
+
+**This tests the rules, not reachability.** Pinging a guest address proves
+nothing while no guest holds that address — the ping would fail with a perfect
+ruleset. The reachability test belongs in Step 12, once a guest exists.
+
+#### 6. Optional — publish a guest service to the LAN
+
+Only if something on the LAN has to reach a service inside a guest without a
+route to `192.168.32.0/24`. Replace the address and ports:
 
 ```bash
 sudo iptables -t nat -A PREROUTING -i enp4s0 -p tcp --dport 2222 -j DNAT --to-destination 192.168.32.10:22
-```
-
-```bash
 sudo iptables -A FORWARD -i enp4s0 -o virbr1 -p tcp -d 192.168.32.10 --dport 22 -j ACCEPT
-```
-
-```bash
 sudo netfilter-persistent save
 ```
 
 **Notes**
 
-- The two rules name Silenus's two addresses rather than whole subnets, so this opens the guest network to one machine and not to everything on `192.168.8.0/24`. Widen to `-s 192.168.8.0/24` only if you mean to.
-- `-I` inserts at the head of `FORWARD`, ahead of the jump into libvirt's own chains, which is what lets these take effect. Running the sub-step twice inserts a second copy of each; `iptables -L FORWARD -n --line-numbers` shows them and `iptables -D FORWARD <n>` removes one.
-- Return traffic needs no rule. Connection tracking matches the replies to the connection Silenus opened, and libvirt's MASQUERADE only applies to traffic a guest itself starts towards somewhere outside its own subnet.
-- Nothing else in this step is required for a working build. A host whose guests only make outbound connections needs none of it, and installing `iptables-persistent` before that is true only creates a saved ruleset to keep in step with reality.
-- `libvirtd` rewrites its own chains when it restarts. Rules added by hand live outside those chains and survive, but the ordering between them is worth re-checking after a restart rather than assumed.
-- `iptables -A` appends, so running the DNAT sub-step twice adds a second copy of each rule. `netfilter-persistent save` then writes both.
+- The required rule names the three RFC 1918 ranges rather than one machine, so anything on a private network that has a route to `192.168.32.0/24` can reach a guest. That is a deliberate widening from an earlier version, which named Silenus's two addresses and nothing else.
+- A route is still needed at the other end. These rules permit the traffic; they do not tell any machine how to get here. Silenus.md Step 13 adds the routes; a host without one never sends the packets at all.
+- `172.16.0.0/12` includes `172.17.0.0/16`, which is `docker0` on this machine, so containers can reach guests too. Drop that range if you would rather they could not.
+- `-I` inserts at the head of `FORWARD`, ahead of the jumps into libvirt's and Docker's chains. That position is what makes the rules take effect; appended with `-A` they would sit after `LIBVIRT_FWI` has already rejected the packet.
+- Return traffic needs no rule. Conntrack matches the replies to the connection that was opened, and libvirt's `MASQUERADE` only applies to traffic a guest itself starts towards something outside its own subnet.
+- `netfilter-persistent save` writes `/etc/iptables/rules.v4`. Without it the rules are lost at the next boot, and sub-step 5 checks the file rather than trusting that `save` exited cleanly.
+- `libvirtd` rewrites its own chains when it restarts. These rules live in `FORWARD` itself, outside those chains, and survive — but their position relative to the jumps is worth re-checking after a `libvirtd` restart rather than assumed.
 - The guest subnet is `192.168.32.0/24` here and `192.168.24.0/24` on Silenus. They differ on purpose: both hosts are reachable from each other, so overlapping guest ranges would make a guest on one indistinguishable from a guest on the other.
-
 
 ### Step 12 — Reboot and final verification
 
