@@ -4,10 +4,10 @@ Debian dotfiles for **bash**, **tmux**, and **SSH** — Gruvbox dark theme
 throughout. Adapted from the macOS set, with every macOS-only assumption
 removed.
 
-The repository also carries
-[thinkpad-t14-gen4-debian-13-setup.md](thinkpad-t14-gen4-debian-13-setup.md),
-the Debian 13 install and configuration guide for the machine these dotfiles
-were built on.
+The repository also carries a Debian 13 build guide per machine, named for the
+host: [Silenus.md](Silenus.md), the Lenovo ThinkPad T14 Gen 4 (Intel) GNOME
+workstation these dotfiles were built on, and [Dionysus.md](Dionysus.md), a
+headless AMD Ryzen 9 3900X KVM and Docker host with no desktop environment.
 
 ## Layout
 
@@ -20,12 +20,13 @@ linux_terminal_dotfiles_configuration/
 ├── tmux/
 │   └── tmux.conf      → ~/.tmux.conf
 ├── ssh/
-│   └── config         → appended to ~/.ssh/config
+│   └── config         → managed block in ~/.ssh/config
 ├── install.sh
 ├── check.sh
 ├── gnome-app-folders.py
 ├── hushlogin          → ~/.hushlogin
-└── thinkpad-t14-gen4-debian-13-setup.md
+├── Silenus.md         ThinkPad T14 Gen 4 (Intel) workstation
+└── Dionysus.md        headless Ryzen 9 3900X KVM host
 ```
 
 ## Prerequisites

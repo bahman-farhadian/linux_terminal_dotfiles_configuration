@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# check.sh — verify this machine matches thinkpad-t14-gen4-debian-13-setup.md.
+# check.sh — verify this machine matches Silenus.md. Silenus only: the disk
+# layout, GNOME and desktop-session checks do not apply to Dionysus.
 #
 # Reads only, never writes. Run as your own user from a desktop session
 # terminal. Exits 0 when every check passes and 1 when any fails.
