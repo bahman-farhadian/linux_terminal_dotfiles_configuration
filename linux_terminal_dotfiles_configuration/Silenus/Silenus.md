@@ -2,7 +2,7 @@
 
 Hostname `Silenus`. Lenovo ThinkPad T14 Gen 4, Intel platform: a GNOME
 workstation, with KVM and Docker running alongside the desktop session. The
-headless host is [Dionysus.md](Dionysus.md).
+headless host is [Dionysus.md](../Dionysus/Dionysus.md).
 
 Every step here can be run again without harm. Files are written whole rather
 than appended to, package installs skip what is present, and group membership
