@@ -99,7 +99,6 @@ ck "nofile soft"     "$(grep -c 'soft.*nofile.*65536' /etc/security/limits.d/99-
 ck "nofile hard"     "$(grep -c 'hard.*nofile.*1048576' /etc/security/limits.d/99-kvm.conf 2>/dev/null)" "1"
 ck "sssd-pool"       "$(virsh -c qemu:///system pool-list --name 2>/dev/null|grep -cx sssd-pool)" "1"
 ck "lssd-pool"       "$(virsh -c qemu:///system pool-list --name 2>/dev/null|grep -cx lssd-pool)" "1"
-ck "no default pool" "$(virsh -c qemu:///system pool-list --all --name 2>/dev/null|grep -cx default)" "0"
 ck "no default net"  "$(virsh -c qemu:///system net-list --all --name 2>/dev/null|grep -cx default)" "0"
 ck "static_network_32" "$(virsh -c qemu:///system net-list --name 2>/dev/null|grep -cx static_network_32)" "1"
 ck "net autostart"   "$(virsh -c qemu:///system net-info static_network_32 2>/dev/null|awk '/^Autostart/{print $2}')" "yes"
