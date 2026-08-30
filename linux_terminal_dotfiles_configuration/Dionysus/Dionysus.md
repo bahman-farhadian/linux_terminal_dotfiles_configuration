@@ -83,11 +83,29 @@ installer will then display the **Shows as** value.
 |---|-----------|------|----------|----------|--------|-------|
 | 1 | lssd | 888 GiB | `953483 MB` | 953.5 GB | xfs | `/data-root/lssd` |
 
+**Hostname and network, during the install**
+
+The router runs no DHCP, so the installer's automatic configuration will fail
+and drop to asking. That is expected — answer it:
+
+| Field | Value |
+|---|---|
+| Interface | the onboard Intel I211, `enp4s0` |
+| IP address | `192.168.8.3` |
+| Netmask | `255.255.255.0` |
+| Gateway | `192.168.8.1` |
+| Name server | `8.8.8.8` |
+| Hostname | `dionysus` |
+| Domain | leave empty |
+
 Package selection: base system and `openssh-server` only. Deselect the desktop
 environment task; this host stays headless.
 
 **Notes**
 
+- The hostname is what makes this machine Dionysus rather than Nyx. The installer writes it to `/etc/hostname` and `/etc/hosts`; nothing later in this document sets it.
+- Without a working network the installer cannot reach the mirror, and Steps 3 to 7 have nothing to install from. `Network autoconfiguration failed` is the expected message on this LAN, not a fault.
+- Configure only the onboard interface here. The USB adapter has no carrier unless the cable to Silenus is plugged in, and Step 9 configures it properly; if the installer offers a choice, pick `enp4s0`.
 - The installer counts in GB, `df -h` counts in GiB. The root partition is entered as `34360 MB`, shows as `34.4 GB`, and reports as `32G` once installed. Same partition.
 - For any other size: type `GiB x 1073.741824` MB, rounded. The EFI partition is entered as `1075 MB` rather than the 1074 the formula gives; that is the number Silenus uses for the same partition, and one megabyte over makes no difference.
 - The four partitions on `sda` come to 227 GiB of the 233 GiB the disk reports, leaving about 6 GiB unpartitioned. That free space is SSD over-provisioning, the same reasoning as Silenus: the drive uses it for wear levelling, which keeps write speed up as the disk fills. It is a smaller margin than Silenus keeps — 2.6% against 6.6% — so raise it by taking a few GiB off `/data-root` if this disk is expected to run close to full.
@@ -481,19 +499,34 @@ Expect a number above 0. This machine is AMD, so the flag is `svm`.
 The bash, tmux, and SSH configuration is in this repository, in this host's own
 directory. Everything it needs was installed in Step 4.
 
-#### 1. Leave the root shell
+#### 1. Get the repository onto this machine
+
+A freshly installed host does not have it yet:
+
+```bash
+git clone <repository-url> ~/dotfiles
+```
+
+```bash
+cd ~/dotfiles/linux_terminal_dotfiles_configuration/Dionysus
+```
+
+Keep it. `install.sh` needs the directory to re-run, and Step 6 reads
+`kvm/static_network_32.xml` from it.
+
+#### 2. Leave the root shell
 
 ```bash
 exit
 ```
 
-#### 2. Run the installer
+#### 3. Run the installer
 
 ```bash
 ./install.sh
 ```
 
-#### 3. Reload the shell
+#### 4. Reload the shell
 
 ```bash
 exec bash
@@ -1044,7 +1077,49 @@ ip -br link
 
 Expect `p2plink0` and no `enx9405bb143cf5`.
 
-#### 5. Clear the profiles the installer left
+#### 5. Hand the LAN interface over from ifupdown
+
+The installer configured `enp4s0` in `/etc/network/interfaces`, because a
+headless install has no NetworkManager to hand it to. Debian ships
+NetworkManager with `[ifupdown] managed=false`, so it will not touch an
+interface defined there: the profile in sub-step 7 would be created and then
+never activate, and `nmcli device status` would report the device `unmanaged`.
+
+**Do this at the console, not over SSH.** It takes the LAN interface down and
+back up, and the session you are running it through goes with it.
+
+```bash
+cat /etc/network/interfaces
+```
+
+```bash
+ls /etc/network/interfaces.d/
+```
+
+Remove the `enp4s0` stanza, leaving only the loopback and the `source` line, so
+the file reads exactly this:
+
+```
+source /etc/network/interfaces.d/*
+
+auto lo
+iface lo inet loopback
+```
+
+Delete any file under `interfaces.d/` that configures `enp4s0` as well.
+
+```bash
+systemctl restart NetworkManager
+```
+
+```bash
+nmcli device status
+```
+
+Expect `enp4s0` to read `disconnected`, not `unmanaged`. `unmanaged` means an
+ifupdown definition is still in place somewhere.
+
+#### 6. Clear the profiles the installer left
 
 ```bash
 nmcli connection show
@@ -1056,7 +1131,7 @@ nmcli connection delete <connection-name>
 
 Repeat the delete for each existing profile before laying down the two below.
 
-#### 6. The LAN interface
+#### 7. The LAN interface
 
 Static, because the router runs no DHCP server:
 
@@ -1084,7 +1159,7 @@ Expect `192.168.8.3/24`.
 ping -c4 192.168.8.1
 ```
 
-#### 7. The point-to-point link to Silenus
+#### 8. The point-to-point link to Silenus
 
 No gateway and no DNS: this link carries traffic between the two machines and
 nothing else, so it must not compete with `enp4s0` for the default route.
@@ -1116,7 +1191,7 @@ no gateway and no DNS. With both ends up:
 ping -c4 192.168.124.2
 ```
 
-#### 8. Enable IP forwarding
+#### 9. Enable IP forwarding
 
 ```bash
 vim /etc/sysctl.d/99-kvm.conf
@@ -1148,6 +1223,8 @@ Expect `net.ipv4.ip_forward = 1`.
 - Rename first, create the profile second. A profile bound to `enx9405bb143cf5` stops matching the moment the rename takes effect.
 - `ipv4.never-default yes` on the point-to-point link is what keeps it from installing a default route. Without a gateway it would not install one anyway, but stating it means a later edit that adds a gateway by accident cannot silently steal the default route from `enp4s0`.
 - A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`-`.3`.
+- `managed=false` is Debian's default, not NetworkManager's own. It exists so that a machine configured through `/etc/network/interfaces` does not have NetworkManager fight it. The consequence here is that removing the stanza is what hands the interface over — installing NetworkManager alone does nothing.
+- The address does not change across the handover: ifupdown and the new profile both hold `192.168.8.3/24`. The interface still goes down and up, so an SSH session over it does not survive.
 - **Changing the address of `enp4s0` will drop your SSH session.** The address in the table is the one the machine already has as `Nyx`, so in practice this step re-creates the profile it is already using. Run it from a console, or from `tmux` so the shell survives, and know how to reach the box physically first.
 - The point-to-point link is a second way in when the LAN side is broken, which is worth having on a machine whose management interface you are about to reconfigure. Bring it up before touching `enp4s0`.
 - IPv6 is disabled on both profiles. Nothing in this build uses it, and leaving it on means a second address family to reason about in the firewall.
