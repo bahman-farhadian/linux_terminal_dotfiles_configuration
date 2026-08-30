@@ -1086,63 +1086,13 @@ ip -br link
 
 Expect `p2plink0` and no `enx9405bb143cf5`.
 
-#### 5. Hand the LAN interface over from ifupdown
+#### 5. Create both connection profiles
 
-The installer configured `enp4s0` in `/etc/network/interfaces`, because a
-headless install has no NetworkManager to hand it to. Debian ships
-NetworkManager with `[ifupdown] managed=false`, so it will not touch an
-interface defined there: the profile in sub-step 7 would be created and then
-never activate, and `nmcli device status` would report the device `unmanaged`.
+Written now, activated later. A profile for a device NetworkManager does not yet
+manage is stored without complaint; it simply cannot come up until sub-step 7
+hands the device over.
 
-**Do this at the console, not over SSH.** It takes the LAN interface down and
-back up, and the session you are running it through goes with it.
-
-```bash
-cat /etc/network/interfaces
-```
-
-```bash
-ls /etc/network/interfaces.d/
-```
-
-Remove the `enp4s0` stanza, leaving only the loopback and the `source` line, so
-the file reads exactly this:
-
-```
-source /etc/network/interfaces.d/*
-
-auto lo
-iface lo inet loopback
-```
-
-Delete any file under `interfaces.d/` that configures `enp4s0` as well.
-
-```bash
-systemctl restart NetworkManager
-```
-
-```bash
-nmcli device status
-```
-
-Expect `enp4s0` to read `disconnected`, not `unmanaged`. `unmanaged` means an
-ifupdown definition is still in place somewhere.
-
-#### 6. Clear the profiles the installer left
-
-```bash
-nmcli connection show
-```
-
-```bash
-nmcli connection delete <connection-name>
-```
-
-Repeat the delete for each existing profile before laying down the two below.
-
-#### 7. The LAN interface
-
-Static, because the router runs no DHCP server:
+LAN — static, because the router runs no DHCP:
 
 ```bash
 nmcli con add type ethernet ifname enp4s0 con-name lan \
@@ -1154,24 +1104,8 @@ nmcli con add type ethernet ifname enp4s0 con-name lan \
 nmcli con mod lan connection.autoconnect yes
 ```
 
-```bash
-nmcli con up lan
-```
-
-```bash
-ip -br addr show enp4s0
-```
-
-Expect `192.168.8.3/24`.
-
-```bash
-ping -c4 192.168.8.1
-```
-
-#### 8. The point-to-point link to Silenus
-
-No gateway and no DNS: this link carries traffic between the two machines and
-nothing else, so it must not compete with `enp4s0` for the default route.
+Point-to-point to Silenus — no gateway and no DNS, so it cannot compete with the
+LAN for the default route:
 
 ```bash
 nmcli con add type ethernet ifname p2plink0 con-name p2p-silenus \
@@ -1184,6 +1118,17 @@ nmcli con mod p2p-silenus connection.autoconnect yes
 ```
 
 ```bash
+nmcli connection show
+```
+
+Both listed. Neither active yet.
+
+#### 6. Bring up the point-to-point link first
+
+The USB adapter was never in `/etc/network/interfaces`, so NetworkManager owns it
+already and this activates straight away:
+
+```bash
 nmcli con up p2p-silenus
 ```
 
@@ -1193,12 +1138,109 @@ ip -br addr show p2plink0
 
 Expect `192.168.124.1/30`.
 
-On Silenus, the other end of the same cable takes `192.168.124.2/30`, also with
-no gateway and no DNS. With both ends up:
+Plug the USB-C cable into Silenus, bring up its end — Silenus.md Step 13 — and
+confirm from Silenus that this works:
 
 ```bash
-ping -c4 192.168.124.2
+ssh <your-user>@192.168.124.1
 ```
+
+This is why the order is what it is. The next sub-step takes the LAN interface
+down, and this link is a second way in that does not depend on it.
+
+#### 7. Hand the LAN interface over from ifupdown
+
+The installer configured `enp4s0` in `/etc/network/interfaces`, because a
+headless install has no NetworkManager to hand it to. Debian ships
+NetworkManager with `[ifupdown] managed=false`, so it will not touch an
+interface defined there: `nmcli con up lan` fails with the device reported
+`unmanaged` until that stanza is gone.
+
+See what the installer wrote:
+
+```bash
+cat /etc/network/interfaces
+```
+
+```bash
+ls /etc/network/interfaces.d/
+```
+
+Back it up and write the handover as a script, so it runs as one piece:
+
+```bash
+cp /etc/network/interfaces /root/interfaces.bak
+```
+
+```bash
+cat > /root/lan-handover.sh <<'EOF'
+#!/bin/sh
+# Hand enp4s0 from ifupdown to NetworkManager, then activate the profile.
+set -e
+printf 'source /etc/network/interfaces.d/*\n\nauto lo\niface lo inet loopback\n' \
+  > /etc/network/interfaces
+grep -rl enp4s0 /etc/network/interfaces.d/ 2>/dev/null | xargs -r rm -f
+systemctl restart NetworkManager
+sleep 5
+nmcli con up lan
+EOF
+```
+
+```bash
+chmod +x /root/lan-handover.sh
+```
+
+Arm a rollback **before** running it. If you cannot get back in, this restores
+the old configuration and reboots into it after ten minutes:
+
+```bash
+systemd-run --on-active=10min --unit=net-rollback \
+  /bin/sh -c 'cp /root/interfaces.bak /etc/network/interfaces; systemctl disable --now NetworkManager; reboot'
+```
+
+Now run the handover detached from your login session:
+
+```bash
+systemd-run --unit=lan-handover --collect /root/lan-handover.sh
+```
+
+The session will drop. Wait about fifteen seconds and reconnect.
+
+#### 8. Confirm, then cancel the rollback
+
+```bash
+nmcli device status
+```
+
+Expect `enp4s0` `connected` on `lan`, and `p2plink0` `connected` on
+`p2p-silenus`. `unmanaged` against `enp4s0` means an ifupdown definition is
+still in place somewhere under `interfaces.d/`.
+
+```bash
+ip -br addr show enp4s0 p2plink0
+```
+
+```bash
+ip -4 route
+```
+
+Exactly one default route, via `192.168.8.1` on `enp4s0`.
+
+```bash
+ping -c4 192.168.8.1
+```
+
+Only once all of that is right:
+
+```bash
+systemctl stop net-rollback.timer
+```
+
+```bash
+systemctl list-timers net-rollback.timer --all
+```
+
+Nothing listed.
 
 #### 9. Enable IP forwarding
 
