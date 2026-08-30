@@ -243,14 +243,29 @@ EN_PAIR="[('xkb', 'us'), ('xkb', 'ir')]"
 sources_now() { gsettings get "$SCHEMA" sources 2>/dev/null; }
 set_sources()  { [ "$(sources_now)" = "$1" ] || gsettings set "$SCHEMA" sources "$1"; }
 
-english_only()  { set_sources "$EN_ONLY"; }
-restore_pair()  { set_sources "$EN_PAIR"; }
+# Only the English pair is managed. German from `DE`, or any other list set by
+# hand, is left exactly as it is — on the lock as much as on the timer. The
+# point is to keep the password prompt on the layout this account normally
+# types in, not to overrule a deliberate choice. The guard lives here rather
+# than at the call sites so both paths cannot drift apart: the timer used to
+# check and the lock did not, so locking the screen with German active threw
+# it away and came back on the English pair.
+english_only() {
+    [ "$(sources_now)" = "$EN_PAIR" ] || return 0
+    set_sources "$EN_ONLY"
+}
+
+# Undoes english_only and nothing else. Without the check, unlocking would pull
+# German onto the English pair even though the lock had left it alone.
+restore_pair() {
+    [ "$(sources_now)" = "$EN_ONLY" ] || return 0
+    set_sources "$EN_PAIR"
+}
 
 case "${1:-watch}" in
     tick)
-        # Only when the pair is the current list. A deliberate switch to German
-        # is left alone.
-        [ "$(sources_now)" = "$EN_PAIR" ] || exit 0
+        # Both are no-ops unless the English pair is current, so a deliberate
+        # German layout survives the timer untouched.
         english_only
         restore_pair
         ;;

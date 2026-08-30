@@ -266,8 +266,14 @@ English the only layout in the list, so nothing else can be active while the
 password is typed. On unlock it puts Persian back.
 
 `keyboard-en-tick.timer` runs every 10 minutes and does the same drop and
-restore, but only when the list is already the English pair, so a deliberate
-switch to German is left alone.
+restore.
+
+Both act only when the list is already the English pair. A deliberate switch to
+German with `DE` — or any other list set by hand — is left exactly as it is, on
+the lock as much as on the timer, and the unlock does not drag it back to the
+pair. The trade-off is deliberate: with German active, the password prompt is on
+the German layout too, because overruling that choice is the thing being avoided.
+Run `EN` before locking if you would rather type the password in English.
 
 Only the layout list is written. GNOME ignores writes to the selected index,
 and that key reads `0` even while Persian is the live layout, so removing the
