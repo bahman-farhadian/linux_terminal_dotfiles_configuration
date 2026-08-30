@@ -979,45 +979,30 @@ grep -o 'amd_iommu=on iommu=pt' /proc/cmdline
 If it prints nothing, redo Step 3 sub-step 10; the rest of this step is
 pointless without the IOMMU active.
 
-#### 3. Read the GPU's PCI IDs
+#### 3. Read the card, then stage everything
 
-Derived at runtime rather than hardcoded: a reinstall does not guarantee
-identical enumeration. This works without IOMMU active, so no reboot is needed
-yet.
-
-```bash
-GPU_PCI_IDS=$(lspci -nn | grep -i nvidia | grep -oP '\[\K[0-9a-f]{4}:[0-9a-f]{4}(?=\])' | paste -sd, -)
-```
-
-```bash
-echo "$GPU_PCI_IDS"
-```
-
-Expect two comma-separated `vendor:device` pairs — the GPU and its audio
-function. On this machine the card is a GeForce GTX 1080 at `09:00.0`,
-`[10de:1b80]`, so the first pair is `10de:1b80`.
-
-Confirm the audio function is there too, since binding only the VGA function
-leaves the card split between two drivers and passthrough fails:
+First look at what is there:
 
 ```bash
 lspci -nn | grep -i nvidia
 ```
 
-Expect two lines, `09:00.0` and `09:00.1`.
+Expect two lines, `09:00.0` and `09:00.1` — the VGA controller and its HDMI
+audio function. Both have to be handed over together; binding only the VGA
+function leaves the card split between two drivers and passthrough fails. On
+this machine the card is a GeForce GTX 1080, `[10de:1b80]`.
 
-#### 4. Bind the card to vfio-pci
+Then paste the whole block. It derives the PCI IDs, writes the three files and
+rebuilds the initramfs:
 
 ```bash
+GPU_PCI_IDS=$(lspci -nn | grep -i nvidia | grep -oP '\[\K[0-9a-f]{4}:[0-9a-f]{4}(?=\])' | paste -sd, -)
+echo "GPU_PCI_IDS=$GPU_PCI_IDS"
+test -n "$GPU_PCI_IDS" || echo "EMPTY — stop here, the rest would write a useless vfio.conf"
 cat > /etc/modprobe.d/vfio.conf <<EOF
 options vfio-pci ids=${GPU_PCI_IDS}
 softdep nouveau pre: vfio-pci
 EOF
-```
-
-#### 5. Blacklist every driver that could claim the card first
-
-```bash
 cat > /etc/modprobe.d/blacklist-gpu.conf <<'EOF'
 blacklist nouveau
 blacklist nvidia
@@ -1025,31 +1010,35 @@ blacklist radeon
 blacklist amdgpu
 options nouveau modeset=0
 EOF
-```
-
-#### 6. Load vfio from the initramfs
-
-```bash
-cat >> /etc/initramfs-tools/modules <<'EOF'
-vfio
-vfio_iommu_type1
-vfio_pci
-vfio_virqfd
-EOF
-```
-
-```bash
+grep -q '^vfio$' /etc/initramfs-tools/modules || printf 'vfio\nvfio_iommu_type1\nvfio_pci\nvfio_virqfd\n' >> /etc/initramfs-tools/modules
 update-initramfs -u -k all
 ```
 
+#### 4. Check what was written
+
+```bash
+cat /etc/modprobe.d/vfio.conf
+```
+
+The `ids=` line must carry two `vendor:device` pairs, `10de:1b80` first. An
+empty `ids=` means the derivation found nothing and the reboot in Step 12 will
+leave `nouveau` holding the card.
+
+```bash
+grep -c '^vfio' /etc/initramfs-tools/modules
+```
+
+Expect `4`, not `8`. Eight means the append ran twice.
+
 **Notes**
 
-- This heredoc is the one place the delimiter is unquoted — `<<EOF`, not `<<'EOF'` — because `${GPU_PCI_IDS}` has to expand. Every other heredoc in this document is quoted so its contents are written literally.
+- The first heredoc is the one place the delimiter is unquoted — `<<EOF`, not `<<'EOF'` — because `${GPU_PCI_IDS}` has to expand. The second is quoted, so its contents are written literally.
+- That expansion is why sub-step 3 is one block. `GPU_PCI_IDS` is a shell variable: derived in one paste and used in another, it is empty in the second, and `options vfio-pci ids=` is written with nothing after it. That file looks plausible, `update-initramfs` succeeds, and the card is still on `nouveau` after the reboot with no error anywhere to explain it. The `test -n` line stops that in its tracks.
 - `nouveau` currently has the card on this machine, which is expected before any of this is applied and is exactly what the blacklist below stops.
 - Both PCI functions must be bound. A GTX 1080 presents the VGA controller at `09:00.0` and an HDMI audio device at `09:00.1`; handing a guest one without the other does not work. Deriving the IDs with `grep -i nvidia` catches both, which is why it is written that way rather than picking the VGA line out.
 - Blacklisting only `nouveau` is the usual reason passthrough silently fails. A stray `nvidia`, `radeon` or `amdgpu` autoload racing `vfio-pci` for the device is what actually causes it, so all four are listed.
 - `softdep` alone only orders module loading. It does not guarantee `vfio-pci` gets first claim on the device during early boot, which is why `vfio` also goes into the initramfs.
-- Appending to `/etc/initramfs-tools/modules` is not idempotent: running sub-step 6 twice writes the four module names twice. Duplicates are harmless to boot, but check the file before repeating it.
+- The append to `/etc/initramfs-tools/modules` is guarded by `grep -q`, so running the block twice does not write the four module names twice. Sub-step 4 counts them as well.
 - `iommu=pt` puts the IOMMU in passthrough mode for devices the host keeps, which avoids the translation cost on everything that is not being handed to a guest.
 - GRUB is written once, in Step 3, with the IOMMU flags already on the line. Two steps setting `GRUB_CMDLINE_LINUX_DEFAULT` would mean the second silently dropping whatever the first put there — the boot-console settings, in this case.
 - `GRUB_CMDLINE_LINUX` is empty on this host, where Silenus carries `rootflags=uquota,pquota`. Silenus needs it because its root filesystem is XFS with quota, and root is mounted before `/etc/fstab` is read. Here root is ext4 and the quota is on ordinary fstab mounts, so fstab is the right place and the kernel command line needs nothing.
@@ -1504,8 +1493,17 @@ Expect `192.168.32.1/24`.
 sudo iptables -t nat -L LIBVIRT_PRT -n -v
 ```
 
-Expect libvirt's own MASQUERADE for `192.168.32.0/24`. Any DNAT rules added by
-hand in Step 11 should be checked here too.
+Expect libvirt's own MASQUERADE for `192.168.32.0/24`.
+
+Step 11's rules have to be back as well — this boot is what proves
+`netfilter-persistent` really restores them:
+
+```bash
+for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do sudo iptables -C FORWARD -s "$net" -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null && printf '  PASS  %s\n' "$net" || printf '  FAIL  %s\n' "$net"; done
+```
+
+Three `PASS` lines. A `FAIL` here with a `PASS` in Step 11 means the rules were
+added but never saved.
 
 #### 8. Nested virtualization and quota persisted
 
@@ -1547,10 +1545,19 @@ Docker quota enforcement:
 docker run --rm --storage-opt size=5G alpine df -h /
 ```
 
-Cross-subnet reachability, run from inside a guest on `static_network_32`:
+Cross-subnet reachability, both directions. From inside a guest on
+`static_network_32`, outward — this only needs libvirt's own rules:
 
 ```bash
 ping -c3 192.168.8.3
+```
+
+From Silenus, inward to that guest — this is what Step 11's rules and Silenus's
+routes exist for, and the first point in the build where it can honestly be
+tested, because until now no guest held an address:
+
+```bash
+ping -c3 <guest-address>
 ```
 
 The guest needs a static address on `192.168.32.0/24` with gateway
