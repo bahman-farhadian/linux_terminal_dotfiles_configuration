@@ -1180,13 +1180,48 @@ nmcli con mod Dionysus connection.autoconnect yes
 nmcli con up Dionysus
 ```
 
-#### 4. Check it
+#### 4. Route to Dionysus's guests, preferring this link
+
+Dionysus's guests live on `192.168.32.0/24`, behind Dionysus. There are two ways
+to reach them: across this cable, or across the LAN. Both routes are installed,
+and the metric decides which is used — lower wins.
+
+On this link, metric 100:
+
+```bash
+nmcli con mod Dionysus +ipv4.routes "192.168.32.0/24 192.168.124.1 100"
+```
+
+On the wireless connection, metric 200. Replace `Huawei-Router` with your own
+connection name from `nmcli connection show`:
+
+```bash
+nmcli con mod Huawei-Router +ipv4.routes "192.168.32.0/24 192.168.8.3 200"
+```
+
+```bash
+nmcli con up Dionysus
+```
+
+```bash
+nmcli con up Huawei-Router
+```
+
+#### 5. Check it
 
 ```bash
 ip -br addr show p2plink0
 ```
 
 Expect `192.168.124.2/30`.
+
+```bash
+ip -4 route get 192.168.32.10
+```
+
+With the cable plugged in, expect `via 192.168.124.1 dev p2plink0`. Unplug it
+and run the same command: the answer must become `via 192.168.8.3`, on the
+wireless interface.
 
 ```bash
 ip -4 route
@@ -1208,7 +1243,10 @@ Needs Dionysus up on the other end.
 - No gateway and no DNS on this profile. `ipv4.never-default yes` states the same thing a second way, so a later edit that adds a gateway by accident cannot take the default route away from the interface that actually reaches the internet.
 - A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length, or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`–`.3`.
 - This is a second route to Dionysus when its LAN side is broken, which is worth having before reconfiguring that machine's management interface.
-- Reaching Dionysus's guests on `192.168.32.0/24` across this link needs a route here pointing at `192.168.124.1`, and IP forwarding on Dionysus. Whether to add that route is not decided here.
+- Both routes are permanent, and NetworkManager withdraws a connection's routes when that connection goes down. Unplugging the cable therefore removes the metric-100 route on its own and the metric-200 one takes over, with no manual step. Plugging it back restores the preference.
+- The metrics are what express "prefer the cable". Same destination, two next hops, lower metric wins. `ip -4 route get 192.168.32.10` is the way to ask the kernel which it would actually use, rather than reading the table and inferring.
+- **The route alone does not make guests reachable.** A libvirt NAT network permits outbound traffic and `RELATED,ESTABLISHED` return traffic; a connection opened from outside into `192.168.32.0/24` is not in either category and is dropped on Dionysus. Dionysus.md Step 11 carries the forwarding rule that allows it. Test with `ping` to a guest, not by reading the routing table.
+- The fallback path leans on Dionysus forwarding between `enp4s0` and `virbr1`, which is what `net.ipv4.ip_forward` in Dionysus.md Step 10 enables.
 - Unplugging the cable takes the profile down with it. `autoconnect yes` brings it back when it is plugged in again; nothing needs re-running.
 
 ### Step 14 — Check the whole setup
