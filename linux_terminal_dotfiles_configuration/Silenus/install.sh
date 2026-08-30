@@ -244,46 +244,69 @@ SCHEMA=org.gnome.desktop.input-sources
 EN_ONLY="[('xkb', 'us')]"
 EN_PAIR="[('xkb', 'us'), ('xkb', 'ir')]"
 
+PREVIOUS="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/lock-keyboard-en.previous"
+
 sources_now() { gsettings get "$SCHEMA" sources 2>/dev/null; }
 set_sources()  { [ "$(sources_now)" = "$1" ] || gsettings set "$SCHEMA" sources "$1"; }
 
-# Only the English pair is managed. German from `DE`, or any other list set by
-# hand, is left exactly as it is — on the lock as much as on the timer. The
-# point is to keep the password prompt on the layout this account normally
-# types in, not to overrule a deliberate choice. The guard lives here rather
-# than at the call sites so both paths cannot drift apart: the timer used to
-# check and the lock did not, so locking the screen with German active threw
-# it away and came back on the English pair.
-english_only() {
-    [ "$(sources_now)" = "$EN_PAIR" ] || return 0
+# The lock forces English unconditionally, German included: the password prompt
+# has to be typable no matter what was in use a second earlier. What was in use
+# is written to $PREVIOUS first so the unlock can put it back, which is how a
+# deliberate German layout survives a lock cycle rather than being discarded by
+# it. $PREVIOUS lives under the runtime directory, so it is cleared at logout
+# and a stale layout is never restored across a reboot.
+on_lock() {
+    now=$(sources_now)
+    [ -n "$now" ] || return 0
+    # Guard against a second lock with no unlock between: without it, the
+    # English the first lock wrote would be recorded as the thing to restore.
+    [ "$now" = "$EN_ONLY" ] || printf '%s\n' "$now" > "$PREVIOUS"
     set_sources "$EN_ONLY"
 }
 
-# Undoes english_only and nothing else. Without the check, unlocking would pull
-# German onto the English pair even though the lock had left it alone.
-restore_pair() {
-    [ "$(sources_now)" = "$EN_ONLY" ] || return 0
+# Exactly what the lock replaced, or the English pair when nothing was recorded
+# — a first unlock after the service starts, for one.
+on_unlock() {
+    if [ -r "$PREVIOUS" ]; then
+        want=$(cat "$PREVIOUS")
+        rm -f "$PREVIOUS"
+    else
+        want="$EN_PAIR"
+    fi
+    set_sources "$want"
+}
+
+# The timer manages the English pair and nothing else: German, or any other
+# list, is left alone.
+#
+# With the pair in use there is no way to read which of the two is selected.
+# GNOME ignores writes to `current`, and it reads 0 even while Persian is the
+# live layout, so "do nothing when English, switch when Persian" cannot be
+# branched on. Dropping Persian and restoring it forces the selection back to
+# English either way: English stays English, Persian becomes English. The only
+# difference from doing nothing in the English case is two writes that leave
+# the list exactly as it was.
+on_tick() {
+    [ "$(sources_now)" = "$EN_PAIR" ] || return 0
+    set_sources "$EN_ONLY"
     set_sources "$EN_PAIR"
 }
 
 case "${1:-watch}" in
     tick)
-        # Both are no-ops unless the English pair is current, so a deliberate
-        # German layout survives the timer untouched.
-        english_only
-        restore_pair
+        on_tick
         ;;
     watch)
         case "$(gdbus call --session --dest org.gnome.ScreenSaver \
                 --object-path /org/gnome/ScreenSaver \
                 --method org.gnome.ScreenSaver.GetActive 2>/dev/null)" in
-            *true*) english_only ;;
+            *true*) on_lock ;;
         esac
         gdbus monitor --session --dest org.gnome.ScreenSaver 2>/dev/null |
         while IFS= read -r line; do
             case "$line" in
-                *ActiveChanged*true*)  english_only ;;
-                *ActiveChanged*false*) restore_pair ;;
+                *ActiveChanged*true*)  on_lock ;;
+                *ActiveChanged*false*) on_unlock ;;
             esac
         done
         ;;

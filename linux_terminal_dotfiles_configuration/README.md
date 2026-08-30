@@ -289,18 +289,23 @@ log out.
 `install.sh` writes `~/.local/bin/lock-keyboard-en.sh` and runs it two ways.
 
 `lock-keyboard-en.service` watches for the screen locking. On lock it makes
-English the only layout in the list, so nothing else can be active while the
-password is typed. On unlock it puts Persian back.
+English the only layout, whatever was in use a moment earlier — German
+included — so the password prompt is always typable. What was in use is written
+to `$XDG_RUNTIME_DIR/lock-keyboard-en.previous` first, and the unlock restores
+it exactly. A deliberate German layout therefore survives a lock cycle rather
+than being discarded by it, and the file lives under the runtime directory so a
+stale layout is never restored across a reboot.
 
-`keyboard-en-tick.timer` runs every 10 minutes and does the same drop and
-restore.
+`keyboard-en-tick.timer` runs every 10 minutes and manages the English pair
+only. German, or any other list set by hand, is left untouched. With the pair in
+use it drops Persian and restores it, which forces the selection back to
+English: English stays English, Persian becomes English.
 
-Both act only when the list is already the English pair. A deliberate switch to
-German with `DE` — or any other list set by hand — is left exactly as it is, on
-the lock as much as on the timer, and the unlock does not drag it back to the
-pair. The trade-off is deliberate: with German active, the password prompt is on
-the German layout too, because overruling that choice is the thing being avoided.
-Run `EN` before locking if you would rather type the password in English.
+Those last two cases cannot be told apart. Both are the same `sources` list, and
+the selected index is not readable — see below — so the drop and restore is what
+produces the right result either way, rather than a branch on which of the two is
+live. The only cost is two writes that leave the list exactly as it was when
+English was already selected.
 
 Only the layout list is written. GNOME ignores writes to the selected index,
 and that key reads `0` even while Persian is the live layout, so removing the
