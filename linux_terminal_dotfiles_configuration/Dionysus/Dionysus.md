@@ -1061,7 +1061,7 @@ libvirt network defined in Step 7, and libvirt owns that bridge.
 
 | Interface | Kind | Address | Purpose |
 |---|---|---|---|
-| `enp4s0` | onboard RJ45 | `192.168.8.3/24`, gw `192.168.8.1`, DNS `8.8.8.8` | the internet — default route and DNS |
+| `enp4s0` | onboard RJ45 | `192.168.8.3/24`, gw `192.168.8.1`, DNS `8.8.8.8` | `wan` — the way out: default route and DNS |
 | `p2plink0` | USB-C ethernet | `192.168.124.1/30` | point-to-point to Silenus |
 
 The USB adapter arrives as `enx9405bb143cf5` and is renamed in sub-step 4 below,
@@ -1141,19 +1141,19 @@ Written now, activated later. A profile for a device NetworkManager does not yet
 manage is stored without complaint; it simply cannot come up until sub-step 7
 hands the device over.
 
-`internet` — static, because the router runs no DHCP. This is the interface that
-reaches the outside; it carries the default route and the only DNS on this host:
+`wan` — static, because the router runs no DHCP. This is the way out of the
+machine: it carries the default route and the only DNS on this host:
 
 ```bash
-nmcli con add type ethernet ifname enp4s0 con-name internet ipv4.method manual ipv4.addresses 192.168.8.3/24 ipv4.gateway 192.168.8.1 ipv4.dns "8.8.8.8" ipv6.method disabled
+nmcli con add type ethernet ifname enp4s0 con-name wan ipv4.method manual ipv4.addresses 192.168.8.3/24 ipv4.gateway 192.168.8.1 ipv4.dns "8.8.8.8" ipv6.method disabled
 ```
 
 ```bash
-nmcli con mod internet connection.autoconnect yes
+nmcli con mod wan connection.autoconnect yes
 ```
 
 `Dionysus` — the point-to-point link. No gateway and no DNS, so it cannot
-compete with `internet` for the default route:
+compete with `wan` for the default route:
 
 ```bash
 nmcli con add type ethernet ifname p2plink0 con-name Dionysus ipv4.method manual ipv4.addresses 192.168.124.1/30 ipv4.never-default yes ipv6.method disabled
@@ -1191,15 +1191,15 @@ confirm from Silenus that this works:
 ssh <your-user>@192.168.124.1
 ```
 
-This is why the order is what it is. The next sub-step takes the LAN interface
+This is why the order is what it is. The next sub-step takes `enp4s0`
 down, and this link is a second way in that does not depend on it.
 
-#### 7. Hand the LAN interface over from ifupdown
+#### 7. Hand `enp4s0` over from ifupdown
 
 The installer configured `enp4s0` in `/etc/network/interfaces`, because a
 headless install has no NetworkManager to hand it to. Debian ships
 NetworkManager with `[ifupdown] managed=false`, so it will not touch an
-interface defined there: `nmcli con up internet` fails with the device reported
+interface defined there: `nmcli con up wan` fails with the device reported
 `unmanaged` until that stanza is gone.
 
 See what the installer wrote:
@@ -1227,7 +1227,7 @@ printf 'source /etc/network/interfaces.d/*\n\nauto lo\niface lo inet loopback\n'
 grep -rl enp4s0 /etc/network/interfaces.d/ 2>/dev/null | xargs -r rm -f
 systemctl restart NetworkManager
 sleep 5
-nmcli con up internet
+nmcli con up wan
 EOF
 ```
 
@@ -1256,7 +1256,7 @@ The session will drop. Wait about fifteen seconds and reconnect.
 nmcli device status
 ```
 
-Expect `enp4s0` `connected` on `internet`, and `p2plink0` `connected` on
+Expect `enp4s0` `connected` on `wan`, and `p2plink0` `connected` on
 `Dionysus`. `unmanaged` against `enp4s0` means an ifupdown definition is
 still in place somewhere under `interfaces.d/`.
 
@@ -1316,7 +1316,8 @@ Expect `net.ipv4.ip_forward = 1`.
 - The file must sort before `99-default.link`, where the default naming policy lives. `10-` does.
 - `update-initramfs -u` puts the file in the initramfs too. A USB adapter is not needed that early, so this is precaution rather than requirement, but it costs nothing and means the name is the same whenever the interface does appear.
 - Rename first, create the profile second. A profile bound to `enx9405bb143cf5` stops matching the moment the rename takes effect.
-- The two profiles are named for what they are rather than for the interface. `internet` is the one that reaches the outside; `Dionysus` is the point-to-point link, and Silenus's end of the same cable carries that same name, so the link is called the same thing from both sides. Connection names are local to each host, so nothing collides.
+- The two profiles are named for what they do, not for the interface underneath. `wan` is the way out; `Dionysus` is the point-to-point link, and Silenus's end of the same cable carries that same name, so the link reads the same from either side. Connection names are local to each host, so nothing collides.
+- `wan` is the router-and-firewall convention: the side facing outward, as against the inside. Worth knowing that this one holds a private address, `192.168.8.3`, because another router sits in front of it doing the real translation. `wan` here means *this host's* way out, not a public address.
 - `ipv4.never-default yes` on the point-to-point link is what keeps it from installing a default route. Without a gateway it would not install one anyway, but stating it means a later edit that adds a gateway by accident cannot silently steal the default route from `enp4s0`.
 - A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`-`.3`.
 - `managed=false` is Debian's default, not NetworkManager's own. It exists so that a machine configured through `/etc/network/interfaces` does not have NetworkManager fight it. The consequence here is that removing the stanza is what hands the interface over — installing NetworkManager alone does nothing.
