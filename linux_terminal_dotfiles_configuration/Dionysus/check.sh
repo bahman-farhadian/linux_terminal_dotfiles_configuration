@@ -9,13 +9,14 @@
 if [ "$(id -u)" -eq 0 ]; then
   echo "STOP: run as your normal user, not root. Dotfiles, user units and group membership all live in your account."; exit 1
 fi
-pass=0; fail=0
+pass=0; fail=0; failed=""
+_note(){ failed="$failed  - $1\n"; }
 ck(){ if [ "$2" = "$3" ]; then printf '  PASS  %-32s %s\n' "$1" "$2"; pass=$((pass+1));
-      else printf '  FAIL  %-32s got[%s] want[%s]\n' "$1" "$2" "$3"; fail=$((fail+1)); fi; }
+      else printf '  FAIL  %-32s got[%s] want[%s]\n' "$1" "$2" "$3"; fail=$((fail+1)); _note "$1: got [$2], wanted [$3]"; fi; }
 ok(){ if [ -n "$2" ]; then printf '  PASS  %-32s %s\n' "$1" "$2"; pass=$((pass+1));
-      else printf '  FAIL  %-32s (empty)\n' "$1"; fail=$((fail+1)); fi; }
+      else printf '  FAIL  %-32s (empty)\n' "$1"; fail=$((fail+1)); _note "$1: returned nothing"; fi; }
 hf(){ [ -f "$2" ] && { printf '  PASS  %-32s\n' "$1"; pass=$((pass+1)); } \
-                  || { printf '  FAIL  %-32s missing %s\n' "$1" "$2"; fail=$((fail+1)); }; }
+                  || { printf '  FAIL  %-32s missing %s\n' "$1" "$2"; fail=$((fail+1)); _note "$1: $2 is missing"; }; }
 
 printf '\n--- Step 1/2/3: disk, quota, secure boot ---\n'
 # lsblk rounds in powers of 1024, and 1075 decimal MB lands either side of the
@@ -33,12 +34,14 @@ ck "sssd fstype"   "$(findmnt -no FSTYPE /data-root/sssd)" "xfs"
 ck "lssd fstype"   "$(findmnt -no FSTYPE /data-root/lssd)" "xfs"
 ck "no swap"       "$(swapon --show --noheadings|wc -l|tr -d ' ')" "0"
 for m in /data-root /data-root/sssd /data-root/lssd; do
-  ck "ftype=1 $m"  "$(xfs_info "$m" 2>/dev/null|grep -c 'ftype=1')" "1"
+  ck "ftype=1 $m"  "$(sudo xfs_info "$m" 2>/dev/null|grep -c 'ftype=1')" "1"
   ck "prjquota $m" "$(findmnt -no OPTIONS "$m"|tr ',' '\n'|grep -c prjquota)" "1"
   ok "quota state $m" "$(sudo xfs_quota -x -c state "$m" 2>/dev/null|grep -i 'project quota state'|head -1)"
 done
 ck "secure boot"   "$(mokutil --sb-state 2>/dev/null)" "SecureBoot enabled"
-ok "shim"          "$(sudo efibootmgr -v 2>/dev/null|grep -o shimx64.efi|head -1)"
+_efi=$(sudo efibootmgr -v 2>/dev/null); _cur=$(printf '%s' "$_efi"|awk '/^BootCurrent:/{print $2}')
+ok "booted from"   "$(printf '%s' "$_efi"|grep -i "^Boot$_cur"|head -1|cut -c1-58)"
+ck "shim in use"   "$(printf '%s' "$_efi"|grep -ci shim|awk '{print ($1>0)?"yes":"no"}')" "yes"
 ok "bios version"  "$(sudo dmidecode -s bios-version 2>/dev/null)"
 
 printf '\n--- Step 3/8: repositories ---\n'
@@ -89,7 +92,7 @@ ck "sshd active" "$(systemctl is-active ssh)" "active"
 printf '\n--- Step 7: KVM ---\n'
 ck "virtualisation"  "$(grep -Ec '(vmx|svm)' /proc/cpuinfo|awk '{print ($1>0)?"yes":"no"}')" "yes"
 ck "libvirtd.socket" "$(systemctl is-active libvirtd.socket)" "active"
-ck "nested"          "$(cat /sys/module/kvm_amd/parameters/nested 2>/dev/null)" "Y"
+ck "nested"          "$(cat /sys/module/kvm_amd/parameters/nested 2>/dev/null|sed 's/^1$/Y/')" "Y"
 ck "nofile soft"     "$(grep -c 'soft.*nofile.*65536' /etc/security/limits.d/99-kvm.conf 2>/dev/null)" "1"
 ck "nofile hard"     "$(grep -c 'hard.*nofile.*1048576' /etc/security/limits.d/99-kvm.conf 2>/dev/null)" "1"
 ck "sssd-pool"       "$(virsh -c qemu:///system pool-list --name 2>/dev/null|grep -cx sssd-pool)" "1"
@@ -111,7 +114,7 @@ ck "quota enforced"  "$(docker run --rm --storage-opt size=1G busybox df -h / 2>
 ck "hello-world"     "$(docker run --rm hello-world 2>/dev/null|grep -c 'working correctly')" "1"
 
 printf '\n--- Step 9: GPU passthrough ---\n'
-ck "iommu active"    "$(dmesg 2>/dev/null|grep -ciE 'AMD-Vi|IOMMU enabled'|awk '{print ($1>0)?"yes":"no"}')" "yes"
+ck "iommu active"    "$(sudo dmesg 2>/dev/null|grep -ciE 'AMD-Vi|IOMMU enabled'|awk '{print ($1>0)?"yes":"no"}')" "yes"
 ck "iommu cmdline"   "$(grep -c 'amd_iommu=on' /proc/cmdline)" "1"
 ck "nouveau unloaded" "$(lsmod|grep -c '^nouveau ')" "0"
 ck "gpu present"     "$(lspci -nn|grep -c '10de:1b80')" "1"
@@ -147,5 +150,11 @@ ck "gateway reachable" "$(ping -c1 -W2 192.168.8.1 >/dev/null 2>&1 && echo yes |
 printf '\n========================================\n'
 printf '  PASS %s   FAIL %s\n' "$pass" "$fail"
 printf '========================================\n'
+
+if [ "$fail" -gt 0 ]; then
+  printf '\nWhat failed:\n'
+  printf "$failed"
+  printf '\nEach line names the check, what the machine returned, and what the\ndocument says it should be. The step to redo is the section heading the\ncheck appeared under.\n'
+fi
 
 [ "$fail" -eq 0 ]

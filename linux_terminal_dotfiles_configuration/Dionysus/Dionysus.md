@@ -650,7 +650,9 @@ modprobe kvm_amd
 cat /sys/module/kvm_amd/parameters/nested
 ```
 
-Expect `Y`.
+Expect `1`. `kvm_amd` exposes this parameter as an integer where `kvm_intel`
+exposes a boolean, so Silenus reports `Y` for the same setting and this host
+reports `1`. Both mean on.
 
 #### 5. Raise the open file limit
 
@@ -787,6 +789,8 @@ Expect `libvirt` and `kvm` in the list.
 - The connection URI matters. Run as an ordinary user, `virsh` defaults to `qemu:///session`, a per-user hypervisor with no networks and no machines. The system VMs are on `qemu:///system`. Set `LIBVIRT_DEFAULT_URI=qemu:///system` if you would rather not type it each time.
 - Group membership only applies at the next login. `newgrp libvirt` works for one shell if you do not want to log out.
 - `modprobe -r kvm_amd` fails if a virtual machine is running. Shut them down first.
+- `xfs_info` on `/data-root` needs `sudo` once Docker owns that path. Docker sets its `data-root` to mode `0710`, so an ordinary user cannot open the directory and the command fails with nothing useful to say. The same applies to the two mounts nested beneath it.
+- `dmesg` needs `sudo` as well. Debian sets `kernel.dmesg_restrict=1`, so the kernel log is root-only, and a check that reads it as an ordinary user finds an empty buffer rather than an error.
 - The packaged `osinfo-db` is the maintained source, refreshed by `apt upgrade`. Do not use `osinfo-db-import --latest`: it fetches from `releases.pagure.org`, a third-party host libosinfo's own maintainers have flagged as unreliable. It is what makes `virt-install --os-variant` resolve rather than guess.
 - `/etc/security/limits.d` applies to login sessions, not to systemd services. If `libvirtd` itself needs a higher limit, add a `LimitNOFILE` drop-in under `/etc/systemd/system/libvirtd.service.d/`.
 - `net-define` reads the file at define time and stores a copy of its own, so the repository file is not consulted again afterwards. Editing it later means running `net-define` again.
@@ -1579,7 +1583,7 @@ not run, or ran too early.
 cat /sys/module/kvm_amd/parameters/nested
 ```
 
-Expect `1` or `Y`.
+Expect `1` — see the note in Step 7 on why this differs from Silenus.
 
 ```bash
 xfs_quota -x -c 'state' /data-root

@@ -11,13 +11,14 @@ fi
 case "$XDG_SESSION_TYPE" in wayland|x11) ;; *)
   echo "STOP: run from a desktop session terminal. XDG_SESSION_TYPE is '$XDG_SESSION_TYPE'; GNOME checks need the session bus."; exit 1 ;;
 esac
-pass=0; fail=0
+pass=0; fail=0; failed=""
+_note(){ failed="$failed  - $1\n"; }
 ck(){ if [ "$2" = "$3" ]; then printf '  PASS  %-32s %s\n' "$1" "$2"; pass=$((pass+1));
-      else printf '  FAIL  %-32s got[%s] want[%s]\n' "$1" "$2" "$3"; fail=$((fail+1)); fi; }
+      else printf '  FAIL  %-32s got[%s] want[%s]\n' "$1" "$2" "$3"; fail=$((fail+1)); _note "$1: got [$2], wanted [$3]"; fi; }
 ok(){ if [ -n "$2" ]; then printf '  PASS  %-32s %s\n' "$1" "$2"; pass=$((pass+1));
-      else printf '  FAIL  %-32s (empty)\n' "$1"; fail=$((fail+1)); fi; }
+      else printf '  FAIL  %-32s (empty)\n' "$1"; fail=$((fail+1)); _note "$1: returned nothing"; fi; }
 hf(){ [ -f "$2" ] && { printf '  PASS  %-32s\n' "$1"; pass=$((pass+1)); } \
-                  || { printf '  FAIL  %-32s missing %s\n' "$1" "$2"; fail=$((fail+1)); }; }
+                  || { printf '  FAIL  %-32s missing %s\n' "$1" "$2"; fail=$((fail+1)); _note "$1: $2 is missing"; }; }
 
 printf '\n--- Step 2/3: disk, quota, secure boot ---\n'
 ck "efi size"     "$(lsblk -no SIZE /dev/nvme0n1p1|tr -d ' ')" "1G"
@@ -33,7 +34,9 @@ ck "quiet in grub"  "$(grep -c '^GRUB_CMDLINE_LINUX_DEFAULT=.*quiet' /etc/defaul
 ck "quiet live"     "$(grep -c 'quiet' /proc/cmdline)" "1"
 ok "xfs quota"    "$(sudo xfs_quota -x -c state / 2>/dev/null|grep -i 'project quota state'|head -1)"
 ck "secure boot"  "$(mokutil --sb-state 2>/dev/null)" "SecureBoot enabled"
-ok "shim"         "$(sudo efibootmgr -v 2>/dev/null|grep -o shimx64.efi|head -1)"
+_efi=$(sudo efibootmgr -v 2>/dev/null); _cur=$(printf '%s' "$_efi"|awk '/^BootCurrent:/{print $2}')
+ok "booted from"  "$(printf '%s' "$_efi"|grep -i "^Boot$_cur"|head -1|cut -c1-58)"
+ck "shim in use"  "$(printf '%s' "$_efi"|grep -ci shim|awk '{print ($1>0)?"yes":"no"}')" "yes"
 ok "bios version" "$(sudo dmidecode -s bios-version 2>/dev/null)"
 
 printf '\n--- Step 3/6/9: repositories ---\n'
@@ -175,5 +178,11 @@ ck "sshd active" "$(systemctl is-active ssh)" "active"
 printf '\n========================================\n'
 printf '  PASS %s   FAIL %s\n' "$pass" "$fail"
 printf '========================================\n'
+
+if [ "$fail" -gt 0 ]; then
+  printf '\nWhat failed:\n'
+  printf "$failed"
+  printf '\nEach line names the check, what the machine returned, and what the\ndocument says it should be. The step to redo is the section heading the\ncheck appeared under.\n'
+fi
 
 [ "$fail" -eq 0 ]
