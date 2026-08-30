@@ -18,10 +18,15 @@ hf(){ [ -f "$2" ] && { printf '  PASS  %-32s\n' "$1"; pass=$((pass+1)); } \
                   || { printf '  FAIL  %-32s missing %s\n' "$1" "$2"; fail=$((fail+1)); }; }
 
 printf '\n--- Step 1/2/3: disk, quota, secure boot ---\n'
-ck "efi size"      "$(lsblk -no SIZE /dev/sda1|tr -d ' ')" "1G"
+# lsblk rounds in powers of 1024, and 1075 decimal MB lands either side of the
+# 1 GiB boundary depending on where the installer aligns it, so this is a range
+# rather than a string. Every other partition is large enough to round stably.
+ck "efi size ~1GiB" "$(lsblk -bno SIZE /dev/sda1 2>/dev/null|awk '{print ($1>=1000000000 && $1<=1200000000)?"ok":"out of range: "$1}')" "ok"
 ck "boot size"     "$(lsblk -no SIZE /dev/sda2|tr -d ' ')" "2G"
 ck "root size"     "$(lsblk -no SIZE /dev/sda3|tr -d ' ')" "32G"
 ck "data size"     "$(lsblk -no SIZE /dev/sda4|tr -d ' ')" "192G"
+ck "sssd size"     "$(lsblk -no SIZE /dev/nvme0n1p1|tr -d ' ')" "192G"
+ck "lssd size"     "$(lsblk -no SIZE /dev/nvme1n1p1|tr -d ' ')" "888G"
 ck "root fstype"   "$(findmnt -no FSTYPE /)" "ext4"
 ck "data fstype"   "$(findmnt -no FSTYPE /data-root)" "xfs"
 ck "sssd fstype"   "$(findmnt -no FSTYPE /data-root/sssd)" "xfs"
@@ -108,6 +113,8 @@ printf '\n--- Step 8: GPU passthrough ---\n'
 ck "iommu active"    "$(dmesg 2>/dev/null|grep -ciE 'AMD-Vi|IOMMU enabled'|awk '{print ($1>0)?"yes":"no"}')" "yes"
 ck "iommu cmdline"   "$(grep -c 'amd_iommu=on' /proc/cmdline)" "1"
 ck "nouveau unloaded" "$(lsmod|grep -c '^nouveau ')" "0"
+ck "gpu present"     "$(lspci -nn|grep -c '10de:1b80')" "1"
+ck "both functions"  "$(lspci -nn|grep -ci nvidia)" "2"
 ck "vfio bound"      "$(lspci -nnk|grep -A3 -i nvidia|grep -c 'Kernel driver in use: vfio-pci')" "2"
 hf "vfio.conf"       /etc/modprobe.d/vfio.conf
 hf "gpu blacklist"   /etc/modprobe.d/blacklist-gpu.conf

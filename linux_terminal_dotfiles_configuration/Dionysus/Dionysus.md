@@ -4,15 +4,16 @@ Hostname `Dionysus`. Purely headless: base system and `openssh-server` only, no
 desktop environment, administered over SSH. The GNOME workstation is
 [Silenus.md](../Silenus/Silenus.md).
 
-AMD Ryzen 9 3900X (12c/24t), 128 GB RAM, NVIDIA GPU reserved for guest
-passthrough, and two network interfaces — an onboard RJ45 and a USB-C ethernet
-adapter, doing different jobs. Three disks:
+ASUS ROG STRIX B450-F GAMING, AMD Ryzen 9 3900X (12c/24t), 125 GiB RAM, an
+NVIDIA GeForce GTX 1080 reserved for guest passthrough, and two network
+interfaces — an onboard Intel I211 and a USB-C ethernet adapter, doing different
+jobs. Three disks, sizes as `lsblk` reports them:
 
-| Role | Interface | Size |
-|---|---|---|
-| OS and Docker `data-root` | SATA SSD | 233 GiB as `lsblk` reports it — a 250 GB drive |
-| `sssd` — VM system disks, Docker volumes | NVMe | 250 GB |
-| `lssd` — VM data disks, Docker volumes | NVMe | 1 TB |
+| Role | Device | Model | Size |
+|---|---|---|---|
+| OS and Docker `data-root` | `sda` | Samsung SSD 850 EVO 250GB | 232.9 GiB |
+| `sssd` — VM system disks, Docker volumes | `nvme0n1` | Samsung SSD 970 EVO Plus 250GB | 232.9 GiB |
+| `lssd` — VM data disks, Docker volumes | `nvme1n1` | Samsung SSD 970 EVO Plus 1TB | 931.5 GiB |
 
 No swap partition and no swapfile anywhere in this build.
 
@@ -25,23 +26,28 @@ Step 3, which is a manual edit and is noted there.
 
 ### Step 1 — BIOS: Secure Boot, virtualization, PCIe addressing
 
+ASUS ROG STRIX B450-F GAMING, BIOS 5502.
+
 | # | Step | How |
 |---|------|-----|
-| 1 | Enter BIOS | Power off fully, power on, tap the setup key at the vendor splash |
-| 2 | Note BIOS version | Write it down before changing anything |
-| 3 | Allow the 3rd party CA | `Allow Microsoft 3rd Party UEFI CA` = **On** |
-| 4 | Check Secure Boot | `Secure Boot` = **On** |
-| 5 | Enable SVM | `SVM Mode` = **Enabled** |
-| 6 | Enable IOMMU | `IOMMU` = **Enabled** |
-| 7 | Above 4G Decoding | **Enabled** |
-| 8 | Resizable BAR | **Auto**, or **Enabled** |
-| 9 | Save and exit | Save changes and reboot |
-| 10 | Boot the installer | Open the boot menu, pick the USB device |
+| 1 | Enter BIOS | Power off fully, power on, tap **Del** at the ASUS splash |
+| 2 | Leave EZ Mode | **F7** switches to Advanced Mode, where everything below lives |
+| 3 | Note BIOS version | `Main` tab — 5502 at the time of writing |
+| 4 | Secure Boot | `Boot → Secure Boot → OS Type` = **Windows UEFI mode** |
+| 5 | Enable SVM | `Advanced → CPU Configuration → SVM Mode` = **Enabled** |
+| 6 | Enable IOMMU | `Advanced → AMD CBS → NBIO Common Options → IOMMU` = **Enabled** |
+| 7 | Above 4G Decoding | `Advanced → PCI Subsystem Settings → Above 4G Decoding` = **Enabled** |
+| 8 | Resizable BAR | Same menu, `Re-Size BAR Support` = **Auto** |
+| 9 | Save and exit | **F10** → **Yes** |
+| 10 | Boot the installer | **F8** at the splash, pick the USB device |
 
 **Notes**
 
-- **TBD — the board model.** The setup key and the exact wording of every line above depend on it: `SVM Mode` may sit under `Advanced → CPU Configuration`, `IOMMU` under `Advanced → AMD CBS` or `NBIO`, and the 3rd party CA under `Boot → Secure Boot → Key Management`. This table names the settings, not the menu paths, until the board is known.
-- Debian's bootloader is signed by Microsoft's 3rd party UEFI CA. With that **Off** the machine will not boot and shows `Invalid signature detected`. Some desktop boards call it `Other OS` versus `Windows UEFI mode` in the CSM or Secure Boot menu; that is the same switch.
+- The menu paths are ASUS's AM4 convention. BIOS 5502 matches them at the time of writing, but confirm each on screen rather than trusting the path: a BIOS update can move a setting between `Advanced` and `AMD CBS` without renaming it.
+- Secure Boot is already enabled on this machine and Debian 13 already boots on it, so this is a check rather than a change. `mokutil --sb-state` reports `SecureBoot enabled` today.
+- On ASUS boards the switch is `OS Type`, not a named 3rd party CA toggle. **Windows UEFI mode** enforces Secure Boot against the shipped key set, which includes Microsoft's 3rd party UEFI CA — the one that signs Debian's bootloader. `Other OS` disables the enforcement rather than adding a key.
+- Debian's bootloader is signed by Microsoft's 3rd party UEFI CA. Without that key present the machine will not boot and shows `Invalid signature detected`.
+- The GTX 1080 is Pascal and does not implement Resizable BAR, so `Auto` changes nothing for it. `Above 4G Decoding` is the one of the pair that matters here: it is what lets the card's BARs be mapped above the 4 GB boundary, which passthrough needs.
 - Turning the 3rd party CA on may switch `Secure Boot Mode` from `Standard` to `Custom`. That is expected. Custom only means the key set is no longer the factory default; Secure Boot still checks every signature.
 - Never use `Reset to Setup Mode` or `Clear All Secure Boot Keys`. They cause the failure above and Debian does not need them.
 - Secure Boot does not conflict with GPU passthrough. `vfio-pci` ships inside Debian's signed kernel, so binding the card in Step 8 is unaffected. What Secure Boot blocks is loading an *unsigned out-of-tree* module — the proprietary NVIDIA driver on the host being the usual one, which this build blacklists anyway.
@@ -65,17 +71,17 @@ installer will then display the **Shows as** value.
 | 3 | Root | 32 GiB | `34360 MB` | 34.4 GB | ext4 | `/` |
 | 4 | Data | 192 GiB | `206158 MB` | 206.2 GB | xfs | `/data-root` |
 
-**NVMe 250 GB (`nvme0n1`)**
+**NVMe 250 GB (`nvme0n1`) — 232.9 GiB**
 
 | # | Partition | Size | Enter as | Shows as | Format | Mount |
 |---|-----------|------|----------|----------|--------|-------|
-| 1 | sssd | whole disk | `max` | about 250 GB | xfs | `/data-root/sssd` |
+| 1 | sssd | 192 GiB | `206158 MB` | 206.2 GB | xfs | `/data-root/sssd` |
 
-**NVMe 1 TB (`nvme1n1`)**
+**NVMe 1 TB (`nvme1n1`) — 931.5 GiB**
 
 | # | Partition | Size | Enter as | Shows as | Format | Mount |
 |---|-----------|------|----------|----------|--------|-------|
-| 1 | lssd | whole disk | `max` | about 1.0 TB | xfs | `/data-root/lssd` |
+| 1 | lssd | 888 GiB | `953483 MB` | 953.5 GB | xfs | `/data-root/lssd` |
 
 Package selection: base system and `openssh-server` only. Deselect the desktop
 environment task; this host stays headless.
@@ -86,8 +92,9 @@ environment task; this host stays headless.
 - For any other size: type `GiB x 1073.741824` MB, rounded. The EFI partition is entered as `1075 MB` rather than the 1074 the formula gives; that is the number Silenus uses for the same partition, and one megabyte over makes no difference.
 - The four partitions on `sda` come to 227 GiB of the 233 GiB the disk reports, leaving about 6 GiB unpartitioned. That free space is SSD over-provisioning, the same reasoning as Silenus: the drive uses it for wear levelling, which keeps write speed up as the disk fills. It is a smaller margin than Silenus keeps — 2.6% against 6.6% — so raise it by taking a few GiB off `/data-root` if this disk is expected to run close to full.
 - `data-root` is a fixed 192 GiB rather than `max` precisely so that margin exists. `max` would consume the whole remainder and leave none.
-- `max` is still used for both NVMe disks, which take one partition each with no over-provisioning: unlike the SATA SSD, neither is the disk the OS runs from.
-- Sizes on the installed system: `lsblk` reports `1G`, `2G`, `32G` and `192G` on `sda`. `df -h` reports the EFI partition as about `1022M`, because the FAT filesystem uses a little of it. Both are correct.
+- Neither NVMe disk uses `max` either. `nvme0n1` takes 192 GiB of 232.9, leaving 40.9 GiB — 17.6%, a generous margin. `nvme1n1` takes 888 GiB of 931.5, leaving 43.5 GiB — 4.7%. Both are deliberate: these disks hold VM images and Docker volumes, which are write-heavy in a way that makes over-provisioning worth more than the capacity it costs.
+- 960 GiB does not fit on `nvme1n1`. The drive is sold as 1 TB, which is 10^12 bytes and therefore 931.5 GiB, so 960 GiB overruns it by 28.5. 888 GiB is the size Silenus uses for its own root partition, and enters as the same `953483 MB`.
+- Sizes on the installed system: `lsblk` reports `1023M`, `2G`, `32G` and `192G` on `sda`, `192G` on `nvme0n1p1` and `888G` on `nvme1n1p1`. The EFI partition reads as `1023M` rather than `1G` because the entered `1075 MB` is decimal; `df -h` reports it smaller still, about `1022M`, because the FAT filesystem uses a little of it. All correct.
 - `sda4` mounts at `/data-root` first and the two NVMe partitions mount as nested points beneath it. The installer creates the parent directory and orders the mounts itself, so no separate top-level mountpoints are needed.
 - OS install ISOs live on the SATA SSD under `/data-root/isos`, referenced by the functional tests in Step 11.
 - No swap partition. Omit it from the table entirely rather than adding one and disabling it later.
@@ -901,8 +908,17 @@ echo "$GPU_PCI_IDS"
 ```
 
 Expect two comma-separated `vendor:device` pairs — the GPU and its audio
-function. If it prints nothing, the card is not NVIDIA or `lspci` names it
-differently; read `lspci -nn` and set the variable by hand.
+function. On this machine the card is a GeForce GTX 1080 at `09:00.0`,
+`[10de:1b80]`, so the first pair is `10de:1b80`.
+
+Confirm the audio function is there too, since binding only the VGA function
+leaves the card split between two drivers and passthrough fails:
+
+```bash
+lspci -nn | grep -i nvidia
+```
+
+Expect two lines, `09:00.0` and `09:00.1`.
 
 #### 4. Bind the card to vfio-pci
 
@@ -943,6 +959,8 @@ update-initramfs -u -k all
 **Notes**
 
 - This heredoc is the one place the delimiter is unquoted — `<<EOF`, not `<<'EOF'` — because `${GPU_PCI_IDS}` has to expand. Every other heredoc in this document is quoted so its contents are written literally.
+- `nouveau` currently has the card on this machine, which is expected before any of this is applied and is exactly what the blacklist below stops.
+- Both PCI functions must be bound. A GTX 1080 presents the VGA controller at `09:00.0` and an HDMI audio device at `09:00.1`; handing a guest one without the other does not work. Deriving the IDs with `grep -i nvidia` catches both, which is why it is written that way rather than picking the VGA line out.
 - Blacklisting only `nouveau` is the usual reason passthrough silently fails. A stray `nvidia`, `radeon` or `amdgpu` autoload racing `vfio-pci` for the device is what actually causes it, so all four are listed.
 - `softdep` alone only orders module loading. It does not guarantee `vfio-pci` gets first claim on the device during early boot, which is why `vfio` also goes into the initramfs.
 - Appending to `/etc/initramfs-tools/modules` is not idempotent: running Step 6 twice writes the four module names twice. Duplicates are harmless to boot, but check the file before repeating it.
