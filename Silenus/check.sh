@@ -72,7 +72,7 @@ for p in vim mokutil dmidecode efibootmgr \
   sudo tmux traceroute tree unrar virt-top vlc wget xclip yt-dlp \
   flatpak gnome-software-plugin-flatpak claude-code \
   qemu-system-x86 qemu-utils ovmf virtinst virt-manager libvirt-daemon-system libvirt-clients \
-  libosinfo-bin osinfo-db osinfo-db-tools libguestfs-tools \
+  libosinfo-bin osinfo-db osinfo-db-tools libguestfs-tools cloud-image-utils acl util-linux \
   ca-certificates docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; do
   dpkg -s "$p" >/dev/null 2>&1 || miss="$miss $p"
 done

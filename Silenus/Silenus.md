@@ -643,7 +643,7 @@ Expect a number above 0. This machine is Intel, so the flag is `vmx`.
 #### 3. Install the packages
 
 ```bash
-apt install -y qemu-system-x86 qemu-utils ovmf virtinst virt-manager libvirt-daemon-system libvirt-clients libosinfo-bin osinfo-db osinfo-db-tools libguestfs-tools
+apt install -y qemu-system-x86 qemu-utils ovmf virtinst virt-manager libvirt-daemon-system libvirt-clients libosinfo-bin osinfo-db osinfo-db-tools libguestfs-tools cloud-image-utils acl util-linux
 ```
 
 #### 4. Start the daemon
@@ -794,6 +794,9 @@ Expect `192.168.24.1/24`. `virbr0` belonged to `default` and should be gone.
 **Notes**
 
 - There is no `qemu-kvm` package in trixie. `qemu-system-x86` is the one that provides the emulator, and KVM itself is a kernel module that is already present.
+- `cloud-image-utils` supplies `cloud-localds`, which builds the small seed ISO a cloud image reads its `user-data` and `meta-data` from. A distribution cloud image booted without one comes up with no account you can log into, since the image ships no password and expects cloud-init to create the user.
+- `acl` supplies `setfacl` and `getfacl`, for granting the `libvirt-qemu` user access to a pool directory without changing the ownership of what is inside it. That applies to every pool in this build, since none of them lives under `/var/lib/libvirt`.
+- `util-linux` is Essential on Debian and is therefore already installed. It is named anyway so the dependency on `lsblk`, `blkid` and `mount` is written down rather than assumed — naming it costs nothing and `apt` treats it as satisfied.
 - The `usermod` sub-step has to run as your own user, not root. Under `sudo` as root, `$USER` is `root`, so the groups would be added to the wrong account.
 - `virt-manager` is a GTK3 application and ignores the GNOME dark preference on its own. Step 7 writes the GTK3 setting that fixes it. Nothing needs editing in its `.desktop` file.
 - The connection URI matters. Run as an ordinary user, `virsh` defaults to `qemu:///session`, a per-user hypervisor with no networks and no machines. The system VMs are on `qemu:///system`. Set `LIBVIRT_DEFAULT_URI=qemu:///system` if you would rather not type it each time.

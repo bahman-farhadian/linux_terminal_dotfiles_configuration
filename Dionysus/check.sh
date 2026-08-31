@@ -69,7 +69,7 @@ for p in bash-completion bridge-utils btop curl git iptables iputils-ping jq lsh
   pwgen python3 rsync sshuttle sudo tmux tree unrar vim wget \
   openssh-server mokutil dmidecode efibootmgr network-manager fwupd fwupd-amd64-signed \
   qemu-system-x86 qemu-utils ovmf virtinst libosinfo-bin osinfo-db osinfo-db-tools \
-  libvirt-daemon-system libvirt-clients libguestfs-tools \
+  libvirt-daemon-system libvirt-clients libguestfs-tools cloud-image-utils acl util-linux \
   ca-certificates docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; do
   dpkg -s "$p" >/dev/null 2>&1 || miss="$miss $p"
 done
