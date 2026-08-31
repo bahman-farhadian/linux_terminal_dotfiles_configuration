@@ -29,6 +29,14 @@ esac
 # across, so a login from a tmux window on another machine arrives reading
 # tmux-256color with no tmux running on this one — and a test on $TERM then
 # skips every SSH session it exists to serve.
+#
+# Over SSH it asks first, apt-style: Enter takes the default and starts tmux, n
+# declines. tmux repaints the whole screen as it starts, which wipes the
+# pre-authentication banner before anyone can read it, so taking the terminal
+# outright would make that banner pointless on exactly the logins it is for.
+# There is deliberately no timeout — a prompt that gave up on its own would
+# clear the banner while it was still being read, which is the thing it exists
+# to prevent. Local terminals are not asked: no banner is shown there.
 _in_mux=""
 if [ -n "$TMUX" ]; then
     _in_mux=1
@@ -46,13 +54,34 @@ if [ -z "$TMUX" ] && [ -z "$_in_mux" ] && [ -z "$NO_AUTO_TMUX" ] && command -v t
         _tmux_orphan=$(tmux list-sessions -F '#{session_name} #{session_attached}' 2>/dev/null \
                        | awk '$1 ~ /^ssh[0-9]+$/ && $2 == 0 { print $1; exit }')
         if [ -n "$_tmux_orphan" ]; then
-            tmux attach-session -t "$_tmux_orphan" && exit
+            _tmux_prompt="Reattach to tmux session $_tmux_orphan?"
         else
             _n=1
             while tmux has-session -t "=ssh$_n" 2>/dev/null; do _n=$((_n + 1)); done
-            tmux new-session -s "ssh$_n" && exit
+            _tmux_prompt="Start tmux session ssh$_n?"
         fi
-        unset _tmux_orphan _n
+        # No terminal on stdin means no tmux either: it would fail to open one.
+        if [ -t 0 ]; then
+            printf '%s [Y/n] ' "$_tmux_prompt"
+            read -r _reply || { _reply=n; printf '\n'; }
+        else
+            _reply=n
+        fi
+        case "$_reply" in
+            [Nn]*) printf 'No tmux. Run `tmux` to start one, or log in again.\n' ;;
+            *)
+                if [ -n "$_tmux_orphan" ]; then
+                    tmux attach-session -t "$_tmux_orphan" && exit
+                else
+                    # Recomputed rather than reused: the wait for an answer is
+                    # long enough for another login to have taken the name.
+                    _n=1
+                    while tmux has-session -t "=ssh$_n" 2>/dev/null; do _n=$((_n + 1)); done
+                    tmux new-session -s "ssh$_n" && exit
+                fi
+                ;;
+        esac
+        unset _tmux_orphan _tmux_prompt _reply _n
     else
         _tmux_detached=$(tmux list-sessions -F '#{session_name} #{session_attached}' 2>/dev/null \
                          | awk '$1 !~ /^ssh[0-9]*$/ && $2 == 0 { print $1; exit }')
