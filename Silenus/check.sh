@@ -180,7 +180,10 @@ if [ "${_hepfb:-0}" -gt 0 ]; then
 else
   na "hephaestus fallback" "no work WiFi profile here yet. Join that network, then: nmcli con mod <work-wifi-profile> +ipv4.routes \"192.168.40.0/24 192.168.88.212 200\""
 fi
-ck "one link autoconnects" "$(for c in Dionysus Hephaestus; do nmcli -g connection.autoconnect connection show "$c" 2>/dev/null; done|grep -c '^yes$')" "1"
+# Neither point-to-point profile may autoconnect. A /30 carries nothing that
+# says which peer is on the far end, so a profile coming up on its own would be
+# guessing, and guessing wrong looks connected while reaching nothing.
+ck "neither link autoconnects" "$(for c in Dionysus Hephaestus; do nmcli -g connection.autoconnect connection show "$c" 2>/dev/null; done|grep -c '^yes$')" "0"
 
 printf '\n--- Step 7/10: keyboard and lid ---\n'
 ck "lock service" "$(systemctl --user is-active lock-keyboard-en.service)" "active"

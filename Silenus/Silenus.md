@@ -1193,8 +1193,8 @@ networks each host NATs behind itself. Dotted lines are wireless or a cable that
 is only connected at one site; solid ones are permanent cable.
 
 Silenus has one spare ethernet port and two peers, so it carries a profile for
-each and only one is up at a time — `Dionysus` autoconnects at home,
-`Hephaestus` is brought up by hand on arrival at work.
+each and only one is up at a time. Neither autoconnects: the one for the site
+you are at is brought up by hand.
 
 Three guest subnets, three point-to-point `/30`s out of one `/29`, and no two
 overlap: the hosts can reach one another, so an address has to say which machine
@@ -1251,7 +1251,7 @@ nmcli con add type ethernet ifname enp0s31f6 con-name Dionysus ipv4.method manua
 ```
 
 ```bash
-nmcli con mod Dionysus connection.autoconnect yes
+nmcli con mod Dionysus connection.autoconnect no
 ```
 
 ```bash
@@ -1312,12 +1312,15 @@ nmcli con mod <work-wifi-profile> +ipv4.routes "192.168.40.0/24 192.168.88.212 2
 That route belongs there and nowhere else, for a reason worth knowing before
 trying it anywhere else — see the notes.
 
-`Dionysus` keeps `autoconnect yes` and comes up on its own at home. `Hephaestus`
-is brought up by hand on arrival, which takes the port from `Dionysus`:
+Neither profile autoconnects, so the port stays unconfigured until you say
+which peer is on the far end. On arrival at work:
 
 ```bash
 nmcli con up Hephaestus
 ```
+
+Bringing either up takes the port from the other, so there is no need to take
+one down first.
 
 ```bash
 ip -br addr show enp0s31f6
@@ -1367,7 +1370,7 @@ Needs Dionysus up on the other end.
 - No gateway and no DNS on this profile. `ipv4.never-default yes` states the same thing a second way, so a later edit that adds a gateway by accident cannot take the default route away from the interface that actually reaches the internet.
 - A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length, or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`–`.3`.
 - This is a second route to Dionysus when its LAN side is broken, which is worth having before reconfiguring that machine's management interface.
-- Two point-to-point links share this one port, because the laptop has only one spare ethernet socket and is never at both sites at once. Neither can autoconnect blindly: with a `/30` there is no way to tell from carrier alone which peer is on the far end, so `Dionysus` autoconnects for the common case and `Hephaestus` is a deliberate `nmcli con up` on arrival. Activating either releases the port from the other.
+- Two point-to-point links share this one port, because the laptop has only one spare ethernet socket and is never at both sites at once. **Neither autoconnects.** With a `/30` there is nothing in carrier alone that says which peer is on the far end, so a profile that came up on its own would be guessing: plug the Hephaestus cable into a port set to autoconnect `Dionysus` and the link comes up with the wrong address and the wrong routes, looking connected while reaching nothing. Both are a deliberate `nmcli con up` for that reason. Activating either releases the port from the other.
 - The two subnets are adjacent `/30`s out of the same `/29`: `192.168.124.0/30` for Dionysus, hosts `.1` and `.2`, and `192.168.124.4/30` for Hephaestus, hosts `.5` and `.6`. One range covers every point-to-point link in the estate with no two colliding.
 - Hephaestus's guests are reached by cable first, `192.168.40.0/24` via `192.168.124.5` at metric 100, and by the work LAN second, via `192.168.88.212` at metric 200. Same shape as Dionysus, different second hop.
 - **The fallback is for the work WiFi only. There is deliberately no route to those guests over the VPN.** From home, reach them the plain way: SSH to Hephaestus, then SSH onward to the guest. One hop, nothing to configure, nothing to keep in step.
@@ -1377,7 +1380,7 @@ Needs Dionysus up on the other end.
 - The metrics are what express "prefer the cable". Same destination, two next hops, lower metric wins. `ip -4 route get 192.168.32.10` is the way to ask the kernel which it would actually use, rather than reading the table and inferring.
 - **The route alone does not make guests reachable.** A libvirt NAT network permits outbound traffic and `RELATED,ESTABLISHED` return traffic; a connection opened from outside into `192.168.32.0/24` is not in either category and is dropped on Dionysus. Dionysus.md Step 11 carries the forwarding rule that allows it. Test with `ping` to a guest, not by reading the routing table.
 - The fallback path leans on Dionysus forwarding between `enp4s0` and `virbr1`, which is what `net.ipv4.ip_forward` in Dionysus.md Step 10 enables.
-- Unplugging the cable takes the profile down with it. `autoconnect yes` brings it back when it is plugged in again; nothing needs re-running.
+- Unplugging the cable takes the profile down with it. Since neither autoconnects, plugging it back in leaves the port idle until you bring the profile up again — the cost of never guessing which peer is on the other end.
 
 ### Step 14 — Check the whole setup
 
