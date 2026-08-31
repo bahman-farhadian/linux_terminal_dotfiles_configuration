@@ -4,28 +4,73 @@ Debian dotfiles for **bash**, **tmux**, and **SSH** — Gruvbox dark theme
 throughout. Adapted from the macOS set, with every macOS-only assumption
 removed.
 
-The repository also carries a Debian 13 build guide per machine, named for the
-host: [Silenus/Silenus.md](Silenus/Silenus.md), the Lenovo ThinkPad T14 Gen 4
-(Intel) GNOME workstation these dotfiles were built on;
-[Dionysus/Dionysus.md](Dionysus/Dionysus.md), a headless AMD Ryzen 9 3900X KVM
-and Docker host; and [Hephaestus/Hephaestus.md](Hephaestus/Hephaestus.md), a
-second headless KVM host with no GPU, on WiFi with a point-to-point cable to
-the laptop.
+## What this is
 
-Separately, [NVIDIA-GPU-Driver.md](NVIDIA-GPU-Driver.md) covers the NVIDIA
-graphics driver, `nvidia-smi` and `nvtop` on any Debian 13 server with a card —
-bare metal, or a VM with one passed through. SSH-only, no display, no X server.
-It includes enrolling a Machine Owner Key, which a server with Secure Boot needs
-and a VM usually does not. It stands on its own and refers to no host here.
+A personal configuration for three machines I run, published so the ideas in it
+can be borrowed — not a framework, and not something to install as-is. There is
+nothing to configure and no options to set: every value here is the one a
+specific machine needed. The hostnames are three real boxes, the subnets are the
+ones they sit on, and the disk models in each guide are the disks in that
+chassis.
 
-All three follow one outline: Part 1 for the OS install (BIOS, partitioning,
-repositories and quota), Part 2 for the configuration, each step carrying
-numbered sub-steps and a Notes block. The headless guides drop the steps that
-need a desktop and keep the rest in the same order.
+So read it as a worked example rather than a product. Take the parts that are
+portable — an alias, the prompt, the tmux status bar, a Notes block — and leave
+the rest. The value is meant to be in the *why*: most blocks explain the
+trade-off behind them, and the reasoning survives being moved to another machine
+even where the values do not.
 
-Each host has its own directory holding a complete, self-contained copy of what
-it installs. Deploy by running the installer inside the directory for that
-machine.
+Read anything before you run it. Two defaults in particular are deliberate
+choices for these hosts and are wrong for plenty of others:
+
+- `ssh/config` sets `StrictHostKeyChecking no` and `UserKnownHostsFile
+  /dev/null`, which disables host-key verification for every host. Reasonable on
+  a bench of machines that are rebuilt constantly; not reasonable if a changed
+  host key should mean something. See [Client](#client).
+- `install.sh` replaces `.bashrc`, `.bash_profile`, `.bash_aliases`,
+  `.tmux.conf` and `.hushlogin` outright, without prompting, on every run. See
+  [What it overwrites](#what-it-overwrites-and-what-it-leaves-alone).
+
+None of this has been tested anywhere but on these three machines. There is no
+support and no promise that any of it keeps working.
+
+## How to read this repository
+
+The documentation comes in two kinds, and they do not overlap.
+
+**This file is the master README.** It covers everything the three hosts share:
+the network they form, the dotfiles themselves, and every behaviour that is
+identical on all of them — the prompt, the aliases, the tmux bindings and status
+bar, the GNOME shortcuts, and the SSH client and server settings. Read it first,
+and read it once. The per-host guides deliberately do not repeat any of it.
+
+**Each host then has its own build guide**, named for the machine and kept in
+that machine's directory:
+
+| Guide | Machine |
+|---|---|
+| [Silenus/Silenus.md](Silenus/Silenus.md) | Lenovo ThinkPad T14 Gen 4 (Intel), GNOME workstation — the machine these dotfiles were built on |
+| [Dionysus/Dionysus.md](Dionysus/Dionysus.md) | Headless AMD Ryzen 9 3900X KVM and Docker host |
+| [Hephaestus/Hephaestus.md](Hephaestus/Hephaestus.md) | Second headless KVM host, no GPU, on WiFi with a point-to-point cable to the laptop |
+
+Each one is a complete build from bare metal for that single machine, and all
+three follow the same outline: Part 1 for the OS install (BIOS, partitioning,
+repositories and quota), Part 2 for the configuration. Every step carries
+numbered sub-steps and a Notes block explaining why it is done that way. The
+headless guides drop the steps that need a desktop and keep the rest in the same
+order, so the three can be read side by side and diffed against one another.
+
+Standing apart from both, [NVIDIA-GPU-Driver.md](NVIDIA-GPU-Driver.md) covers
+the NVIDIA graphics driver, `nvidia-smi` and `nvtop` on any Debian 13 server
+with a card — bare metal, or a VM with one passed through. SSH-only, no display,
+no X server. It includes enrolling a Machine Owner Key, which a server with
+Secure Boot needs and a VM usually does not. It names no host here and can be
+used on its own.
+
+Each host directory holds a complete, self-contained copy of what that machine
+installs. The three duplicate one another rather than sharing a common
+directory, which is the point: one directory can be copied to a new box and run
+there with nothing else alongside it. Deploy by running the installer inside the
+directory for that machine.
 
 ## The network
 
@@ -292,12 +337,20 @@ apart by stepping up that ramp rather than by hue.
 | inactive window | bg1 `#3c3836` | fg1 `#ebdbb2` |
 | session name | bg2 `#504945` | bright yellow `#fabd2f` |
 | active window | bg3 `#665c54` | fg0 `#fbf1c7` |
-| zoomed marker | bg0_h `#1d2021` | bright red `#fb4934` |
+| zoomed marker | inherits bg3 `#665c54` | bright red `#fb4934` |
 
 Both tabs stay light, so the active one is told apart by its lighter block
 rather than by dimmer text. The session name carries bright yellow, since it
 names the session and is worth picking out at a glance. bright red is the only accent left and appears only where
 it means something — the zoomed marker and the synchronised-panes borders.
+
+The zoomed marker sets no background of its own, so it inherits the active tab's
+block and the tab stays one unbroken run of colour. That is a readability
+trade-off taken on purpose: bright red on bg3 measures 1.89:1, against 4.77:1
+back when the marker painted itself bg0_h. It survives on being bold, one
+character wide, and the only red in the bar — but it is knowingly the weakest
+pairing here, and the reason to accept it is that a near-black box dropped into
+the middle of a tab broke the lightness ramp the whole bar is built on.
 
 The bar itself uses `bg=default` so it takes the terminal's own background. A
 terminal window whose height is not an exact multiple of the character cell

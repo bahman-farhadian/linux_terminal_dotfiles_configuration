@@ -17,6 +17,14 @@ jobs. Three disks, sizes as `lsblk` reports them:
 
 No swap partition and no swapfile anywhere in this build.
 
+> **A personal build record, published for ideas.** This is how one specific
+> machine was actually built — its hardware, its disks, its addresses. It is not
+> a general Debian guide, and the values in it are not defaults to copy: they
+> are what this box needed on the day. The reasoning in the Notes blocks travels
+> to other hardware; the numbers do not, so check each one against your own
+> before you run the block. [The master README](../README.md) covers what all
+> three hosts share.
+
 Every step here can be run again without harm. Files are written whole rather
 than appended to, package installs skip what is present, and group membership
 is unchanged when it is already granted. The single exception is `visudo` in
