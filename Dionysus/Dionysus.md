@@ -1515,6 +1515,19 @@ quota from Step 3 is already live.
 systemctl reboot
 ```
 
+A logged-in `root` SSH session refuses the reboot rather than performing it:
+
+```
+User root is logged in on sshd.
+Please retry operation after closing inhibitors and logging out other users.
+```
+
+Log that session out and repeat, or override it:
+
+```bash
+systemctl reboot -i
+```
+
 #### 2. Boot fundamentals
 
 ```bash
@@ -1631,29 +1644,32 @@ cat /sys/module/kvm_amd/parameters/nested
 Expect `1` — see the note in Step 7 on why this differs from Silenus.
 
 ```bash
-xfs_quota -x -c 'state' /data-root
+sudo xfs_quota -x -c 'state' /data-root
 ```
 
 ```bash
-xfs_quota -x -c 'state' /data-root/sssd
+sudo xfs_quota -x -c 'state' /data-root/sssd
 ```
 
 ```bash
-xfs_quota -x -c 'state' /data-root/lssd
+sudo xfs_quota -x -c 'state' /data-root/lssd
 ```
 
-Expect `Accounting: ON` and `Enforcement: ON` on all three.
+Expect `Accounting: ON` and `Enforcement: ON` on all three, under **Project
+quota state**. The user and group sections above it read `OFF`, which is
+correct — only project quota is turned on, and it is the one
+`--storage-opt size=` uses.
 
 #### 9. Functional tests
 
 A guest on the `sssd` pool:
 
 ```bash
-virsh vol-create-as sssd-pool <vm-name>.qcow2 20G --format qcow2
+virsh -c qemu:///system vol-create-as sssd-pool <vm-name>.qcow2 20G --format qcow2
 ```
 
 ```bash
-virt-install --name <vm-name> --memory 4096 --vcpus 2 --disk vol=sssd-pool/<vm-name>.qcow2 --network network=static_network_32 --os-variant debian13 --cdrom /data-root/isos/debian-13-netinst.iso
+virt-install --connect qemu:///system --name <vm-name> --memory 4096 --vcpus 2 --disk vol=sssd-pool/<vm-name>.qcow2 --network network=static_network_32 --os-variant debian13 --cdrom /data-root/isos/debian-13-netinst.iso
 ```
 
 Docker quota enforcement:
@@ -1684,15 +1700,16 @@ GPU passthrough — attach the card to a VM by its PCI address in the domain XML
 then:
 
 ```bash
-virsh start <gpu-vm-name>
+virsh -c qemu:///system start <gpu-vm-name>
 ```
 
 ```bash
-virsh domdisplay <gpu-vm-name>
+virsh -c qemu:///system domdisplay <gpu-vm-name>
 ```
 
 **Notes**
 
+- **Confirm the machine actually rebooted before trusting anything below.** `systemctl reboot` refuses while another user — typically a `root` shell left open from an earlier step — holds a session, and it says so rather than failing silently. Every check here then runs against the old boot and passes for the wrong reason. `uptime -p` after logging back in is the cheap way to be sure.
 - Verification is gathered here rather than spread through Steps 9 to 11 because every one of those changes only takes effect on this boot. Checking them earlier reports the state before the change, which reads as a pass and is not one.
 - `virt-install` with `--cdrom` expects a console. Add `--noautoconsole` and connect afterwards with `virsh console <vm-name>`, or run it from a `tmux` session, since there is no display on this host.
 - If `lspci -nnk` shows `nouveau` or `nvidia` in use rather than `vfio-pci`, the blacklist did not take. Check that `update-initramfs` ran after the file was written in Step 9.
