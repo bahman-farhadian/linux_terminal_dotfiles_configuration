@@ -50,7 +50,7 @@ that machine's directory:
 |---|---|
 | [Silenus/Silenus.md](Silenus/Silenus.md) | Lenovo ThinkPad T14 Gen 4 (Intel), GNOME workstation — the machine these dotfiles were built on |
 | [Dionysus/Dionysus.md](Dionysus/Dionysus.md) | Headless AMD Ryzen 9 3900X KVM and Docker host |
-| [Hephaestus/Hephaestus.md](Hephaestus/Hephaestus.md) | Second headless KVM host, no GPU, on WiFi with a point-to-point cable to the laptop |
+| [Hephaestus/Hephaestus.md](Hephaestus/Hephaestus.md) | Second headless Intel Core i5-12400 KVM host, no discrete GPU, on WiFi with a point-to-point cable to the laptop |
 
 Each one is a complete build from bare metal for that single machine, and all
 three follow the same outline: Part 1 for the OS install (BIOS, partitioning,

@@ -128,6 +128,14 @@ printf '\n--- Step 9: networking ---\n'
 ck "wan profile"     "$(nmcli -g connection.id connection show wan 2>/dev/null)" "wan"
 ck "wan interface"   "$(nmcli -g connection.interface-name connection show wan 2>/dev/null)" "wlp2s0"
 ok "wan address"     "$(ip -4 -br addr show wlp2s0 2>/dev/null|awk '{print $3}')"
+ck "wan autoconnect" "$(nmcli -g connection.autoconnect connection show wan 2>/dev/null)" "yes"
+ck "wan mac pinned"  "$(nmcli -g 802-11-wireless.cloned-mac-address connection show wan 2>/dev/null)" "permanent"
+# Named rather than left to show up as a symptom. Installing over WiFi leaves a
+# wlp2s0 stanza in /etc/network/interfaces; the wpa_supplicant ifupdown starts
+# for it holds the interface, so NetworkManager reports the device unavailable
+# while still calling it managed, and every activation fails with "No suitable
+# device found". Step 9 sub-step 4 removes the stanza and kills that supplicant.
+ck "no ifupdown wifi" "$(cat /etc/network/interfaces /etc/network/interfaces.d/* 2>/dev/null|grep -cE '^[[:space:]]*(iface|allow-hotplug|auto)[[:space:]]+wlp2s0')" "0"
 # The profile, not the live link. The cable to Silenus is connected only while
 # that machine is on site, and a check that failed whenever it was unplugged
 # would be noise rather than signal.

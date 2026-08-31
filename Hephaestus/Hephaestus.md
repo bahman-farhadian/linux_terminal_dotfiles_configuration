@@ -1,18 +1,19 @@
-# Hephaestus — Debian 13 "trixie" headless KVM host
+# Hephaestus — Intel Core i5-12400, Debian 13 "trixie" headless KVM host
 
 Hostname `Hephaestus`. Purely headless: base system and `openssh-server` only, no
 desktop environment, administered over SSH. The other hosts are
 [Dionysus.md](../Dionysus/Dionysus.md), the Ryzen 9 3900X KVM host, and
 [Silenus.md](../Silenus/Silenus.md), the ThinkPad workstation.
 
-Two network interfaces — onboard WiFi and onboard ethernet — and no GPU to hand
-to a guest, which is the one step this build drops against Dionysus. Two disks,
-sizes as `lsblk` reports them:
+ASUS PRIME H610M-A WIFI, Intel Core i5-12400 (6c/12t), 31 GiB RAM, no discrete
+GPU to hand to a guest — the one step this build drops against Dionysus — and
+two network interfaces, onboard WiFi and onboard ethernet. Two disks, sizes as
+`lsblk` reports them:
 
-| Role | Device | Size |
-|---|---|---|
-| OS and Docker `data-root` | `nvme0n1` | 232.9 GiB |
-| `lssd` — VM disks and Docker volumes | `sda` | 1.8 TiB |
+| Role | Device | Model | Size |
+|---|---|---|---|
+| OS and Docker `data-root` | `nvme0n1` | Samsung SSD 970 EVO Plus 250GB | 232.9 GiB |
+| `lssd` — VM disks and Docker volumes | `sda` | Samsung SSD 870 EVO 2TB | 1.8 TiB |
 
 No swap partition and no swapfile anywhere in this build.
 
@@ -34,56 +35,11 @@ patch the machine by hand.** A `sed` against a file this document writes leaves
 the machine and the document disagreeing, and nothing will tell you which is
 right. Every block is written to be run again.
 
-## Facts to confirm before starting
-
-Two things this document could not read from the machine. Each is marked at the
-step that uses it.
-
-| # | Fact | Used by |
-|---|------|---------|
-| 1 | Motherboard, for the BIOS setup key and menu paths | Step 1 |
-| 2 | Whether `sda` is an SSD or a spinning disk. It changes nothing here, since no over-provisioning is left on it either way, but it belongs in the record | Step 2 |
-
-Everything else is settled. The CPU vendor is deliberately not on the list: the
-steps that care read it from the machine rather than being told.
-
-```mermaid
-graph TB
-    INET(("Internet"))
-    AP["WiFi network<br/>192.168.88.0/24"]
-    INET --- AP
-
-    subgraph HEP ["Hephaestus"]
-        HW["wlp2s0 &middot; WiFi<br/>connection: wan<br/>192.168.88.212/24"]
-        HE["eno1 &middot; onboard ethernet<br/>connection: Hephaestus<br/>192.168.124.5/30"]
-        HB["virbr1 &middot; static_network_40<br/>192.168.40.1/24 &middot; NAT"]
-        HG["guests<br/>192.168.40.2 &ndash; .254<br/>static, no DHCP"]
-        HB --- HG
-    end
-
-    SIL["Silenus<br/>192.168.124.6/30"]
-    AP -.-|WiFi| HW
-    HE ===|ethernet cable| SIL
-
-    classDef wan fill:#1f6feb,stroke:#0b4fc0,color:#ffffff
-    classDef p2p fill:#8957e5,stroke:#6a3fbf,color:#ffffff
-    classDef guest fill:#2da44e,stroke:#1a7f37,color:#ffffff
-    classDef infra fill:#57606a,stroke:#424a53,color:#ffffff
-    class HW wan
-    class HE p2p
-    class HB,HG guest
-    class AP,INET infra
-    class SIL p2p
-```
-
-The guest subnet is `192.168.40.0/24` here, against `192.168.24.0/24` on Silenus
-and `192.168.32.0/24` on Dionysus. All three differ on purpose: the hosts can
-reach one another, so overlapping guest ranges would make a guest on one
-indistinguishable from a guest on another.
-
 ## Part 1 — OS installation
 
 ### Step 1 — BIOS: Secure Boot and virtualization
+
+ASUS PRIME H610M-A WIFI.
 
 The same settings as Dionysus, including the ones passthrough would need. Every
 host in this estate leaves the BIOS in the same state, so a machine that later
@@ -91,19 +47,22 @@ gains a card needs no trip back into firmware.
 
 | # | Step | How |
 |---|------|-----|
-| 1 | Enter BIOS | Power off fully, power on, tap the setup key at the vendor splash |
-| 2 | Note BIOS version | Write it down before changing anything |
-| 3 | Secure Boot | `OS Type` = **Windows UEFI mode**, or the vendor's equivalent |
-| 4 | Enable virtualization | `SVM Mode` on AMD, `Intel VT-x` on Intel |
-| 5 | Enable IOMMU | `IOMMU` = **Enabled** — `AMD-Vi` or `Intel VT-d` |
-| 6 | Above 4G Decoding | **Enabled** |
-| 7 | Resizable BAR | **Auto**, or **Enabled** |
-| 8 | Save and exit | Save changes and reboot |
-| 9 | Boot the installer | Open the boot menu, pick the USB device |
+| 1 | Enter BIOS | Power off fully, power on, tap **Del** at the ASUS splash |
+| 2 | Leave EZ Mode | **F7** switches to Advanced Mode, where everything below lives |
+| 3 | Note BIOS version | `Main` tab — write it down before changing anything |
+| 4 | Secure Boot | `Boot → Secure Boot → OS Type` = **Windows UEFI mode** |
+| 5 | Enable VT-x | `Advanced → CPU Configuration → Intel (VMX) Virtualization Technology` = **Enabled** |
+| 6 | Enable VT-d | `Advanced → System Agent (SA) Configuration → VT-d` = **Enabled** |
+| 7 | Above 4G Decoding | `Advanced → PCI Subsystem Settings → Above 4G Decoding` = **Enabled**, if the board exposes it |
+| 8 | Resizable BAR | Same menu, `Re-Size BAR Support` = **Auto**, if present |
+| 9 | Save and exit | **F10** → **Yes** |
+| 10 | Boot the installer | **F8** at the splash, pick the USB device |
 
 **Notes**
 
-- **Fact 1.** The setup key and the exact wording of each line depend on the board — commonly **Del** or **F2**. This table names the settings, not the menu paths, until the board is recorded.
+- The menu paths are ASUS's LGA1700 convention. Confirm each on screen rather than trusting the path: a BIOS update can move a setting between `Advanced` and a chipset submenu without renaming it.
+- **H610 is a budget chipset, and rows 7 and 8 may simply not exist on it.** Above 4G Decoding and Re-Size BAR are commonly cut from H610 firmware. Neither is used by this build — there is no card to pass through — so a board that does not offer them is not a fault and needs no workaround. Set them if they are there and move on if they are not.
+- VT-x and VT-d can be read back from the running system instead of a reboot: `grep -c vmx /proc/cpuinfo` above 0 means VT-x is on, and `ls /sys/class/iommu/` listing anything means VT-d is on and the kernel picked it up.
 - Debian's bootloader is signed by Microsoft's 3rd party UEFI CA. The key set has to include it or the machine will not boot and shows `Invalid signature detected`. On ASUS boards the switch is `OS Type` = **Windows UEFI mode**; other vendors name it after the CA directly.
 - **The IOMMU lines are set even though nothing here uses them.** They cost nothing when idle, and the alternative is a trip back into firmware — on a machine at another site — the day this host is given a card. What is absent is the *operating system* side of passthrough: no `amd_iommu=on` on the kernel command line, no `vfio-pci` binding, no driver blacklist, no `vfio` in the initramfs. Dionysus.md Step 9 is where that lives if it is ever wanted here.
 - Turning the 3rd party CA on may switch `Secure Boot Mode` from `Standard` to `Custom`. That is expected. Custom only means the key set is no longer the factory default; Secure Boot still checks every signature.
@@ -148,7 +107,7 @@ environment task; this host stays headless.
 
 - The OS disk here is the NVMe and the bulk disk is the SATA drive, which is the reverse of Dionysus. The four sizes on `nvme0n1` are identical to Dionysus's `sda` because the two disks are the same size, so the same numbers apply unchanged.
 - The four partitions on `nvme0n1` come to 227 GiB of the 232.9 the disk reports, leaving about 5.9 GiB unpartitioned as SSD over-provisioning — the drive uses it for wear levelling, which keeps write speed up as it fills.
-- `sda` takes the whole disk with `max` and keeps no such margin, which is the one deliberate difference from how Dionysus treats its bulk disks. **Fact 2**: if it turns out to be an SSD that will run close to full, taking 4% off it is worth more than the capacity.
+- `sda` takes the whole disk with `max` and keeps no such margin, which is the one deliberate difference from how Dionysus treats its bulk disks. It **is** an SSD — a Samsung 870 EVO 2TB, `lsblk -d -o NAME,ROTA` reports `0` — so the same over-provisioning argument that reserves 5.9 GiB on `nvme0n1` applies to it in principle. It was not applied: the disk is bulk storage for VM images and Docker volumes, 2 TB is far more than this host will fill, and an SSD kept well below capacity has enough unwritten blocks to wear-level with regardless. If it ever does run close to full, reclaiming 4% is worth more than the capacity, and that means reformatting — see the Notes in Step 3 for what a reformat has to fix in `/etc/fstab`.
 - There is one bulk disk here where Dionysus has two, so there is one pool rather than two. `sssd` does not exist on this host; anything Dionysus would put there goes on `lssd`.
 - The installer counts in GB, `df -h` counts in GiB. The root partition is entered as `34360 MB`, shows as `34.4 GB`, and reports as `32G` once installed. Same partition.
 - For any other size: type `GiB x 1073.741824` MB, rounded. The EFI partition is entered as `1075 MB` rather than the 1074 the formula gives; that is the number the other two hosts use for the same partition, and one megabyte over makes no difference.
@@ -400,6 +359,9 @@ The installation is done.
 
 ### Step 4 — Firmware updates
 
+Everything on this machine that publishes firmware to LVFS can be updated from
+Linux. The motherboard is the exception and is handled separately, in the notes.
+
 #### 1. Become root
 
 ```bash
@@ -412,38 +374,52 @@ sudo -i
 apt install -y fwupd fwupd-amd64-signed
 ```
 
-#### 3. Refresh, look, apply
+#### 3. Refresh the firmware list
 
 ```bash
 fwupdmgr refresh --force
 ```
 
+#### 4. See what the machine has
+
 ```bash
 fwupdmgr get-devices
 ```
 
+#### 5. See what is available
+
 ```bash
 fwupdmgr get-updates
 ```
+
+#### 6. Apply
 
 ```bash
 fwupdmgr update
 ```
 
-#### 4. Reboot to apply
+#### 7. Reboot to apply
 
 ```bash
 systemctl reboot
 ```
 
-Log back in, become root, and confirm nothing is left:
+Log back in and become root again before continuing:
+
+```bash
+sudo -i
+```
+
+#### 8. Check nothing is left
 
 ```bash
 fwupdmgr get-updates
 ```
 
-The last line must read `No updates available`. If it does not, repeat from
-`fwupdmgr update`.
+The last line must read `No updates available`. If it does not, repeat from the
+Apply sub-step.
+
+#### 9. Check Secure Boot survived
 
 ```bash
 mokutil --sb-state
@@ -454,10 +430,13 @@ Expect `SecureBoot enabled`.
 **Notes**
 
 - `fwupd-amd64-signed` holds the Debian-signed EFI file. Without it firmware updates stop working once Secure Boot is on, which it is on this host.
-- Never power off during a firmware update. Firmware is written during the reboot, not by `fwupdmgr update`, so apply, reboot and re-check are one round.
+- Never power off during a firmware update.
+- Firmware is written during the reboot, not by `fwupdmgr update`. Apply, reboot and re-check are one round. Repeat until the check is clean.
 - `Devices with no available firmware updates` and `Devices with the latest available firmware version` both mean nothing to do. Only the last line decides.
-- What appears depends on the vendor. Lenovo publishes to LVFS, which is why Silenus updates its BIOS this way; many desktop and small-form-factor boards do not, and their firmware is updated from the BIOS's own flash utility instead. `fwupdmgr get-devices` is the honest answer for this machine, not a list written in advance.
-- A BIOS update resets BIOS settings on many boards, virtualization included. After one, redo Step 1 and re-run the checks in Step 3.
+- **This is a desktop board, not a Lenovo laptop, and that changes what to expect.** Lenovo publishes to LVFS, which is why Silenus updates its BIOS this way. ASUS does not generally publish consumer motherboard firmware there, so do not be surprised if the PRIME H610M-A WIFI itself never appears in `get-devices`. Its BIOS is updated from the firmware's own **EZ Flash** utility, with the `.CAP` file on a FAT32 USB stick. Verify against ASUS's own support page rather than assuming either way.
+- The NVMe and SATA disks may or may not appear. Samsung consumer drives are largely absent from LVFS; `fwupdmgr get-devices` is the honest answer for this machine, not a list written in advance.
+- The AC-power caveat that applies to Silenus does not apply here. This machine has no battery, so nothing is skipped for want of mains power.
+- A BIOS update resets BIOS settings on many boards, `Intel VT-x` and `VT-d` included. After one, redo Step 1 and re-run the checks in Step 3.
 
 ### Step 5 — Packages
 
@@ -688,11 +667,13 @@ ip -br addr show virbr1
 
 Expect `192.168.40.1/24`.
 
-#### 9. Leave the root shell, and join the groups
+#### 9. Leave the root shell
 
 ```bash
 exit
 ```
+
+#### 10. Add your user to the libvirt and kvm groups
 
 ```bash
 sudo usermod -aG libvirt,kvm $USER
@@ -719,19 +700,27 @@ groups
 
 Docker Engine from Docker's own repository, not Debian's `docker.io`.
 
-#### 1. Become root, and add the repository
+#### 1. Become root
+
+The rest of this step is run as root.
 
 ```bash
 sudo -i
 ```
 
+#### 2. Install what the repository setup needs
+
 ```bash
 apt install -y ca-certificates curl gnupg
 ```
 
+#### 3. Create the keyring directory
+
 ```bash
 install -m 0755 -d /etc/apt/keyrings
 ```
+
+#### 4. Fetch Docker's signing key
 
 ```bash
 curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
@@ -740,6 +729,8 @@ curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/doc
 ```bash
 chmod a+r /etc/apt/keyrings/docker.asc
 ```
+
+#### 5. Add the repository
 
 ```bash
 vim /etc/apt/sources.list.d/docker.sources
@@ -760,13 +751,13 @@ Signed-By: /etc/apt/keyrings/docker.asc
 apt update
 ```
 
-#### 2. Install the engine
+#### 6. Install the engine
 
 ```bash
 apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
-#### 3. Point data-root at the data partition
+#### 7. Point data-root at the NVMe data partition
 
 ```bash
 mkdir -p /etc/docker
@@ -788,11 +779,23 @@ Put this in it:
 }
 ```
 
+#### 8. Start it
+
 ```bash
-systemctl enable --now docker && systemctl restart docker
+systemctl enable --now docker
 ```
 
-#### 4. Check the driver and backing filesystem
+```bash
+systemctl restart docker
+```
+
+```bash
+systemctl is-active docker
+```
+
+Expect `active`.
+
+#### 9. Check the driver and backing filesystem
 
 ```bash
 docker info --format '{{.Driver}}'
@@ -806,7 +809,13 @@ docker info --format '{{.DriverStatus}}'
 
 Expect `Backing Filesystem` to read `xfs` and `Supports d_type` to read `true`.
 
-#### 5. Prove the quota is enforced
+```bash
+docker info | grep -i "docker root dir"
+```
+
+Expect `/data-root`.
+
+#### 10. Prove the quota is enforced
 
 Reporting the right size is not proof. Fill the container past its limit and
 watch it stop:
@@ -815,19 +824,23 @@ watch it stop:
 docker run --rm --storage-opt size=1G busybox sh -c 'df -h / | tail -1; dd if=/dev/zero of=/big bs=1M count=1200'
 ```
 
-Expect `dd` to stop early with `No space left on device`.
+Expect `df` to report about `1.0G`, and `dd` to stop early with
+`No space left on device`. If `dd` writes all 1200 MiB, the limit is not
+active.
 
-#### 6. Leave the root shell, and join the group
+#### 11. Leave the root shell
 
 ```bash
 exit
 ```
 
+#### 12. Add your user to the docker group
+
 ```bash
 sudo usermod -aG docker $USER
 ```
 
-Log out and back in, then:
+Log out and log back in, then check it works without `sudo`:
 
 ```bash
 docker run --rm hello-world
@@ -835,11 +848,16 @@ docker run --rm hello-world
 
 **Notes**
 
-- Two storage tiers by design. **Capped**, on `/data-root`: image layers and small containers, bounded per container with `--storage-opt size=`. **Uncapped**, bind-mounted: anything needing real bulk mounts explicitly into `/data-root/lssd` and is not subject to the cap.
-- Docker defaults to the containerd snapshotter, which reports itself as `overlayfs` and does not implement `--storage-opt size=`. It accepts the flag and ignores it, so a container silently gets the whole disk. Turning the snapshotter off is what makes the XFS project quota from Step 3 apply.
-- Debian's `docker.io` and `podman-docker` conflict with Docker Engine. Remove either before installing.
-- Membership in the `docker` group is equivalent to root. Treat it as an admin privilege, not a convenience.
-- `Suites: trixie` is written out rather than derived from `/etc/os-release`, so the file says which release it is pinned to.
+- Two storage tiers by design. **Capped**, on `nvme0n1p4`: image layers and small containers sit on `/data-root` directly, bounded per container with `--storage-opt size=`. **Uncapped**, bind-mounted: anything needing real bulk — databases, local models — mounts explicitly into `/data-root/lssd` on the SATA SSD and is not subject to the `data-root` cap.
+- An uncapped container looks like `docker run -d --name <name> -v /data-root/lssd/<volume>:/data <image>`.
+- Docker now defaults to the containerd snapshotter, which reports itself as `overlayfs` and does not implement `--storage-opt size=`. It accepts the flag and ignores it, so a container silently gets the whole disk. Turning the snapshotter off is what makes the XFS project quota from Step 3 apply.
+- `--storage-opt size=` works only on `overlay2` over XFS with project quota. It is not supported on ext4, and not by the containerd snapshotter.
+- Switching the driver hides images pulled under the previous one. They are not deleted, but they live in a separate store. Pull them again if anything is missing.
+- Debian's `docker.io` and `podman-docker` conflict with Docker Engine. If either was installed earlier, remove it before installing the engine.
+- Adding your user to the `docker` group must run as your own user, not root.
+- Membership in the `docker` group is equivalent to root. Any member can start a container that mounts the whole filesystem. Treat it as an admin privilege, not a convenience.
+- `Suites: trixie` is written out rather than derived from `/etc/os-release`, so the file says which release it is pinned to. Change it when the machine is upgraded.
+- `--rm` deletes the container when it exits, so these checks leave nothing behind.
 
 ### Step 9 — Networking
 
@@ -853,6 +871,45 @@ in Step 7, and libvirt owns that bridge.
 
 Persisted through NetworkManager's own connection profiles with `nmcli`, not
 `/etc/network/interfaces`.
+
+```mermaid
+graph TB
+    INET(("Internet"))
+    AP["WiFi network<br/>192.168.88.0/24"]
+    INET --- AP
+
+    subgraph HEP ["Hephaestus"]
+        HW["wlp2s0 &middot; WiFi<br/>connection: wan<br/>192.168.88.212/24"]
+        HE["eno1 &middot; onboard ethernet<br/>connection: Hephaestus<br/>192.168.124.5/30"]
+        HB["virbr1 &middot; static_network_40<br/>192.168.40.1/24 &middot; NAT"]
+        HG["guests<br/>192.168.40.2 &ndash; .254<br/>static, no DHCP"]
+        HB --- HG
+    end
+
+    SIL["Silenus<br/>192.168.124.6/30"]
+    AP -.-|WiFi| HW
+    HE ===|ethernet cable| SIL
+
+    classDef wan fill:#1f6feb,stroke:#0b4fc0,color:#ffffff
+    classDef p2p fill:#8957e5,stroke:#6a3fbf,color:#ffffff
+    classDef guest fill:#2da44e,stroke:#1a7f37,color:#ffffff
+    classDef infra fill:#57606a,stroke:#424a53,color:#ffffff
+    class HW wan
+    class HE p2p
+    class HB,HG guest
+    class AP,INET infra
+    class SIL p2p
+```
+
+Blue is this host's way out, purple the point-to-point link to Silenus, green
+the guest network it NATs behind itself. The dotted line is wireless; the solid
+one is the cable, which is only connected when Silenus is on site.
+
+The guest subnet is `192.168.40.0/24` here, against `192.168.24.0/24` on Silenus
+and `192.168.32.0/24` on Dionysus. All three differ on purpose: the hosts can
+reach one another, so overlapping guest ranges would make a guest on one
+indistinguishable from a guest on another.
+
 
 #### 1. Become root
 
@@ -880,20 +937,82 @@ Both `wlp2s0` and `eno1` are fixed by their hardware paths and need no renaming.
 Dionysus renames its second interface only because a USB adapter arrives as
 `enx` followed by its MAC address; both of these are onboard.
 
-#### 4. Configure WiFi as the way out
+#### 4. Take WiFi back from ifupdown
 
-The installer already joined this network, so a profile exists. Give it the name
-the other hosts use for the same job:
+Installing over WiFi writes the SSID and key into `/etc/network/interfaces`, so
+the installed system comes up on the network it was installed over. That stanza
+starts a `wpa_supplicant` of ifupdown's own on `wlp2s0`, and that instance holds
+the interface. NetworkManager's supplicant then cannot take it:
+
+```
+device (wlp2s0): Couldn't initialize supplicant interface:
+    wpa_supplicant couldn't grab this interface
+device (wlp2s0): supplicant interface keeps failing, giving up
+```
+
+Back the file up and cut it down to loopback:
 
 ```bash
-nmcli connection show
+cp -a /etc/network/interfaces /etc/network/interfaces.bak.$(date +%F-%H%M%S)
 ```
 
 ```bash
-nmcli con mod <existing-wifi-profile> connection.id wan
+cat > /etc/network/interfaces <<'EOF'
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+source /etc/network/interfaces.d/*
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+EOF
 ```
 
-The work network runs DHCP, so the addressing needs nothing further:
+Removing the stanza is not enough on a running system — the supplicant it
+started stays up until it is killed:
+
+```bash
+ifdown wlp2s0 2>/dev/null; pkill -f 'wpa_supplicant.*wlp2s0'
+```
+
+```bash
+systemctl restart wpa_supplicant && systemctl restart NetworkManager
+```
+
+```bash
+nmcli -f DEVICE,TYPE,STATE,CONNECTION device status
+```
+
+`wlp2s0` must read `disconnected`, not `unavailable`, before going on.
+
+#### 5. Configure WiFi as the way out
+
+Nothing usable survives sub-step 4 — what the installer left was an ifupdown
+stanza, never a NetworkManager profile — so `wan` is created outright. The
+network name and the key are both read into variables, so neither is typed into
+a command and neither reaches the shell history or this file:
+
+```bash
+read -rp  'WiFi SSID: ' WIFI_SSID
+read -rsp 'WiFi PSK:  ' WIFI_PSK; echo
+```
+
+The SSID is echoed back as you type it; the key is not, so the second prompt
+looks as though it did nothing:
+
+```
+WiFi SSID: Example-AP-5G
+WiFi PSK:
+```
+
+```bash
+nmcli connection add type wifi ifname wlp2s0 con-name wan ssid "$WIFI_SSID" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$WIFI_PSK" 802-11-wireless.cloned-mac-address permanent connection.autoconnect yes connection.autoconnect-priority 10 ipv4.method auto ipv6.method disabled
+```
+
+```bash
+unset WIFI_SSID WIFI_PSK
+```
 
 ```bash
 nmcli con up wan
@@ -907,7 +1026,7 @@ Expect an address on `192.168.88.0/24`. It has been `192.168.88.212`; a DHCP
 lease is not a guarantee, so anything that has to reach this host by address
 either wants a reservation on the work DHCP server or should use the cable.
 
-#### 5. The point-to-point link to Silenus
+#### 6. The point-to-point link to Silenus
 
 `eno1` carries a cable to Silenus, on its own `/30`. No gateway and no DNS, so
 it cannot compete with WiFi for the default route:
@@ -937,20 +1056,7 @@ both up:
 ping -c4 192.168.124.6
 ```
 
-After a clean install there is nothing else on this interface and the next two
-commands print nothing to delete. They matter only when reconfiguring the
-existing system in place, which had a bridge named `br` on `eno1` holding
-`192.168.48.2/30`. Check before deleting:
-
-```bash
-nmcli connection show
-```
-
-```bash
-nmcli connection delete bridge-br bridge-br-slave
-```
-
-#### 6. Confirm
+#### 7. Confirm
 
 ```bash
 nmcli device status
@@ -966,7 +1072,7 @@ ip -4 route
 
 Exactly one default route, on `wlp2s0`.
 
-#### 7. Enable IP forwarding
+#### 8. Enable IP forwarding
 
 ```bash
 vim /etc/sysctl.d/99-kvm.conf
@@ -992,7 +1098,13 @@ Expect `net.ipv4.ip_forward = 1`.
 
 - There is no bridge built by hand for guests. Defining the guest network in libvirt — the same choice the other two hosts made — means libvirt creates and owns `virbr1`.
 - Nothing is renamed on this host. Both interfaces have stable hardware-derived names already, which is exactly why Dionysus renames its USB adapter and this machine renames nothing.
-- Whether `wlp2s0` needs the `[ifupdown] managed=false` handover Dionysus's ethernet needed depends on what the installer wrote. Check `/etc/network/interfaces`: if it carries a stanza for `wlp2s0`, remove all but the loopback lines and restart NetworkManager, exactly as Dionysus.md Step 10 sub-step 5 does. A WiFi install usually leaves NetworkManager in charge already.
+- **A WiFi install always leaves ifupdown holding the adapter**, and sub-step 4 is how it is taken back. This is not the handover Dionysus needed. There the ethernet stanza only made the interface unmanaged, and `[ifupdown] managed=false` settled it. Here the stanza carries `wpa-ssid` and `wpa-psk`, so it starts a second supplicant, and the symptom is not `unmanaged` but `unavailable` alongside `NM-MANAGED: yes` — a combination that reads like a driver or firmware fault and is neither.
+- The failure names the wrong device, which is the confusing part. `No suitable device found for this connection (device docker0 not available because profile is not compatible with device (mismatching interface name))` is NetworkManager reporting the last device it happened to check. `wlp2s0` is missing from that message precisely because it was never a candidate to begin with.
+- The SSID and the key go in through `read` rather than being typed into the `nmcli` line. What `read` consumes arrives on stdin and is never part of a command, so neither value is written to `~/.bash_history`, and `unset` clears both from the shell afterwards. Typed inline they would sit in the history file for every later reader. A leading space suppresses that one line — these dotfiles set `HISTCONTROL=ignoreboth`, which includes `ignorespace` — but relying on a shell setting to protect a credential is thinner than never putting it on the command line at all.
+- `-rp` for the SSID echoes what is typed; `-rsp` for the key does not. `-r` on both stops a backslash in either value being read as an escape.
+- `802-11-wireless.cloned-mac-address permanent` is what keeps the DHCP lease stable. NetworkManager randomizes the MAC by default, a new MAC draws a new lease, and `192.168.88.212` quietly stops being the address this host answers on. `ip link` shows the randomization while it is active: a `permaddr` next to a different current address.
+- The adapter is a Realtek RTL8822CE driven by `rtw_8822ce`, on the PCIe bus at `02:00.0` rather than Intel's CNVi, which is why it enumerates as `wlp2s0` and not `wlo1`. Its firmware ships in `firmware-realtek`, from the `non-free-firmware` component Step 3 sub-step 4 enables.
+- `rfkill` is not installed on this host. Read the blocks from sysfs instead: `for d in /sys/class/rfkill/*; do echo "$(cat $d/name) soft=$(cat $d/soft) hard=$(cat $d/hard)"; done`.
 - The two point-to-point links do not overlap. Silenus reaches Dionysus on `192.168.124.0/30` — hosts `.1` and `.2` — and this machine on `192.168.124.4/30` — hosts `.5` and `.6`. Adjacent `/30`s out of the same `/29`, deliberately, so one range covers every point-to-point link in the estate without any two colliding.
 - `wan` takes its address by DHCP, which is the one place this host differs from the other two — both of those are static because their router hands out nothing. A lease can change, so the cable at `192.168.124.5` is the address to rely on, and Silenus reaches the guest network across it first for exactly that reason.
 - The cable is the second way in when WiFi fails, which matters more here than on Dionysus: this machine is at another site and has no console you can walk to. Bring `Hephaestus` up before touching `wan`, and make any change to `wan` from a `tmux` session so a dropped connection does not leave a command half-done.
@@ -1070,19 +1182,29 @@ sudo systemctl enable --now guest-net-access.service
 sudo iptables -S FORWARD
 ```
 
+The three `ACCEPT` rules must come out **before** `-j LIBVIRT_FWI`. Read it, then
+have the shell decide:
+
 ```bash
 ours=$(sudo iptables -S FORWARD | grep -n 'd 192.168.40.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1); libv=$(sudo iptables -S FORWARD | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1); if [ -n "$ours" ] && [ -n "$libv" ] && [ "$ours" -lt "$libv" ]; then echo "  PASS  rules precede LIBVIRT_FWI ($ours < $libv)"; else echo "  FAIL  ours=$ours libvirt=$libv"; fi
 ```
+
+```bash
+systemctl is-enabled guest-net-access.service
+```
+
+Expect `enabled`, so it runs again on the next boot.
 
 **Existence is not enough, and that is the whole point of this test.**
 `iptables -C` finds a rule wherever it sits and reports success, including from
 below the `REJECT` that stops the packet. Only the position tells you whether
 the rule does anything.
 
-**This tests the rules, not reachability.** Pinging a guest address proves
-nothing while no guest holds that address. Reachability is tested in Step 11.
+**This still tests the rules, not reachability.** Pinging a guest address proves
+nothing while no guest holds that address. Reachability is what the guest note
+in Step 11 covers, for when the first one exists.
 
-#### 5. Optional — publish a guest service
+#### 5. Optional — publish a guest service to the LAN
 
 ```bash
 sudo apt install -y iptables-persistent
@@ -1179,14 +1301,18 @@ Expect `Accounting: ON` and `Enforcement: ON` on both.
 
 #### 7. Functional tests
 
-A guest on the pool:
+The pool takes a volume and gives the space back:
 
 ```bash
-virsh vol-create-as lssd-pool <vm-name>.qcow2 20G --format qcow2
+virsh vol-create-as lssd-pool verify.qcow2 1G --format qcow2
 ```
 
 ```bash
-virt-install --name <vm-name> --memory 4096 --vcpus 2 --disk vol=lssd-pool/<vm-name>.qcow2 --network network=static_network_40 --os-variant debian13 --cdrom /data-root/isos/debian-13-netinst.iso --noautoconsole
+virsh vol-list lssd-pool
+```
+
+```bash
+virsh vol-delete verify.qcow2 --pool lssd-pool
 ```
 
 Docker quota enforcement:
@@ -1195,26 +1321,17 @@ Docker quota enforcement:
 docker run --rm --storage-opt size=5G alpine df -h /
 ```
 
-Reachability, outward from inside a guest:
+Expect `/` inside the container to report 5G, not the size of `/data-root`.
 
-```bash
-ping -c3 192.168.88.212
-```
-
-Then inward, from a machine with a route to `192.168.40.0/24`:
-
-```bash
-ping -c3 <guest-address>
-```
-
-The guest needs a static address on `192.168.40.0/24` with gateway
-`192.168.40.1` — nothing hands one out.
+These two prove the pool and the quota directly. Everything else this build
+rests on is asserted by `check.sh` in Step 12, which is the verification pass
+proper — run it next.
 
 **Notes**
 
 - Verification is gathered here because the changes in Steps 9 and 10 only take effect on this boot. Checking them earlier reports the state before the change, which reads as a pass and is not one.
-- `virt-install` with `--cdrom` expects a console, which a headless host does not have. `--noautoconsole` is in the line above for that reason; connect afterwards with `virsh console <vm-name>`.
-- The inward reachability test is the first point in the build where it can honestly be run, because until now no guest held an address.
+- **No guest is built here.** Nothing in this document creates an install ISO or a directory to keep one in, so a `virt-install` line naming one could not be run by anyone following this guide. A guest left behind by a verification step is also debris on a machine that is otherwise reproducible end to end. The volume test proves what this step can honestly prove: the pool is active, libvirt allocates on it, and the space comes back.
+- When you do build the first guest, give it a static address on `192.168.40.0/24` with gateway `192.168.40.1` — nothing hands one out. Reachability is then tested outward with `ping -c3 192.168.88.212` from inside the guest, and inward with `ping -c3 <guest-address>` from a machine holding a route to that subnet. `virt-install --cdrom` expects a console this host does not have, so add `--noautoconsole` and attach afterwards with `virsh console <vm-name>`. Name the pool explicitly — `--disk vol=lssd-pool/<name>.qcow2` — or libvirt puts the disk in the `default` pool on the 32 GiB root filesystem.
 - **Reaching a guest from off-site is an SSH hop, not a route.** Silenus routes `192.168.40.0/24` across the cable when it is here, and across the work LAN when it is on that WiFi. From anywhere else — over the office VPN, from home — the way in is `ssh hephaestus` and then `ssh <guest-address>`, or `ssh -J hephaestus <guest-address>` in one line. No route over the VPN is configured on either side, deliberately: it would need a change on the office router for a path this already covers.
 
 ### Step 12 — Check the whole setup
@@ -1243,5 +1360,7 @@ what the machine returned and what was wanted.
 - It asks for your sudo password once. Some checks read files only root can see, and one reads libvirt's firewall chains.
 - It needs network. It pulls the `busybox` and `hello-world` images to prove the Docker storage quota is really enforced.
 - It only reads. Nothing on the machine is changed, so it is safe to run at any time.
+- It exits `0` when everything passes and `1` otherwise.
+- This is `Hephaestus/check.sh`, not Dionysus's. It asserts this host's disk sizes, both interfaces including the WiFi `wan` profile, `static_network_40`, and that no desktop and no Claude Code are installed. It carries no GPU section, because there is no card here. Dionysus's would fail on the disks, the network and the passthrough checks, and vice versa.
 - Every step from 1 to 10 has at least one assertion here, under a heading naming it. Steps 11 and 12 have none by design: Step 11 is itself a verification pass, and Step 12 is this script.
 - The `eno1` checks assert the profile and its address, not that the link is up. The cable is only connected when Silenus is on site, and a check that failed whenever it was unplugged would be noise rather than signal.
