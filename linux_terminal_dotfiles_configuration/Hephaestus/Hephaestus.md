@@ -497,11 +497,11 @@ exit
 #### 2. Get the repository onto this machine
 
 ```bash
-git clone <repository-url> ~/dotfiles
+git clone https://github.com/bahman-farhadian/linux_terminal_dotfiles_configuration.git ~/dotfiles
 ```
 
 ```bash
-cd ~/dotfiles/linux_terminal_dotfiles_configuration/Hephaestus
+cd ~/dotfiles/Hephaestus
 ```
 
 Keep it. `install.sh` needs the directory to re-run, and Step 7 reads
@@ -521,6 +521,7 @@ exec bash
 
 **Notes**
 
+- Cloned over HTTPS, not SSH. A freshly installed machine has no key registered with GitHub yet, and the SSH URL would fail at exactly this step — the one that installs the SSH configuration. HTTPS needs no credentials to read a public repository. If the repository is private, either clone it once over HTTPS with a personal access token or add this host's key to GitHub first.
 - `Hephaestus/install.sh` is byte-identical to `Dionysus/install.sh` apart from its header comment, and `bash/`, `tmux/`, `ssh/` and `hushlogin` are byte-identical copies. It carries no keyboard-lock service, no GNOME shortcuts and no GTK3 dark setting, because none of them has a session to act on here.
 - It asks once whether to configure `root` as well. Answer `y`. The answer is recorded in `/etc/dotfiles-root-configured`, so every later run keeps `/root` in step.
 - Safe to re-run. The SSH block is replaced between its markers, not duplicated, and your own `Host` entries outside the markers are untouched.
@@ -652,7 +653,7 @@ virsh net-undefine default
 first — this path is relative to it:
 
 ```bash
-cd ~<your-user>/dotfiles/linux_terminal_dotfiles_configuration/Hephaestus
+cd ~<your-user>/dotfiles/Hephaestus
 ```
 
 ```bash
@@ -1216,7 +1217,7 @@ and prints `PASS` or `FAIL` for each one.
 #### 1. Run it
 
 ```bash
-cd ~/dotfiles/linux_terminal_dotfiles_configuration/Hephaestus
+cd ~/dotfiles/Hephaestus
 ```
 
 ```bash

@@ -560,11 +560,11 @@ exit
 A freshly installed host does not have it yet:
 
 ```bash
-git clone <repository-url> ~/dotfiles
+git clone https://github.com/bahman-farhadian/linux_terminal_dotfiles_configuration.git ~/dotfiles
 ```
 
 ```bash
-cd ~/dotfiles/linux_terminal_dotfiles_configuration/Dionysus
+cd ~/dotfiles/Dionysus
 ```
 
 Keep it. `install.sh` needs the directory to re-run, and Step 7 reads
@@ -585,6 +585,7 @@ exec bash
 
 **Notes**
 
+- Cloned over HTTPS, not SSH. A freshly installed machine has no key registered with GitHub yet, and the SSH URL would fail at exactly this step — the one that installs the SSH configuration. HTTPS needs no credentials to read a public repository. If the repository is private, either clone it once over HTTPS with a personal access token or add this host's key to GitHub first.
 - Run it from `Dionysus/` in this repository, as your own user. As root it configures `/root` and leaves your account untouched.
 - It asks once whether to configure `root` as well. Answer `y` for the same prompt, aliases, and tmux settings under `su`. The answer is recorded in `/etc/dotfiles-root-configured`, so every later run keeps `/root` in step rather than leaving it on whatever an earlier run installed.
 - Safe to re-run. The SSH block is replaced between its markers, not duplicated, and your own `Host` entries outside the markers are untouched.
@@ -754,7 +755,7 @@ and its comment block carries the address plan.
 first — this path is relative to it:
 
 ```bash
-cd ~<your-user>/dotfiles/linux_terminal_dotfiles_configuration/Dionysus
+cd ~<your-user>/dotfiles/Dionysus
 ```
 
 ```bash
@@ -1696,7 +1697,7 @@ and prints `PASS` or `FAIL` for each one.
 #### 1. Run it
 
 ```bash
-cd ~/dotfiles/linux_terminal_dotfiles_configuration/Dionysus
+cd ~/dotfiles/Dionysus
 ```
 
 ```bash

@@ -92,7 +92,7 @@ it belongs to.
 ## Layout
 
 ```
-linux_terminal_dotfiles_configuration/
+.
 ├── README.md              this file, covering all three hosts
 ├── NVIDIA-GPU-Driver.md   GPU driver on a headless server, metal or VM
 ├── Silenus/               ThinkPad T14 Gen 4 (Intel) workstation
