@@ -1241,6 +1241,19 @@ this boot to take hold together. The quota from Step 3 is already live.
 systemctl reboot
 ```
 
+A logged-in `root` SSH session refuses the reboot rather than performing it:
+
+```
+User root is logged in on sshd.
+Please retry operation after closing inhibitors and logging out other users.
+```
+
+Log that session out and repeat, or override it:
+
+```bash
+systemctl reboot -i
+```
+
 #### 2. Boot fundamentals
 
 ```bash
@@ -1290,29 +1303,31 @@ KVM_MOD=$(ls /sys/module | grep -E '^kvm_(intel|amd)$'); cat /sys/module/$KVM_MO
 ```
 
 ```bash
-xfs_quota -x -c 'state' /data-root
+sudo xfs_quota -x -c 'state' /data-root
 ```
 
 ```bash
-xfs_quota -x -c 'state' /data-root/lssd
+sudo xfs_quota -x -c 'state' /data-root/lssd
 ```
 
-Expect `Accounting: ON` and `Enforcement: ON` on both.
+Expect `Accounting: ON` and `Enforcement: ON` on both, under **Project quota
+state**. The user and group sections above it read `OFF`, which is correct —
+only project quota is turned on, and it is the one `--storage-opt size=` uses.
 
 #### 7. Functional tests
 
 The pool takes a volume and gives the space back:
 
 ```bash
-virsh vol-create-as lssd-pool verify.qcow2 1G --format qcow2
+virsh -c qemu:///system vol-create-as lssd-pool verify.qcow2 1G --format qcow2
 ```
 
 ```bash
-virsh vol-list lssd-pool
+virsh -c qemu:///system vol-list lssd-pool
 ```
 
 ```bash
-virsh vol-delete verify.qcow2 --pool lssd-pool
+virsh -c qemu:///system vol-delete verify.qcow2 --pool lssd-pool
 ```
 
 Docker quota enforcement:
@@ -1329,6 +1344,7 @@ proper — run it next.
 
 **Notes**
 
+- **Confirm the machine actually rebooted before trusting anything below.** `systemctl reboot` refuses while another user — typically a `root` shell left open from an earlier step — holds a session, and it says so rather than failing silently. Every check here then runs against the old boot and passes for the wrong reason. `uptime -p` after logging back in is the cheap way to be sure.
 - Verification is gathered here because the changes in Steps 9 and 10 only take effect on this boot. Checking them earlier reports the state before the change, which reads as a pass and is not one.
 - **No guest is built here.** Nothing in this document creates an install ISO or a directory to keep one in, so a `virt-install` line naming one could not be run by anyone following this guide. A guest left behind by a verification step is also debris on a machine that is otherwise reproducible end to end. The volume test proves what this step can honestly prove: the pool is active, libvirt allocates on it, and the space comes back.
 - When you do build the first guest, give it a static address on `192.168.40.0/24` with gateway `192.168.40.1` — nothing hands one out. Reachability is then tested outward with `ping -c3 192.168.88.212` from inside the guest, and inward with `ping -c3 <guest-address>` from a machine holding a route to that subnet. `virt-install --cdrom` expects a console this host does not have, so add `--noautoconsole` and attach afterwards with `virsh console <vm-name>`. Name the pool explicitly — `--disk vol=lssd-pool/<name>.qcow2` — or libvirt puts the disk in the `default` pool on the 32 GiB root filesystem.
