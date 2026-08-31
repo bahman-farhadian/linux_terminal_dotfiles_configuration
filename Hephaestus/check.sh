@@ -108,6 +108,10 @@ ck "nested"          "$(cat /sys/module/$_kvm/parameters/nested 2>/dev/null|sed 
 ck "nofile soft"     "$(grep -c 'soft.*nofile.*65536' /etc/security/limits.d/99-kvm.conf 2>/dev/null)" "1"
 ck "nofile hard"     "$(grep -c 'hard.*nofile.*1048576' /etc/security/limits.d/99-kvm.conf 2>/dev/null)" "1"
 ck "lssd-pool"       "$(virsh -c qemu:///system pool-list --name 2>/dev/null|grep -cx lssd-pool)" "1"
+# Active is not the same as coming back. pool-list without --all shows only
+# running pools, so a pool started by hand passes that check while autostart is
+# off and the next boot has no pool at all.
+ck "pool autostart"  "$(virsh -c qemu:///system pool-info lssd-pool 2>/dev/null|awk '/^Autostart/{print $2}')" "yes"
 ck "no default net"  "$(virsh -c qemu:///system net-list --all --name 2>/dev/null|grep -cx default)" "0"
 ck "static_network_40" "$(virsh -c qemu:///system net-list --name 2>/dev/null|grep -cx static_network_40)" "1"
 ck "net autostart"   "$(virsh -c qemu:///system net-info static_network_40 2>/dev/null|awk '/^Autostart/{print $2}')" "yes"
