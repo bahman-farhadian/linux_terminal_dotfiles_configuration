@@ -625,7 +625,7 @@ sudo -i
 #### 2. Install the packages
 
 ```bash
-apt install -y qemu-system-x86 qemu-utils ovmf virtinst libosinfo-bin osinfo-db osinfo-db-tools libvirt-daemon-system libvirt-clients libguestfs-tools
+apt install -y qemu-system-x86 qemu-utils ovmf virtinst libosinfo-bin osinfo-db osinfo-db-tools libvirt-daemon-system libvirt-clients libguestfs-tools cloud-image-utils acl util-linux
 ```
 
 #### 3. Start the daemon
@@ -814,6 +814,9 @@ Expect `libvirt` and `kvm` in the list.
 **Notes**
 
 - There is no `qemu-kvm` package in trixie. `qemu-system-x86` is the one that provides the emulator, and KVM itself is a kernel module that is already present. An install line naming `qemu-kvm` fails outright with no candidate.
+- `cloud-image-utils` supplies `cloud-localds`, which builds the small seed ISO a cloud image reads its `user-data` and `meta-data` from. A distribution cloud image booted without one comes up with no account you can log into, since the image ships no password and expects cloud-init to create the user.
+- `acl` supplies `setfacl` and `getfacl`, for granting the `libvirt-qemu` user access to a pool directory without changing the ownership of what is inside it. That applies to every pool in this build, since none of them lives under `/var/lib/libvirt`.
+- `util-linux` is Essential on Debian and is therefore already installed. It is named anyway so the dependency on `lsblk`, `blkid` and `mount` is written down rather than assumed — naming it costs nothing and `apt` treats it as satisfied.
 - `virt-manager` is not installed. It is a GTK3 desktop application with nothing to display on here. Manage this host from Silenus over SSH with `virt-manager -c qemu+ssh://dionysus/system`, or from the command line with `virsh`.
 - The `usermod` sub-step has to run as your own user, not root. Under `sudo` as root, `$USER` is `root`, so the groups would be added to the wrong account.
 - The connection URI matters. Run as an ordinary user, `virsh` defaults to `qemu:///session`, a per-user hypervisor with no networks and no machines. The system VMs are on `qemu:///system`. Set `LIBVIRT_DEFAULT_URI=qemu:///system` if you would rather not type it each time.

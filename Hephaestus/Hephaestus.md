@@ -536,7 +536,7 @@ sudo -i
 #### 2. Install the packages
 
 ```bash
-apt install -y qemu-system-x86 qemu-utils ovmf virtinst libosinfo-bin osinfo-db osinfo-db-tools libvirt-daemon-system libvirt-clients libguestfs-tools
+apt install -y qemu-system-x86 qemu-utils ovmf virtinst libosinfo-bin osinfo-db osinfo-db-tools libvirt-daemon-system libvirt-clients libguestfs-tools cloud-image-utils acl util-linux
 ```
 
 #### 3. Start the daemon
@@ -688,6 +688,9 @@ groups
 **Notes**
 
 - There is no `qemu-kvm` package in trixie. `qemu-system-x86` provides the emulator, and KVM itself is a kernel module already present. An install line naming `qemu-kvm` fails outright with no candidate.
+- `cloud-image-utils` supplies `cloud-localds`, which builds the small seed ISO a cloud image reads its `user-data` and `meta-data` from. A distribution cloud image booted without one comes up with no account you can log into, since the image ships no password and expects cloud-init to create the user.
+- `acl` supplies `setfacl` and `getfacl`, for granting the `libvirt-qemu` user access to a pool directory without changing the ownership of what is inside it. That applies to every pool in this build, since none of them lives under `/var/lib/libvirt`.
+- `util-linux` is Essential on Debian and is therefore already installed. It is named anyway so the dependency on `lsblk`, `blkid` and `mount` is written down rather than assumed — naming it costs nothing and `apt` treats it as satisfied.
 - `virt-manager` is not installed. Drive this host from Silenus with `virt-manager -c qemu+ssh://hephaestus/system`, or use `virsh`.
 - **Always name a pool when creating a guest.** libvirt keeps a `default` storage pool pointing at `/var/lib/libvirt/images`, on the 32 GiB root filesystem, and `virt-install` uses it silently when `--disk` names no pool. It is not removed here because `virt-manager` recreates it on connect; `--disk vol=lssd-pool/<name>.qcow2` is the habit that avoids it.
 - The `usermod` sub-step has to run as your own user. Under `sudo` as root, `$USER` is `root`, so the groups would go to the wrong account.
