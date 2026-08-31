@@ -1158,8 +1158,8 @@ networks each host NATs behind itself. Dotted lines are wireless or a cable that
 is only connected at one site; solid ones are permanent cable.
 
 Silenus has one spare ethernet port and two peers, so it carries a profile for
-each and only one is up at a time — `Dionysus` autoconnects at home,
-`Hephaestus` is brought up by hand on arrival at work.
+each and only one is up at a time. Neither autoconnects: the one for the site
+you are at is brought up by hand.
 
 Three guest subnets, three point-to-point `/30`s out of one `/29`, and no two
 overlap: the hosts can reach one another, so an address has to say which machine
