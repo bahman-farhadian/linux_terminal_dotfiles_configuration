@@ -10,6 +10,22 @@ if [ "$(id -u)" -eq 0 ]; then
   echo "STOP: run as your normal user, not root. Dotfiles, user units and group membership all live in your account."; exit 1
 fi
 pass=0; fail=0; skip=0; failed=""; skipped=""
+# Where this script lives, which is also where the files it deploys come from.
+REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# same() is stronger than hf(). hf asks whether a file exists; this asks whether
+# it is still the repository's copy. install.sh deploys these with a plain cp,
+# so anything that differs was edited on the machine and will be overwritten by
+# the next run — better to hear about it now than to lose it silently.
+same(){
+  if [ ! -f "$3" ]; then
+    printf '  FAIL  %-32s missing %s\n' "$1" "$3"; fail=$((fail+1)); _note "$1: $3 is missing"
+  elif cmp -s "$REPO/$2" "$3"; then
+    printf '  PASS  %-32s matches the repository\n' "$1"; pass=$((pass+1))
+  else
+    printf '  FAIL  %-32s differs from the repository\n' "$1"; fail=$((fail+1))
+    _note "$1: $3 differs from $REPO/$2 — diff them, then either commit the change or re-run install.sh"
+  fi
+}
 _note(){ failed="$failed  - $1\n"; }
 # na() is for a check that cannot be run here rather than one that failed —
 # something the document makes conditional, or that depends on hardware being
@@ -77,7 +93,11 @@ ck "no claude-code"  "$(dpkg -l claude-code 2>/dev/null|grep -c '^ii')" "0"
 ck "no desktop"    "$(dpkg -l 2>/dev/null|grep -cE '^ii +(gnome-shell|xserver-xorg-core) ')" "0"
 
 printf '\n--- Step 6: dotfiles ---\n'
-for f in .bashrc .bash_aliases .bash_profile .tmux.conf .hushlogin; do hf "$f" "$HOME/$f"; done
+same ".bashrc"       bash/bashrc       "$HOME/.bashrc"
+same ".bash_aliases" bash/bash_aliases "$HOME/.bash_aliases"
+same ".bash_profile" bash/bash_profile "$HOME/.bash_profile"
+same ".tmux.conf"    tmux/tmux.conf    "$HOME/.tmux.conf"
+same ".hushlogin"    hushlogin         "$HOME/.hushlogin"
 hf "tmux completion" "$HOME/.local/share/bash-completion/completions/tmux"
 if [ -e /etc/dotfiles-root-configured ]; then
   ck "tmux completion (root)" "$(sudo test -r /root/.local/share/bash-completion/completions/tmux && echo yes || echo no)" "yes"

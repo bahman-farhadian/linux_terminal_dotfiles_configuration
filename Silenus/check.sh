@@ -12,6 +12,22 @@ case "$XDG_SESSION_TYPE" in wayland|x11) ;; *)
   echo "STOP: run from a desktop session terminal. XDG_SESSION_TYPE is '$XDG_SESSION_TYPE'; GNOME checks need the session bus."; exit 1 ;;
 esac
 pass=0; fail=0; skip=0; failed=""; skipped=""
+# Where this script lives, which is also where the files it deploys come from.
+REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# same() is stronger than hf(). hf asks whether a file exists; this asks whether
+# it is still the repository's copy. install.sh deploys these with a plain cp,
+# so anything that differs was edited on the machine and will be overwritten by
+# the next run — better to hear about it now than to lose it silently.
+same(){
+  if [ ! -f "$3" ]; then
+    printf '  FAIL  %-32s missing %s\n' "$1" "$3"; fail=$((fail+1)); _note "$1: $3 is missing"
+  elif cmp -s "$REPO/$2" "$3"; then
+    printf '  PASS  %-32s matches the repository\n' "$1"; pass=$((pass+1))
+  else
+    printf '  FAIL  %-32s differs from the repository\n' "$1"; fail=$((fail+1))
+    _note "$1: $3 differs from $REPO/$2 — diff them, then either commit the change or re-run install.sh"
+  fi
+}
 _note(){ failed="$failed  - $1\n"; }
 # na() is for a check that cannot be run here rather than one that failed —
 # something the document makes conditional, or that depends on hardware being
@@ -123,7 +139,11 @@ ck "hello-world"     "$(docker run --rm hello-world 2>/dev/null|grep -c 'working
 ck "groups"          "$(id -nG|tr ' ' '\n'|grep -cE '^(libvirt|kvm|docker)$')" "3"
 
 printf '\n--- Step 7: dotfiles ---\n'
-for f in .bashrc .bash_aliases .bash_profile .tmux.conf .hushlogin; do hf "$f" "$HOME/$f"; done
+same ".bashrc"       bash/bashrc       "$HOME/.bashrc"
+same ".bash_aliases" bash/bash_aliases "$HOME/.bash_aliases"
+same ".bash_profile" bash/bash_profile "$HOME/.bash_profile"
+same ".tmux.conf"    tmux/tmux.conf    "$HOME/.tmux.conf"
+same ".hushlogin"    hushlogin         "$HOME/.hushlogin"
 hf "tmux completion" "$HOME/.local/share/bash-completion/completions/tmux"
 if [ -e /etc/dotfiles-root-configured ]; then
   ck "tmux completion (root)" "$(sudo test -r /root/.local/share/bash-completion/completions/tmux && echo yes || echo no)" "yes"
