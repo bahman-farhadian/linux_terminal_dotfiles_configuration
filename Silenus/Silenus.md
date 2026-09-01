@@ -1513,6 +1513,78 @@ prints `PASS` or `FAIL` for each one.
 The last line gives the counts. Any failure names what it found and what it
 expected, so it points at the step to redo.
 
+#### 3. Read the reachability block
+
+Below the totals, `check.sh` reports which path it would take to each peer's
+guest network and whether that peer answers. Nothing there counts toward `PASS`
+or `FAIL`, because the right answer depends on where this laptop is: a peer at
+the other site reading `NOT routed from here` is correct, not broken.
+
+```
+  Dionysus
+    guest network 192.168.32.0/24  routed via 192.168.124.1 on enp0s31f6
+    its bridge 192.168.32.1        answers, so the route works end to end
+    the host itself 192.168.8.3    answers
+
+  Hephaestus
+    guest network 192.168.40.0/24  NOT routed from here, leaving by the default gateway
+    its bridge 192.168.40.1        no reply
+    the host itself 192.168.88.212 answers
+```
+
+That last line is the shape to recognise from home on the VPN: the host answers
+because the tunnel carries `192.168.88.0/24`, while its guests do not, because
+nothing carries `192.168.40.0/24`.
+
+#### 4. The reachability drill
+
+`check.sh` never writes, so it cannot do the two things that actually prove the
+path: put an address on a guest network, and take a link down to force the
+fallback. Both are below, and neither needs a virtual machine — a network
+namespace on the guest bridge is indistinguishable from a guest as far as
+routing and `iptables` are concerned.
+
+On **this host** and on the **peer** you are testing, as root, with each host's
+own subnet:
+
+```bash
+ip netns add g24
+ip link add v24h type veth peer name v24g
+ip link set v24h master virbr1 up
+ip link set v24g netns g24
+ip -n g24 link set lo up
+ip -n g24 addr add 192.168.24.10/24 dev v24g
+ip -n g24 link set v24g up
+ip -n g24 route add default via 192.168.24.1
+```
+
+Then the four pings, two from each side. `ttl=63` means one routing hop and
+`ttl=62` means two, so the pair reaching `62` is the guest-to-guest path:
+
+```bash
+ping -c3 192.168.32.10                       # this host   → peer's guest
+ip netns exec g24 ping -c3 192.168.32.10     # this guest  → peer's guest
+```
+
+Force the fallback with the cable still plugged in, which is the tier nothing
+else exercises:
+
+```bash
+nmcli con down Dionysus
+ip -4 route get 192.168.32.10
+ip netns exec g24 ping -c3 192.168.32.10
+nmcli con up Dionysus
+```
+
+The route must move from `via 192.168.124.1 dev enp0s31f6` to
+`via 192.168.8.3 dev wlp0s20f3` on its own, and the ping must keep working.
+
+Tear down on both hosts:
+
+```bash
+ip netns del g24; ip link del v24h 2>/dev/null || true
+```
+
 **Notes**
 
 - Run it as your own user from a desktop session terminal. It refuses to start as root or on a plain tty, because the dotfiles, GNOME settings, user services and group membership all live in your account and need the session bus.
