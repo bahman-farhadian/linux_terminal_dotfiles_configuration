@@ -102,6 +102,10 @@ ck "nested"          "$(cat /sys/module/kvm_intel/parameters/nested 2>/dev/null)
 ok "nested conf"     "$([ -f /etc/modprobe.d/kvm-intel.conf ] && echo present || echo 'not needed, nested already Y')"
 ck "ip_forward"      "$(sysctl -n net.ipv4.ip_forward)" "1"
 ck "ip_forward conf" "$(grep -c 'net.ipv4.ip_forward = 1' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
+# Answering ARP for the guest subnet is what lets a peer route here over WiFi
+# with no gateway, so neither end has to know this laptop's current address.
+ck "proxy_arp"       "$(sysctl -n net.ipv4.conf.wlp0s20f3.proxy_arp 2>/dev/null)" "1"
+ck "proxy_arp conf"  "$(grep -c 'net.ipv4.conf.wlp0s20f3.proxy_arp = 1' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
 ck "nofile soft"     "$(grep -c 'soft.*nofile.*65536' /etc/security/limits.d/99-kvm.conf 2>/dev/null)" "1"
 ck "nofile hard"     "$(grep -c 'hard.*nofile.*1048576' /etc/security/limits.d/99-kvm.conf 2>/dev/null)" "1"
 ck "no default net"  "$(virsh -c qemu:///system net-list --all --name 2>/dev/null|grep -cx default)" "0"
