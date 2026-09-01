@@ -1051,6 +1051,15 @@ default gateway and die on the work LAN:
 nmcli con mod Hephaestus +ipv4.routes "192.168.24.0/24 192.168.124.6 100"
 ```
 
+With the cable out, that route goes away with the profile. Silenus is still on
+the work WiFi and still forwards for its guests, so a second route on `wan` at a
+higher metric keeps the path. Replace `<silenus-work-address>` with what Silenus
+actually holds on `192.168.88.0/24`:
+
+```bash
+nmcli con mod wan +ipv4.routes "192.168.24.0/24 <silenus-work-address> 200"
+```
+
 ```bash
 nmcli con up Hephaestus
 ```
@@ -1126,6 +1135,9 @@ Expect `net.ipv4.ip_forward = 1`.
 - `802-11-wireless.cloned-mac-address permanent` is what keeps the DHCP lease stable. NetworkManager randomizes the MAC by default, a new MAC draws a new lease, and `192.168.88.212` quietly stops being the address this host answers on. `ip link` shows the randomization while it is active: a `permaddr` next to a different current address.
 - The adapter is a Realtek RTL8822CE driven by `rtw_8822ce`, on the PCIe bus at `02:00.0` rather than Intel's CNVi, which is why it enumerates as `wlp2s0` and not `wlo1`. Its firmware ships in `firmware-realtek`, from the `non-free-firmware` component Step 3 sub-step 4 enables.
 - `rfkill` is not installed on this host. Read the blocks from sysfs instead: `for d in /sys/class/rfkill/*; do echo "$(cat $d/name) soft=$(cat $d/soft) hard=$(cat $d/hard)"; done`.
+- **Two routes to `192.168.24.0/24`, and the metric picks between them.** The cable is metric 100 and wins while it is up; with it out, the metric 200 route on `wan` carries the traffic across the work LAN instead. Both ends fall back together — Silenus's own pair is the cable first and `192.168.88.212` second — so neither takes a path the other is not using.
+- **That fallback is the one route here written against a DHCP address.** Silenus is a laptop on the work network and its lease is not a reservation, so the next hop can change under you. A reservation on the work DHCP server is what makes it dependable; without one, treat the cable as the real path and this as a convenience. It is why `check.sh` reports the fallback as N/A rather than failing when it is absent.
+- **No route over a VPN.** A next hop has to be directly reachable. Over the office VPN the work network sits behind a gateway, so a route via Silenus's address there is refused with `Nexthop has invalid gateway` — the same reasoning Silenus.md Step 13 sets out for the opposite direction. Off-site, reaching a guest is an SSH hop.
 - **The route to `192.168.24.0/24` is half of a pair.** It lets a guest here answer one on Silenus; the other half is Silenus.md Step 14, whose rules let a connection *started* here reach into that network past libvirt's `REJECT`. Either alone gives a path that works one way and reads as a routing fault.
 - Reaching Dionysus's guests from here is not possible and is not configured. That host is at another site with no network path to this one, and Silenus cannot bridge them: it has one spare ethernet port, its two point-to-point profiles are mutually exclusive, and it is never at both sites at once. Guest-to-guest across sites is an SSH hop, not a route.
 - The two point-to-point links do not overlap. Silenus reaches Dionysus on `192.168.124.0/30` — hosts `.1` and `.2` — and this machine on `192.168.124.4/30` — hosts `.5` and `.6`. Adjacent `/30`s out of the same `/29`, deliberately, so one range covers every point-to-point link in the estate without any two colliding.

@@ -155,6 +155,14 @@ ck "p2p never-default" "$(nmcli -g ipv4.never-default connection show Hephaestus
 # Half of a pair: this route lets a guest here answer one on Silenus, and
 # Silenus.md Step 14 lets a connection started here in past libvirt's REJECT.
 ck "route to silenus guests" "$(nmcli -g ipv4.routes connection show Hephaestus 2>/dev/null|grep -c '192.168.24.0/24 192.168.124.6 100')" "1"
+# Written against whatever Silenus holds on the work WiFi, which is a lease
+# rather than a reservation. Absent, it is unconfigured rather than wrong.
+_sfb=$(nmcli -g ipv4.routes connection show wan 2>/dev/null|grep -c '192.168.24.0/24 .* 200')
+if [ "${_sfb:-0}" -gt 0 ]; then
+  ck "silenus guests fallback" "$_sfb" "1"
+else
+  na "silenus guests fallback" "no route to 192.168.24.0/24 over wan. With Silenus on the work WiFi: nmcli con mod wan +ipv4.routes \"192.168.24.0/24 <silenus-work-address> 200\""
+fi
 if [ "$(cat /sys/class/net/eno1/carrier 2>/dev/null)" = "1" ]; then
   ck "p2p link up" "$(ip -4 -br addr show eno1 2>/dev/null|awk '{print $3}')" "192.168.124.5/30"
 else
