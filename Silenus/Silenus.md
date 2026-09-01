@@ -465,7 +465,7 @@ sudo -i
 #### 2. Install the packages
 
 ```bash
-apt install -y bash-completion bridge-utils btop curl default-jre duf ethtool ffmpeg filezilla foliate fonts-jetbrains-mono git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc lshw make nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip yt-dlp
+apt install -y bash-completion bridge-utils btop curl default-jre duf ethtool ffmpeg filezilla foliate fonts-jetbrains-mono git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc lshw make nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv remmina remmina-plugin-rdp rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip yt-dlp
 ```
 
 #### 3. Install flatpak
@@ -560,6 +560,7 @@ The `Installed:` line must show a version, not `(none)`.
 
 **Notes**
 
+- `remmina` is the remote-desktop client, from Debian's own repository rather than a flatpak. The protocols live in separate plugin packages, so `remmina` on its own gives you the application with no way to open an RDP session. `remmina-plugin-rdp` is a Recommends of `remmina` and would normally arrive with it, but it is named here so the install does not depend on recommends being enabled — a machine configured with `APT::Install-Recommends "false"` would otherwise get a client that cannot speak the one protocol it was installed for.
 - Log out and back in before flatpak applications appear in GNOME Software.
 - The four flatpaks are Telegram, Obfuscate for redacting screenshots, Obsidian for notes, and Impression for writing bootable USB images.
 - `flatpak install` takes several application IDs at once, and `-y` stops it asking to confirm each one. Installed as root, they are available to every user.
