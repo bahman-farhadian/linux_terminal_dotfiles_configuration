@@ -146,9 +146,13 @@ ck "vfio in initramfs" "$(grep -c '^vfio' /etc/initramfs-tools/modules 2>/dev/nu
 printf '\n--- Step 10: networking ---\n'
 ck "wan profile"     "$(nmcli -g connection.id connection show wan 2>/dev/null)" "wan"
 ck "wan interface"   "$(nmcli -g connection.interface-name connection show wan 2>/dev/null)" "enp4s0"
+# Both profiles must come up on their own. A headless host that boots with
+# autoconnect off has no network and no console to fix it from.
+ck "wan autoconnect" "$(nmcli -g connection.autoconnect connection show wan 2>/dev/null)" "yes"
 ck "wan address"     "$(ip -4 -br addr show enp4s0 2>/dev/null|awk '{print $3}')" "192.168.8.3/24"
 ck "p2p profile"     "$(nmcli -g connection.id connection show Dionysus 2>/dev/null)" "Dionysus"
 ck "p2p never-default" "$(nmcli -g ipv4.never-default connection show Dionysus 2>/dev/null)" "yes"
+ck "p2p autoconnect" "$(nmcli -g connection.autoconnect connection show Dionysus 2>/dev/null)" "yes"
 # Half of a pair: this route lets a guest here answer one on Silenus, and
 # Silenus.md Step 14 lets a connection started here in past libvirt's REJECT.
 ck "route to silenus guests" "$(nmcli -g ipv4.routes connection show Dionysus 2>/dev/null|grep -c '192.168.24.0/24 192.168.124.2 100')" "1"
