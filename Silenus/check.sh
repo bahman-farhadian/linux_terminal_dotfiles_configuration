@@ -68,7 +68,7 @@ for p in vim mokutil dmidecode efibootmgr \
   bash-completion bridge-utils btop curl default-jre duf ethtool ffmpeg filezilla foliate fonts-jetbrains-mono git \
   gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc \
   iperf3 jq keepassxc lshw make nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio \
-  openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv rsync sshuttle \
+  openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv remmina remmina-plugin-rdp rsync sshuttle \
   sudo tmux traceroute tree unrar virt-top vlc wget xclip yt-dlp \
   flatpak gnome-software-plugin-flatpak claude-code \
   qemu-system-x86 qemu-utils ovmf virtinst virt-manager libvirt-daemon-system libvirt-clients \
