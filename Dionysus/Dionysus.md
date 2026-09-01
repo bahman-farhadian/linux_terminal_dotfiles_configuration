@@ -610,6 +610,7 @@ exec bash
 - It also writes `/etc/ssh/banner.txt` and points sshd at it with `Banner`, so it is shown **before authentication** and to **every account**. That is the right place for a notice telling someone they are not welcome — after login it is addressed to a person who is already in — and it is the only place that works here, because `~/.hushlogin` suppresses the motd for any account that has one. The file carries a name and a short notice and no hostname or kernel version, so it is correct unchanged on every host.
 - `/etc/motd` is emptied and `/etc/update-motd.d/10-uname` has its execute bit dropped, which removes Debian's licence paragraphs and the kernel line for any account without a `.hushlogin` — root, in practice. The file is not deleted, so a package upgrade can restore it and the next `install.sh` run turns it off again. `Last login` is left alone: it is worth seeing.
 - `cpy` falls back to plain `tee` when there is no display, so it prints and copies nothing here rather than failing.
+- Debian packages no bash completion for `tmux`, so `install.sh` fetches one from upstream into `~/.local/share/bash-completion/completions/tmux`, and gives `/root` the same file when root is managed. It downloads to a temporary file first, so a failed fetch leaves a working copy alone instead of truncating it to nothing. Tab-completion for subcommands, session names and window names works in the next shell you open.
 - `README.md` at the top of the repository covers the prompt, the tmux keys, and what changes.
 
 ### Step 7 — KVM and libvirt

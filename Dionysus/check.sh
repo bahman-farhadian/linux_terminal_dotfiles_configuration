@@ -81,6 +81,11 @@ ck "no desktop"    "$(dpkg -l 2>/dev/null|grep -cE '^ii +(gnome-shell|xserver-xo
 printf '\n--- Step 6: dotfiles ---\n'
 for f in .bashrc .bash_aliases .bash_profile .tmux.conf .hushlogin; do hf "$f" "$HOME/$f"; done
 hf "tmux completion" "$HOME/.local/share/bash-completion/completions/tmux"
+if [ -e /etc/dotfiles-root-configured ]; then
+  ck "tmux completion (root)" "$(sudo test -r /root/.local/share/bash-completion/completions/tmux && echo yes || echo no)" "yes"
+else
+  na "tmux completion (root)" "root is not managed on this host; ./install.sh --root adds it"
+fi
 ck "functions" "$(bash -ic 'type -t update upgrade ports _asroot privip' 2>/dev/null|grep -c function)" "5"
 ck "no GNOME aliases" "$(bash -ic 'alias DE EN kbd' 2>&1|grep -c '^alias')" "0"
 ck "hist ignorespace"   "$(bash -ic 'echo $HISTCONTROL' 2>/dev/null|grep -c 'ignoreboth\|ignorespace')" "1"

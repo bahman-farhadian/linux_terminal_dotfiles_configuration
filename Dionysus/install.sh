@@ -345,6 +345,12 @@ else
     _warn "curl not found — tmux completion skipped"
 fi
 
+# /root gets the same file, the way it already gets .tmux.conf. Placed after the
+# branch above so an existing copy is propagated even when the download failed.
+if [ "$HAS_SUDO" = true ] && [ -r "$_tc_dst" ]; then
+    sudo_cp "$_tc_dst" /root/.local/share/bash-completion/completions/tmux
+fi
+
 _hdr "default shell → bash"
 BASH_BIN="$(command -v bash)"
 CURRENT_SHELL="$(getent passwd "$USER" 2>/dev/null | cut -d: -f7)"

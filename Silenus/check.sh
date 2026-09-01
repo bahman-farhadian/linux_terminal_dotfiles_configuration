@@ -121,6 +121,11 @@ ck "groups"          "$(id -nG|tr ' ' '\n'|grep -cE '^(libvirt|kvm|docker)$')" "
 printf '\n--- Step 7: dotfiles ---\n'
 for f in .bashrc .bash_aliases .bash_profile .tmux.conf .hushlogin; do hf "$f" "$HOME/$f"; done
 hf "tmux completion" "$HOME/.local/share/bash-completion/completions/tmux"
+if [ -e /etc/dotfiles-root-configured ]; then
+  ck "tmux completion (root)" "$(sudo test -r /root/.local/share/bash-completion/completions/tmux && echo yes || echo no)" "yes"
+else
+  na "tmux completion (root)" "root is not managed on this host; ./install.sh --root adds it"
+fi
 hf "keyboard script" "$HOME/.local/bin/lock-keyboard-en.sh"
 ck "script executable" "$([ -x "$HOME/.local/bin/lock-keyboard-en.sh" ] && echo yes || echo no)" "yes"
 ck "functions" "$(bash -ic 'type -t update upgrade ports _asroot' 2>/dev/null|grep -c function)" "4"
