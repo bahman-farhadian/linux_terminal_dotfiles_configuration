@@ -185,21 +185,30 @@ local network at a higher metric, and the kernel falls back on its own.
 a deliberate stop, not a missing feature. The two hosts sit in different
 buildings and neither router carries the other's guest range, so joining them
 means a tunnel — and a tunnel between two always-on servers should not run
-through a laptop that is sometimes shut. Across sites, a guest is an SSH hop.
+through a laptop that is sometimes shut. Across sites, log into the guest's own
+host and reach it from there — see below.
 
 ## Reaching a guest
 
-Hosts are reachable in more places than guest subnets are routed, so `ssh -J`
-covers every case the routing does not:
+Hosts are reachable in more places than guest subnets are routed. Where a route
+does not reach, log into the host and go on from there — the host always reaches
+its own guests, because it *is* their gateway:
 
 | You are | The guest is on | How |
 |---|---|---|
 | at home | Dionysus | direct — `192.168.32.0/24` is routed |
 | at home | Silenus | direct — `192.168.24.0/24` is routed |
-| at home, on the office VPN | Hephaestus | `ssh -J <you>@192.168.88.212 <guest>` |
+| at home, on the office VPN | Hephaestus | `ssh <you>@192.168.88.212`, then `ssh <guest>` |
 | at work | Hephaestus | direct — `192.168.40.0/24` is routed |
 | at work | Silenus | direct — `192.168.24.0/24` is routed |
-| at work | Dionysus | `ssh -J <you>@192.168.8.3 <guest>`, if home is reachable |
+| at work | Dionysus | `ssh <you>@192.168.8.3`, then `ssh <guest>`, if home is reachable |
+
+Two logins rather than `ssh -J`. `ProxyJump` only forwards the TCP connection,
+so the second hop is still authenticated by **your** key, which has to be on the
+guest for it to work. Logging into the host first means the second hop uses the
+*host's* key and the host's own route — which is the pair that is always
+provisioned, since the host is the one that built the guest. It also leaves you
+a shell on the host, which is usually where the next command was going anyway.
 
 The office VPN is what makes the third row work: it carries
 `192.168.88.0/24 via 192.168.88.1`, so Hephaestus answers on `192.168.88.212`
@@ -212,8 +221,9 @@ point. A route for `192.168.40.0/24` sent down the VPN dies at the VPN server,
 which routes by destination and has never heard of that subnet. Only the
 direction *into* the tunnel would work, and a path that works one way and not
 the other is worse than one that plainly does not: stateful traffic breaks in
-ways that read as packet loss. `ssh -J` needs no route at all — it opens a
-connection to a host that answers, and asks that host to open the next one.
+ways that read as packet loss. Logging into the host needs no route to the guest
+at all — you connect to a machine that answers, and it reaches its own guests
+over a bridge it owns.
 
 Each direction needs both halves. A route tells the far host how to send a
 packet; the `guest-net-access` service on the receiving host is what lets a
