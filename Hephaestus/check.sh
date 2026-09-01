@@ -152,6 +152,9 @@ ck "p2p profile"     "$(nmcli -g connection.id connection show Hephaestus 2>/dev
 ck "p2p interface"   "$(nmcli -g connection.interface-name connection show Hephaestus 2>/dev/null)" "eno1"
 ck "p2p address"     "$(nmcli -g ipv4.addresses connection show Hephaestus 2>/dev/null)" "192.168.124.5/30"
 ck "p2p never-default" "$(nmcli -g ipv4.never-default connection show Hephaestus 2>/dev/null)" "yes"
+# Half of a pair: this route lets a guest here answer one on Silenus, and
+# Silenus.md Step 14 lets a connection started here in past libvirt's REJECT.
+ck "route to silenus guests" "$(nmcli -g ipv4.routes connection show Hephaestus 2>/dev/null|grep -c '192.168.24.0/24 192.168.124.6 100')" "1"
 if [ "$(cat /sys/class/net/eno1/carrier 2>/dev/null)" = "1" ]; then
   ck "p2p link up" "$(ip -4 -br addr show eno1 2>/dev/null|awk '{print $3}')" "192.168.124.5/30"
 else

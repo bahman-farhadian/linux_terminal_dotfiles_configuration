@@ -1387,7 +1387,127 @@ Needs Dionysus up on the other end.
 - The fallback path leans on Dionysus forwarding between `enp4s0` and `virbr1`, which is what `net.ipv4.ip_forward` in Dionysus.md Step 10 enables.
 - Unplugging the cable takes the profile down with it. Since neither autoconnects, plugging it back in leaves the port idle until you bring the profile up again — the cost of never guessing which peer is on the other end.
 
-### Step 14 — Check the whole setup
+### Step 14 — Firewall
+
+`libvirt` writes the rules for `static_network_24` itself when the network
+starts. This step adds the one thing libvirt deliberately does not do: letting a
+machine outside the guest network open a connection into it. That is what makes
+this laptop a hub rather than only a client — a guest on Dionysus or Hephaestus
+can reach a guest here, not just the other way round.
+
+#### 1. Read what libvirt installed
+
+```bash
+sudo iptables -L LIBVIRT_FWI -n -v
+```
+
+The last rule is `-o virbr1 -j REJECT`. A guest reaches the outside and the
+replies come back through conntrack; a connection *started* from outside matches
+neither `ACCEPT` and falls to that `REJECT`. That is the gap this step closes.
+
+#### 2. What this step adds, and what is optional
+
+| # | Rule | Required | Why |
+|---|------|----------|-----|
+| 1 | `FORWARD` accept, private ranges → `192.168.24.0/24` | **yes** | without it a guest on a peer host cannot open a connection to a guest here |
+| 2 | `DNAT` on a port to one guest | no | only to publish a guest service |
+
+#### 3. Add the required rules, as a service
+
+The rules have to sit **above** the jump to `LIBVIRT_FWI`. Position cannot be
+saved and restored: `libvirtd` inserts its jumps at the head of `FORWARD` every
+time it starts, so a saved ruleset comes back permanently below the `REJECT`.
+
+```bash
+sudo tee /usr/local/sbin/guest-net-access >/dev/null <<'EOF'
+#!/bin/sh
+# Let private networks open connections into the libvirt guest network.
+#
+# These must precede the jump to LIBVIRT_FWI, whose final rule rejects anything
+# inbound to virbr1 that conntrack does not already know. libvirtd re-inserts
+# its own jumps at the head of FORWARD on every start, so this deletes and
+# re-inserts rather than assuming a position it once had.
+set -e
+for net in 192.168.0.0/16 172.16.0.0/12 10.0.0.0/8; do
+    iptables -D FORWARD -s "$net" -d 192.168.24.0/24 -o virbr1 -j ACCEPT 2>/dev/null || true
+done
+for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+    iptables -I FORWARD 1 -s "$net" -d 192.168.24.0/24 -o virbr1 -j ACCEPT
+done
+EOF
+sudo chmod +x /usr/local/sbin/guest-net-access
+sudo tee /etc/systemd/system/guest-net-access.service >/dev/null <<'EOF'
+[Unit]
+Description=Allow private networks into the libvirt guest network
+After=libvirtd.service docker.service
+Wants=libvirtd.service
+PartOf=libvirtd.service
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/guest-net-access
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now guest-net-access.service
+```
+
+#### 4. Test the rules, and their position
+
+```bash
+sudo iptables -S FORWARD
+```
+
+The three `ACCEPT` rules must come out **before** `-j LIBVIRT_FWI`. Read it, then
+have the shell decide:
+
+```bash
+ours=$(sudo iptables -S FORWARD | grep -n 'd 192.168.24.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1); libv=$(sudo iptables -S FORWARD | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1); if [ -n "$ours" ] && [ -n "$libv" ] && [ "$ours" -lt "$libv" ]; then echo "  PASS  rules precede LIBVIRT_FWI ($ours < $libv)"; else echo "  FAIL  ours=$ours libvirt=$libv"; fi
+```
+
+```bash
+systemctl is-enabled guest-net-access.service
+```
+
+Expect `enabled`, so it runs again on the next boot.
+
+**Existence is not enough, and that is the whole point of this test.**
+`iptables -C` finds a rule wherever it sits and reports success, including from
+below the `REJECT` that stops the packet. Only the position tells you whether
+the rule does anything.
+
+#### 5. Optional — publish a guest service to the LAN
+
+```bash
+sudo apt install -y iptables-persistent
+```
+
+```bash
+sudo iptables -t nat -A PREROUTING -i wlp0s20f3 -p tcp --dport 2222 -j DNAT --to-destination 192.168.24.10:22
+```
+
+```bash
+sudo iptables -A FORWARD -i wlp0s20f3 -o virbr1 -p tcp -d 192.168.24.10 --dport 22 -j ACCEPT
+```
+
+```bash
+sudo netfilter-persistent save
+```
+
+**Notes**
+
+- **This is what makes the hub bidirectional.** Silenus already had routes *to* both peers' guest networks and `ip_forward` on, so a guest here could reach a guest there. Nothing let a packet in the other direction past libvirt's `REJECT`, so the path only worked one way and looked like a routing fault rather than a firewall one.
+- **The peers need a route back.** These rules permit the traffic; they do not tell Dionysus or Hephaestus how to reach `192.168.24.0/24`. That route is added on each peer — Dionysus.md Step 10 and Hephaestus.md Step 9 — and without it the reply never leaves the far host.
+- `PartOf=libvirtd.service` is what makes a `libvirtd` restart carry this unit with it. Without it the rules stay where they were while libvirt re-inserts its jumps on top, and the host silently stops accepting connections into the guest network until the next boot.
+- `-I FORWARD 1` inserts at the head. Appended with `-A`, the rules end up after `LIBVIRT_FWI` has already rejected the packet, and every existence check still passes.
+- `172.16.0.0/12` includes `172.17.0.0/16`, which is `docker0`, so containers can reach guests too. Drop that range if you would rather they could not.
+- `iptables-persistent` is installed only for the optional rule. The required rules do not use it, and installing it regardless means a saved snapshot of libvirt's and Docker's chains being restored at boot next to the copies those daemons rebuild.
+- This is the same service, by the same name, that Dionysus.md Step 11 and Hephaestus.md Step 10 install. Only the guest subnet and the outward interface differ.
+
+### Step 15 — Check the whole setup
 
 `check.sh` in this repository runs every check the steps above describe and
 prints `PASS` or `FAIL` for each one.

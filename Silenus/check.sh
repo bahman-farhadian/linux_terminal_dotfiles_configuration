@@ -190,6 +190,21 @@ fi
 # guessing, and guessing wrong looks connected while reaching nothing.
 ck "neither link autoconnects" "$(for c in Dionysus Hephaestus; do nmcli -g connection.autoconnect connection show "$c" 2>/dev/null; done|grep -c '^yes$')" "0"
 
+printf '\n--- Step 14: firewall ---\n'
+for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+  ck "guests reachable from $net" "$(sudo iptables -C FORWARD -s "$net" -d 192.168.24.0/24 -o virbr1 -j ACCEPT 2>/dev/null && echo yes || echo no)" "yes"
+done
+# Existence is not enough: a rule below the jump to LIBVIRT_FWI, whose last rule
+# rejects anything inbound to virbr1, is never reached and still passes -C.
+_ours=$(sudo iptables -S FORWARD 2>/dev/null | grep -n 'd 192.168.24.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1)
+_libv=$(sudo iptables -S FORWARD 2>/dev/null | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1)
+ck "rules precede LIBVIRT_FWI" "$([ -n "$_ours" ] && [ -n "$_libv" ] && [ "$_ours" -lt "$_libv" ] && echo yes || echo no)" "yes"
+ck "guest-net-access enabled" "$(systemctl is-enabled guest-net-access.service 2>/dev/null)" "enabled"
+ck "guest-net-access active"  "$(systemctl is-active guest-net-access.service 2>/dev/null)" "active"
+hf "guest-net-access script"  /usr/local/sbin/guest-net-access
+hf "guest-net-access unit"    /etc/systemd/system/guest-net-access.service
+ck "unit follows libvirtd"    "$(systemctl show -p PartOf --value guest-net-access.service 2>/dev/null|grep -c libvirtd)" "1"
+
 printf '\n--- Step 7/10: keyboard and lid ---\n'
 ck "lock service" "$(systemctl --user is-active lock-keyboard-en.service)" "active"
 ck "tick timer"   "$(systemctl --user is-active keyboard-en-tick.timer)" "active"
