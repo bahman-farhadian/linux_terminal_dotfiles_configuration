@@ -621,6 +621,7 @@ exec bash
 - `/etc/motd` is emptied and `/etc/update-motd.d/10-uname` has its execute bit dropped, which removes Debian's licence paragraphs and the kernel line for any account without a `.hushlogin` — root, in practice. The file is not deleted, so a package upgrade can restore it and the next `install.sh` run turns it off again. `Last login` is left alone: it is worth seeing.
 - It also writes `~/.config/gtk-3.0/settings.ini` with `gtk-application-prefer-dark-theme=1`. GNOME's dark preference is a libadwaita setting, so a GTK3 application that never opted into it stays light. This is narrower than exporting `GTK_THEME`, which would force every GTK application onto the legacy Adwaita-dark including the GTK4 ones that already follow GNOME correctly.
 - `install.sh` owns that file. If you put your own keys in it, they are replaced the next time the dark setting is missing from it.
+- Debian packages no bash completion for `tmux`, so `install.sh` fetches one from upstream into `~/.local/share/bash-completion/completions/tmux`, and gives `/root` the same file when root is managed. It downloads to a temporary file first, so a failed fetch leaves a working copy alone instead of truncating it to nothing. Tab-completion for subcommands, session names and window names works in the next shell you open.
 - `README.md` covers the prompt, the tmux keys, and what changes.
 
 ### Step 8 — KVM and libvirt

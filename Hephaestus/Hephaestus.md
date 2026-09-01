@@ -523,6 +523,7 @@ exec bash
 - It also writes `/etc/profile.d/99-history.sh` so both rules apply to every account, not only yours.
 - `cpy` falls back to plain `tee` when there is no display, so it prints and copies nothing here rather than failing.
 - `Hephaestus/bash/bash_aliases` drops the `DE`, `EN` and `kbd` aliases. They call `gsettings` against the GNOME input-source schema, which does not exist on this host.
+- Debian packages no bash completion for `tmux`, so `install.sh` fetches one from upstream into `~/.local/share/bash-completion/completions/tmux`, and gives `/root` the same file when root is managed. It downloads to a temporary file first, so a failed fetch leaves a working copy alone instead of truncating it to nothing. Tab-completion for subcommands, session names and window names works in the next shell you open.
 - `README.md` at the top of the repository covers the prompt, the tmux keys, and what changes.
 
 ### Step 7 — KVM and libvirt
