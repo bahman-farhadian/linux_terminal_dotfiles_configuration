@@ -697,6 +697,7 @@ Put this in it:
 
 ```
 net.ipv4.ip_forward = 1
+net.ipv4.conf.wlp0s20f3.proxy_arp = 1
 ```
 
 ```bash
@@ -704,10 +705,17 @@ sysctl --system
 ```
 
 ```bash
-sysctl net.ipv4.ip_forward
+sysctl net.ipv4.ip_forward net.ipv4.conf.wlp0s20f3.proxy_arp
 ```
 
-Expect `net.ipv4.ip_forward = 1`.
+Expect `1` for both.
+
+`proxy_arp` is what lets a peer reach this host's guests over WiFi without
+knowing what address this laptop currently holds. With it on, this host answers
+ARP for any address it can route out a *different* interface — which is
+`192.168.24.0/24` behind `virbr1` — so a peer can carry a gatewayless route and
+let ARP find the way. Without it, that peer has to name this machine's address,
+and on a DHCP network that address is a lease rather than a fact.
 
 #### 7. Raise the open file limit
 
