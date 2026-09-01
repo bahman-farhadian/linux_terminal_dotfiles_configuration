@@ -1389,15 +1389,11 @@ A guest reaches the outside, and the replies come back because conntrack knows
 about them. A connection *started* from outside matches neither `ACCEPT` and
 falls to the `REJECT`. That is the gap this step closes.
 
-#### 2. What this step adds, and what is optional
+#### 2. What this step adds
 
 | # | Rule | Required | Why |
 |---|------|----------|-----|
 | 1 | `FORWARD` accept, private ranges → `192.168.32.0/24` | **yes** | without it nothing on your network can reach a guest at all |
-| 2 | `DNAT` on a port to one guest | no | only to publish a guest service to the LAN |
-
-Rule 1 is the whole point of the step. Rule 2 is a convenience for one service
-and most builds never need it.
 
 #### 3. Add the required rules, as a service
 
@@ -1476,24 +1472,6 @@ the rule does anything.
 **This still tests the rules, not reachability.** Pinging a guest address proves
 nothing while no guest holds that address. Reachability is tested in Step 12.
 
-#### 5. Optional — publish a guest service to the LAN
-
-Only if something on the LAN has to reach a service inside a guest without a
-route to `192.168.32.0/24`. This is the one part of the step that needs
-`iptables-persistent`, so it is installed here rather than earlier:
-
-```bash
-sudo apt install -y iptables-persistent
-```
-
-Replace the address and ports:
-
-```bash
-sudo iptables -t nat -A PREROUTING -i enp4s0 -p tcp --dport 2222 -j DNAT --to-destination 192.168.32.10:22
-sudo iptables -A FORWARD -i enp4s0 -o virbr1 -p tcp -d 192.168.32.10 --dport 22 -j ACCEPT
-sudo netfilter-persistent save
-```
-
 **Notes**
 
 - The required rule names the three RFC 1918 ranges rather than one machine, so anything on a private network that has a route to `192.168.32.0/24` can reach a guest. That is a deliberate widening from an earlier version, which named Silenus's two addresses and nothing else.
@@ -1501,11 +1479,8 @@ sudo netfilter-persistent save
 - `172.16.0.0/12` includes `172.17.0.0/16`, which is `docker0` on this machine, so containers can reach guests too. Drop that range if you would rather they could not.
 - `-I FORWARD 1` inserts at the head. That position is the whole thing: appended with `-A`, or inserted before `libvirtd` next starts, the rules end up after `LIBVIRT_FWI` has already rejected the packet, and every existence check still passes.
 - `netfilter-persistent` cannot hold this. It restores a ruleset at boot, and `libvirtd` starts afterwards and inserts its jumps on top — so the required rules would come back permanently below the `REJECT`. A unit ordered `After=libvirtd.service docker.service` runs once both have settled, which is the only point at which the head of `FORWARD` means what it looks like it means.
-- That is also why `iptables-persistent` is not installed until sub-step 5. A build that publishes no guest service never needs it, and installing it anyway means a saved snapshot of libvirt's and Docker's chains being restored at boot alongside the copies those daemons rebuild for themselves.
-- If it is already installed and its saved file carries these three rules, nothing breaks: the unit deletes before inserting, so a restored copy in the wrong position is removed and re-added at the head. `sudo netfilter-persistent save` after the unit has run makes the file agree with reality, and `sudo apt purge iptables-persistent` removes the question entirely on a host with no DNAT.
 - The script deletes before inserting, so running it again — by hand, or at the next boot — leaves three rules rather than six.
 - Return traffic needs no rule. Conntrack matches the replies to the connection that was opened, and libvirt's `MASQUERADE` only applies to traffic a guest itself starts towards something outside its own subnet.
-- `netfilter-persistent save` is still what carries the optional DNAT in sub-step 5, which sits in the `nat` table and is not subject to this ordering problem.
 - `PartOf=libvirtd.service` is what makes a `libvirtd` restart carry this unit with it. Without it the rules stay where they were while libvirt re-inserts its jumps on top, and the host silently stops accepting connections into the guest network until the next boot — which is precisely the failure this whole arrangement exists to prevent, arriving by a different route. `After=` then orders the two, so the rules go back in front rather than behind.
 - `systemctl restart guest-net-access` does the same by hand, for a `virsh net-destroy`/`net-start` that shuffled the chains without restarting the daemon.
 - The guest subnet is `192.168.32.0/24` here and `192.168.24.0/24` on Silenus. They differ on purpose: both hosts are reachable from each other, so overlapping guest ranges would make a guest on one indistinguishable from a guest on the other.

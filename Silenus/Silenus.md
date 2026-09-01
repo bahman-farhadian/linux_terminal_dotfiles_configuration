@@ -1405,12 +1405,11 @@ The last rule is `-o virbr1 -j REJECT`. A guest reaches the outside and the
 replies come back through conntrack; a connection *started* from outside matches
 neither `ACCEPT` and falls to that `REJECT`. That is the gap this step closes.
 
-#### 2. What this step adds, and what is optional
+#### 2. What this step adds
 
 | # | Rule | Required | Why |
 |---|------|----------|-----|
 | 1 | `FORWARD` accept, private ranges → `192.168.24.0/24` | **yes** | without it a guest on a peer host cannot open a connection to a guest here |
-| 2 | `DNAT` on a port to one guest | no | only to publish a guest service |
 
 #### 3. Add the required rules, as a service
 
@@ -1479,24 +1478,6 @@ Expect `enabled`, so it runs again on the next boot.
 below the `REJECT` that stops the packet. Only the position tells you whether
 the rule does anything.
 
-#### 5. Optional — publish a guest service to the LAN
-
-```bash
-sudo apt install -y iptables-persistent
-```
-
-```bash
-sudo iptables -t nat -A PREROUTING -i wlp0s20f3 -p tcp --dport 2222 -j DNAT --to-destination 192.168.24.10:22
-```
-
-```bash
-sudo iptables -A FORWARD -i wlp0s20f3 -o virbr1 -p tcp -d 192.168.24.10 --dport 22 -j ACCEPT
-```
-
-```bash
-sudo netfilter-persistent save
-```
-
 **Notes**
 
 - **This is what makes the hub bidirectional.** Silenus already had routes *to* both peers' guest networks and `ip_forward` on, so a guest here could reach a guest there. Nothing let a packet in the other direction past libvirt's `REJECT`, so the path only worked one way and looked like a routing fault rather than a firewall one.
@@ -1504,7 +1485,6 @@ sudo netfilter-persistent save
 - `PartOf=libvirtd.service` is what makes a `libvirtd` restart carry this unit with it. Without it the rules stay where they were while libvirt re-inserts its jumps on top, and the host silently stops accepting connections into the guest network until the next boot.
 - `-I FORWARD 1` inserts at the head. Appended with `-A`, the rules end up after `LIBVIRT_FWI` has already rejected the packet, and every existence check still passes.
 - `172.16.0.0/12` includes `172.17.0.0/16`, which is `docker0`, so containers can reach guests too. Drop that range if you would rather they could not.
-- `iptables-persistent` is installed only for the optional rule. The required rules do not use it, and installing it regardless means a saved snapshot of libvirt's and Docker's chains being restored at boot next to the copies those daemons rebuild.
 - This is the same service, by the same name, that Dionysus.md Step 11 and Hephaestus.md Step 10 install. Only the guest subnet and the outward interface differ.
 
 ### Step 15 — Check the whole setup
