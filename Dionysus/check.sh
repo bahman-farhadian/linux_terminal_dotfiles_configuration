@@ -152,6 +152,10 @@ ck "p2p never-default" "$(nmcli -g ipv4.never-default connection show Dionysus 2
 # Half of a pair: this route lets a guest here answer one on Silenus, and
 # Silenus.md Step 14 lets a connection started here in past libvirt's REJECT.
 ck "route to silenus guests" "$(nmcli -g ipv4.routes connection show Dionysus 2>/dev/null|grep -c '192.168.24.0/24 192.168.124.2 100')" "1"
+# The cable is metric 100 and wins while up; this carries the same traffic over
+# the home LAN when it is not. Silenus holds 192.168.8.2 statically, so unlike
+# the work-side fallback this next hop cannot move.
+ck "silenus guests fallback" "$(nmcli -g ipv4.routes connection show wan 2>/dev/null|grep -c '192.168.24.0/24 192.168.8.2 200')" "1"
 ck "p2p renamed"     "$([ -e /sys/class/net/p2plink0 ] && echo yes || echo no)" "yes"
 if [ "$(cat /sys/class/net/p2plink0/carrier 2>/dev/null)" = "1" ]; then
   ck "p2p address"   "$(ip -4 -br addr show p2plink0 2>/dev/null|awk '{print $3}')" "192.168.124.1/30"
