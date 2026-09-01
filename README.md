@@ -134,6 +134,63 @@ Three guest subnets, three point-to-point `/30`s out of one `/29`, and no two
 overlap: the hosts can reach one another, so an address has to say which machine
 it belongs to.
 
+## The guest networks
+
+Each host NATs its own guests behind itself, and Silenus is the hub: it holds a
+route to the guest network of whichever peer its cable is currently in, forwards
+for its own guests, and each peer holds a route back to `192.168.24.0/24`.
+
+```mermaid
+graph LR
+    subgraph SIL ["Silenus &middot; the hub"]
+        SG["guests<br/>192.168.24.0/24"]
+        SB["virbr1 &middot; 192.168.24.1"]
+        SG --- SB
+    end
+
+    subgraph DIO ["Dionysus &middot; home"]
+        DB["virbr1 &middot; 192.168.32.1"]
+        DG["guests<br/>192.168.32.0/24"]
+        DB --- DG
+    end
+
+    subgraph HEP ["Hephaestus &middot; work"]
+        HB["virbr1 &middot; 192.168.40.1"]
+        HG["guests<br/>192.168.40.0/24"]
+        HB --- HG
+    end
+
+    SB <== "cable at home<br/>192.168.124.0/30" ==> DB
+    SB <-. "cable at work<br/>192.168.124.4/30" .-> HB
+    DG x-. "no path &mdash; different sites" .-x HG
+
+    classDef guest fill:#2da44e,stroke:#1a7f37,color:#ffffff
+    classDef hub fill:#8957e5,stroke:#6a3fbf,color:#ffffff
+    class SG,DG,HG guest
+    class SB,DB,HB hub
+```
+
+Two links, one at a time. Silenus has a single spare ethernet port and its two
+point-to-point profiles are mutually exclusive, so the live path is whichever
+site the laptop is at.
+
+| From | To | Works |
+|---|---|---|
+| Silenus guests | Dionysus guests | at home, cable up |
+| Silenus guests | Hephaestus guests | at work, cable up |
+| Dionysus guests | Hephaestus guests | **never** |
+
+The last row is a property of the sites, not of the configuration. Dionysus is
+at home and Hephaestus is at work, with no network path between those two
+buildings, so no routing on Silenus can join them — a transit router has to hold
+both links up at once, and this one is never at both places. Reaching a guest
+across sites is an SSH hop: `ssh -J <host> <guest-address>`.
+
+Each direction needs both halves. A route tells the far host how to send a
+packet; the `guest-net-access` service on the receiving host is what lets a
+connection *started* elsewhere past libvirt's `REJECT` on `virbr1`. With only
+one of the two, the path works one way and reads as a routing fault.
+
 ## Layout
 
 ```

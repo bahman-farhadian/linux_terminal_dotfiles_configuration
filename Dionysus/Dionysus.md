@@ -1272,6 +1272,7 @@ nmcli con add type ethernet ifname enp4s0 con-name wan ipv4.method manual ipv4.a
 nmcli con add type ethernet ifname p2plink0 con-name Dionysus ipv4.method manual ipv4.addresses 192.168.124.1/30 ipv4.never-default yes ipv6.method disabled
 nmcli con mod wan connection.autoconnect yes
 nmcli con mod Dionysus connection.autoconnect yes
+nmcli con mod Dionysus +ipv4.routes "192.168.24.0/24 192.168.124.2 100"
 printf 'source /etc/network/interfaces.d/*\n\nauto lo\niface lo inet loopback\n' > /etc/network/interfaces
 grep -rl enp4s0 /etc/network/interfaces.d/ 2>/dev/null | xargs -r rm -f
 systemctl restart NetworkManager
@@ -1343,6 +1344,8 @@ Expect `net.ipv4.ip_forward = 1`.
 - Rename first, in sub-step 4, and only then run the block. A profile bound to `enx9405bb143cf5` stops matching the moment the rename takes effect, so the order of the two sub-steps matters.
 - The two profiles are named for what they do, not for the interface underneath. `wan` is the way out; `Dionysus` is the point-to-point link, and Silenus's end of the same cable carries that same name, so the link reads the same from either side. Connection names are local to each host, so nothing collides.
 - `wan` is the router-and-firewall convention: the side facing outward, as against the inside. Worth knowing that this one holds a private address, `192.168.8.3`, because another router sits in front of it doing the real translation. `wan` here means *this host's* way out, not a public address.
+- **The route to `192.168.24.0/24` is what lets a guest here answer a guest on Silenus.** Silenus already routes to `192.168.32.0/24` across this cable and forwards for its own guests, but a reply from a guest on this host has to know the way back: without this route it leaves by the default gateway and dies on the home LAN. The other half of the pair is Silenus.md Step 14, whose rules let a connection *started* here past libvirt's `REJECT` on that side.
+- Reaching Hephaestus's guests from here is not possible and is not configured. That host is at another site with no network path to this one, and Silenus cannot bridge them: it has one spare ethernet port, its two point-to-point profiles are mutually exclusive, and it is never at both sites at once. Guest-to-guest across sites is an SSH hop, not a route.
 - `ipv4.never-default yes` on the point-to-point link is what keeps it from installing a default route. Without a gateway it would not install one anyway, but stating it means a later edit that adds a gateway by accident cannot silently steal the default route from `enp4s0`.
 - A `/30` gives four addresses: `.0` the network, `.1` and `.2` the two hosts, `.3` the broadcast. Both ends must carry the same prefix length or each considers the other off-link and nothing passes. `.1` and `.2` cannot be written as a `/31` pair, because `/31` boundaries are even-aligned — `.0`–`.1`, then `.2`-`.3`.
 - `managed=false` is Debian's default, not NetworkManager's own. It exists so that a machine configured through `/etc/network/interfaces` does not have NetworkManager fight it. The consequence here is that removing the stanza is what hands the interface over — installing NetworkManager alone does nothing.

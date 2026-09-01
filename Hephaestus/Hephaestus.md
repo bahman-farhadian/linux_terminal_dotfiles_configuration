@@ -1043,6 +1043,14 @@ nmcli con add type ethernet ifname eno1 con-name Hephaestus ipv4.method manual i
 nmcli con mod Hephaestus connection.autoconnect yes
 ```
 
+Silenus's own guests live on `192.168.24.0/24`, behind Silenus at the other end
+of this cable. A guest here needs a route to them, or its replies leave by the
+default gateway and die on the work LAN:
+
+```bash
+nmcli con mod Hephaestus +ipv4.routes "192.168.24.0/24 192.168.124.6 100"
+```
+
 ```bash
 nmcli con up Hephaestus
 ```
@@ -1109,6 +1117,8 @@ Expect `net.ipv4.ip_forward = 1`.
 - `802-11-wireless.cloned-mac-address permanent` is what keeps the DHCP lease stable. NetworkManager randomizes the MAC by default, a new MAC draws a new lease, and `192.168.88.212` quietly stops being the address this host answers on. `ip link` shows the randomization while it is active: a `permaddr` next to a different current address.
 - The adapter is a Realtek RTL8822CE driven by `rtw_8822ce`, on the PCIe bus at `02:00.0` rather than Intel's CNVi, which is why it enumerates as `wlp2s0` and not `wlo1`. Its firmware ships in `firmware-realtek`, from the `non-free-firmware` component Step 3 sub-step 4 enables.
 - `rfkill` is not installed on this host. Read the blocks from sysfs instead: `for d in /sys/class/rfkill/*; do echo "$(cat $d/name) soft=$(cat $d/soft) hard=$(cat $d/hard)"; done`.
+- **The route to `192.168.24.0/24` is half of a pair.** It lets a guest here answer one on Silenus; the other half is Silenus.md Step 14, whose rules let a connection *started* here reach into that network past libvirt's `REJECT`. Either alone gives a path that works one way and reads as a routing fault.
+- Reaching Dionysus's guests from here is not possible and is not configured. That host is at another site with no network path to this one, and Silenus cannot bridge them: it has one spare ethernet port, its two point-to-point profiles are mutually exclusive, and it is never at both sites at once. Guest-to-guest across sites is an SSH hop, not a route.
 - The two point-to-point links do not overlap. Silenus reaches Dionysus on `192.168.124.0/30` — hosts `.1` and `.2` — and this machine on `192.168.124.4/30` — hosts `.5` and `.6`. Adjacent `/30`s out of the same `/29`, deliberately, so one range covers every point-to-point link in the estate without any two colliding.
 - `wan` takes its address by DHCP, which is the one place this host differs from the other two — both of those are static because their router hands out nothing. A lease can change, so the cable at `192.168.124.5` is the address to rely on, and Silenus reaches the guest network across it first for exactly that reason.
 - The cable is the second way in when WiFi fails, which matters more here than on Dionysus: this machine is at another site and has no console you can walk to. Bring `Hephaestus` up before touching `wan`, and make any change to `wan` from a `tmux` session so a dropped connection does not leave a command half-done.
