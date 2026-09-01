@@ -1140,12 +1140,11 @@ The last rule is `-o virbr1 -j REJECT`. A guest reaches the outside and the
 replies come back through conntrack; a connection *started* from outside matches
 neither `ACCEPT` and falls to that `REJECT`. That is the gap this step closes.
 
-#### 2. What this step adds, and what is optional
+#### 2. What this step adds
 
 | # | Rule | Required | Why |
 |---|------|----------|-----|
 | 1 | `FORWARD` accept, private ranges → `192.168.40.0/24` | **yes** | without it nothing on your network can reach a guest at all |
-| 2 | `DNAT` on a port to one guest | no | only to publish a guest service |
 
 #### 3. Add the required rules, as a service
 
@@ -1218,31 +1217,12 @@ the rule does anything.
 nothing while no guest holds that address. Reachability is what the guest note
 in Step 11 covers, for when the first one exists.
 
-#### 5. Optional — publish a guest service to the LAN
-
-```bash
-sudo apt install -y iptables-persistent
-```
-
-```bash
-sudo iptables -t nat -A PREROUTING -i wlp2s0 -p tcp --dport 2222 -j DNAT --to-destination 192.168.40.10:22
-```
-
-```bash
-sudo iptables -A FORWARD -i wlp2s0 -o virbr1 -p tcp -d 192.168.40.10 --dport 22 -j ACCEPT
-```
-
-```bash
-sudo netfilter-persistent save
-```
-
 **Notes**
 
 - `PartOf=libvirtd.service` is what makes a `libvirtd` restart carry this unit with it. Without it the rules stay where they were while libvirt re-inserts its jumps on top, and the host silently stops accepting connections into the guest network until the next boot.
 - `-I FORWARD 1` inserts at the head. Appended with `-A`, the rules end up after `LIBVIRT_FWI` has already rejected the packet, and every existence check still passes.
 - A route is still needed at the other end. These rules permit the traffic; they do not tell any machine how to get here.
 - `172.16.0.0/12` includes `172.17.0.0/16`, which is `docker0`, so containers can reach guests too. Drop that range if you would rather they could not.
-- `iptables-persistent` is installed only for the optional rule. The required rules do not use it, and installing it regardless means a saved snapshot of libvirt's and Docker's chains being restored at boot next to the copies those daemons rebuild.
 
 ### Step 11 — Reboot and final verification
 
