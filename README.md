@@ -170,21 +170,50 @@ graph LR
     class SB,DB,HB hub
 ```
 
-Two links, one at a time. Silenus has a single spare ethernet port and its two
-point-to-point profiles are mutually exclusive, so the live path is whichever
-site the laptop is at.
+Silenus has a single spare ethernet port and its two point-to-point profiles are
+mutually exclusive, so the cable serves whichever site the laptop is at. Losing
+the cable does not lose the path: each pair carries a second route over the
+local network at a higher metric, and the kernel falls back on its own.
 
-| From | To | Works |
+| From | To | Routed |
 |---|---|---|
-| Silenus guests | Dionysus guests | at home, cable up |
-| Silenus guests | Hephaestus guests | at work, cable up |
-| Dionysus guests | Hephaestus guests | **never** |
+| Silenus guests | Dionysus guests | at home — cable, else the home LAN |
+| Silenus guests | Hephaestus guests | at work — cable, else the work WiFi |
+| Dionysus guests | Hephaestus guests | **no** |
 
-The last row is a property of the sites, not of the configuration. Dionysus is
-at home and Hephaestus is at work, with no network path between those two
-buildings, so no routing on Silenus can join them — a transit router has to hold
-both links up at once, and this one is never at both places. Reaching a guest
-across sites is an SSH hop: `ssh -J <host> <guest-address>`.
+**Guest subnets are routed within a site, never between them.** That last row is
+a deliberate stop, not a missing feature. The two hosts sit in different
+buildings and neither router carries the other's guest range, so joining them
+means a tunnel — and a tunnel between two always-on servers should not run
+through a laptop that is sometimes shut. Across sites, a guest is an SSH hop.
+
+## Reaching a guest
+
+Hosts are reachable in more places than guest subnets are routed, so `ssh -J`
+covers every case the routing does not:
+
+| You are | The guest is on | How |
+|---|---|---|
+| at home | Dionysus | direct — `192.168.32.0/24` is routed |
+| at home | Silenus | direct — `192.168.24.0/24` is routed |
+| at home, on the office VPN | Hephaestus | `ssh -J <you>@192.168.88.212 <guest>` |
+| at work | Hephaestus | direct — `192.168.40.0/24` is routed |
+| at work | Silenus | direct — `192.168.24.0/24` is routed |
+| at work | Dionysus | `ssh -J <you>@192.168.8.3 <guest>`, if home is reachable |
+
+The office VPN is what makes the third row work: it carries
+`192.168.88.0/24 via 192.168.88.1`, so Hephaestus answers on `192.168.88.212`
+from home even with no cable anywhere near it. The reverse holds too — from
+Hephaestus, Silenus answers on its VPN address, one hop through the office
+router.
+
+That is host reachability, not guest routing, and the difference is the whole
+point. A route for `192.168.40.0/24` sent down the VPN dies at the VPN server,
+which routes by destination and has never heard of that subnet. Only the
+direction *into* the tunnel would work, and a path that works one way and not
+the other is worse than one that plainly does not: stateful traffic breaks in
+ways that read as packet loss. `ssh -J` needs no route at all — it opens a
+connection to a host that answers, and asks that host to open the next one.
 
 Each direction needs both halves. A route tells the far host how to send a
 packet; the `guest-net-access` service on the receiving host is what lets a
