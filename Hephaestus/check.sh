@@ -190,6 +190,44 @@ hf "guest-net-access script"  /usr/local/sbin/guest-net-access
 hf "guest-net-access unit"    /etc/systemd/system/guest-net-access.service
 ck "unit follows libvirtd"    "$(systemctl show -p PartOf --value guest-net-access.service 2>/dev/null|grep -c libvirtd)" "1"
 
+
+# ---------------------------------------------------------------------------
+# Reachability. This block reports, it does not judge, so nothing here counts
+# toward PASS or FAIL. Which peer is reachable depends on where this machine is
+# and which cable is in; "not routed from here" is the correct answer for a
+# host at the other site, not a fault. Reads only, like everything above.
+# ---------------------------------------------------------------------------
+printf '\n--- Reachability from here, right now ---\n\n'
+_defgw=$(ip -4 route show default 2>/dev/null | awk '{print $3; exit}')
+_reach() {   # 1 peer  2 subnet  3 probe address  4 its bridge  5 its host address
+  local r gw dev
+  r=$(ip -4 route get "$3" 2>/dev/null | head -1)
+  gw=$(printf '%s\n' "$r" | sed -n 's/.* via \([0-9.]*\).*/\1/p')
+  dev=$(printf '%s\n' "$r" | sed -n 's/.* dev \([a-zA-Z0-9]*\).*/\1/p')
+  printf '  %s\n' "$1"
+  if [ -z "$dev" ]; then
+    printf '    guest network %-16s no route at all\n' "$2"
+  elif [ -n "$gw" ] && [ "$gw" = "$_defgw" ]; then
+    printf '    guest network %-16s NOT routed from here, leaving by the default gateway\n' "$2"
+  elif [ -n "$gw" ]; then
+    printf '    guest network %-16s routed via %s on %s\n' "$2" "$gw" "$dev"
+  else
+    printf '    guest network %-16s on-link on %s\n' "$2" "$dev"
+  fi
+  ping -c1 -W2 "$4" >/dev/null 2>&1 \
+    && printf '    its bridge %-19s answers, so the route works end to end\n' "$4" \
+    || printf '    its bridge %-19s no reply\n' "$4"
+  ping -c1 -W2 "$5" >/dev/null 2>&1 \
+    && printf '    the host itself %-14s answers\n' "$5" \
+    || printf '    the host itself %-14s no reply\n' "$5"
+  printf '\n'
+}
+_reach "Silenus" "192.168.24.0/24" 192.168.24.10 192.168.24.1 192.168.124.6
+printf '  A guest network answering on its bridge proves the routing. It does not\n'
+printf '  prove the firewall: traffic to the bridge address stops on that host and\n'
+printf '  never reaches the FORWARD chain. Only traffic to a real guest does, which\n'
+printf '  is what the reachability drill in the guide covers.\n'
+
 printf '\n========================================\n'
 printf '  PASS %s   FAIL %s   N/A %s\n' "$pass" "$fail" "$skip"
 printf '========================================\n'
