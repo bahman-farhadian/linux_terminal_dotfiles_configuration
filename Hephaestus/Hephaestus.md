@@ -1055,6 +1055,15 @@ nmcli con mod Hephaestus +ipv4.routes "192.168.24.0/24 192.168.124.6 100"
 nmcli con up Hephaestus
 ```
 
+**If you are logged in over this cable, that last command drops you.** `con up`
+reactivates the interface your session is running on. Either work from the WiFi
+address instead, or skip the reactivation and put the route straight into the
+running kernel table, which changes nothing about the link:
+
+```bash
+ip route add 192.168.24.0/24 via 192.168.124.6 dev eno1
+```
+
 ```bash
 ip -br addr show eno1
 ```
