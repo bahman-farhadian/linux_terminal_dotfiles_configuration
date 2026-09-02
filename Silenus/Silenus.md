@@ -1599,10 +1599,14 @@ next hop for a guest or point-to-point subnet that no step here writes. It
 cannot police a whole machine, and it is not meant to. It polices the parts that
 would otherwise make two supposedly identical hosts behave differently.
 
-The residue it was written for was real: a namespace from sub-step 5, left up,
-kept `virbr1` alive and made a peer's `bridge answers` read `yes` when a clean
-host would have said `no`. Every check passed while a test result was being
-produced by something no document mentions.
+The residue it was written for was real. A namespace from sub-step 6 was still
+up, with its veth attached to `virbr1`, through a run reporting 133 `PASS` and
+no failures — every other check is blind to it by construction. It changed
+nothing about that run's results, as it happens: a `virbr1` with no ports at all
+still answers on its own address, so the peer's `bridge answers` column reads
+`yes` either way. The point is not that this particular leftover was harmful.
+It is that a host carrying it passes every check while differing from a fresh
+build, and nothing said so.
 
 #### 5. Run it from each position
 
@@ -1673,7 +1677,8 @@ The route must move from `via 192.168.124.1 dev enp0s31f6` to
 `via 192.168.8.3 dev wlp0s20f3` on its own, and the ping must keep working.
 
 Tear down on both hosts. This is not tidying — sub-step 4 fails until you do,
-because a namespace left up keeps `virbr1` alive and changes what the peer sees:
+because a namespace this document does not create is a difference between this
+host and a rebuilt one:
 
 ```bash
 ip netns del g24; ip link del v24h 2>/dev/null || true
