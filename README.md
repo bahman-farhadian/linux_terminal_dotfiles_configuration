@@ -209,7 +209,7 @@ the difference is where the surprises live.
 | Hephaestus → Silenus guests, over the work WiFi | 200 | yes | **no** — this is the gatewayless + `proxy_arp` pair |
 | guest ↔ guest, Silenus ↔ Hephaestus | — | yes | **no** |
 | Silenus → the Hephaestus *host*, over the VPN | — | n/a | yes — answers on `192.168.88.212` |
-| Silenus → Hephaestus *guests*, over the VPN | — | **impossible** | — |
+| Silenus → Hephaestus *guests*, from home | — | **not built, by choice** | — |
 | Dionysus guests ↔ Hephaestus guests | — | **impossible** | — |
 
 The two impossible rows are not work left undone. The VPN carries

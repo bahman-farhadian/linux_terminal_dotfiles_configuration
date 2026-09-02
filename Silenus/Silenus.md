@@ -1251,15 +1251,27 @@ kernel picks the best live path with nothing to run by hand:
 | `192.168.40.0/24` | 100 | `192.168.124.5` | `Hephaestus` profile | at work, cable in |
 | `192.168.40.0/24` | 200 | `192.168.88.212` | work WiFi profile | at work, no cable |
 
-**There is no third tier over the VPN, and it is not a gap to be filled later.**
-From home the tunnel carries `192.168.88.0/24`, so Hephaestus itself answers on
-`192.168.88.212` — but a packet for `192.168.40.10` sent down `tun1` reaches the
-VPN server, which routes by destination and has no route for that subnet, and
-drops it. Naming `192.168.88.212` as the next hop does not help: `tun1` is layer
-3, so the gateway never goes on the wire, and `proxy_arp` has no broadcast
-domain to answer in. Making it work needs a route on the office router or a
-tunnel between the two hosts. Neither is configuration on a machine here, which
-is why the answer from home is to log into Hephaestus and go on from there.
+**There is no third tier from home, and that is a decision rather than an
+oversight.** The office VPN carries `192.168.88.0/24`, so Hephaestus itself
+answers on `192.168.88.212` from anywhere the tunnel is up. Its guests do not,
+and no route can make them: **the far end of that tunnel is the VPN server, not
+Hephaestus.** The server decapsulates and forwards by destination, has no route
+for `192.168.40.0/24`, and drops it. Naming `192.168.88.212` as the next hop
+does not help — `tun1` is layer 3, so the gateway never goes on the wire, and
+`proxy_arp` has no broadcast domain to answer in.
+
+Three things would work, and each was weighed and set aside:
+
+| Option | Why not |
+|---|---|
+| A route on the office router | Someone else's network, for a path a login already covers |
+| A tunnel between the two hosts | WireGuard handles the laptop's changing VPN address, GRE and IPIP do not — but it is a daemon and a keypair on both hosts to maintain for a case that arises rarely |
+| `DNAT` on Hephaestus, per service | Publishes one port at `192.168.88.212`, which the VPN already reaches. Real, but per-service rather than routing, and it puts guest services on the work LAN |
+
+So from home the answer is to log into Hephaestus and work from there, and
+`sshuttle -r <you>@192.168.88.212 192.168.40.0/24` covers the occasional case
+where something local needs to speak TCP to a guest. Both use access that
+already exists and leave nothing running.
 
 #### 1. Confirm which interface the cable is in
 
