@@ -242,6 +242,31 @@ _reach() {   # 1 peer  2 subnet  3 probe address  4 its bridge  5 its host addre
   printf '\n'
 }
 _reach "Silenus" "192.168.24.0/24" 192.168.24.10 192.168.24.1 192.168.8.2
+
+# --- and now judge it -------------------------------------------------------
+# Whether Silenus is reachable depends on where that laptop is, which this host
+# cannot know. So the route is asserted — it is configuration and must always
+# hold — while reachability is only asserted when the laptop is actually
+# answering. Absent, it is untestable rather than broken.
+_routed(){ # 1 probe address -> yes/no
+  local r gw
+  r=$(ip -4 route get "$1" 2>/dev/null | head -1)
+  gw=$(printf '%s\n' "$r" | sed -n 's/.* via \([0-9.]*\).*/\1/p')
+  [ -n "$r" ] || { echo no; return; }
+  if [ -n "$gw" ] && [ "$gw" = "$_defgw" ]; then echo no; else echo yes; fi
+}
+ck "Silenus guests routed" "$(_routed 192.168.24.10)" "yes"
+_peer=""
+for a in 192.168.124.2 192.168.8.2; do
+  ping -c1 -W2 "$a" >/dev/null 2>&1 && { _peer=$a; break; }
+done
+if [ -n "$_peer" ]; then
+  printf '  Silenus is answering on %s\n' "$_peer"
+  ck "Silenus guests reachable" "$(ping -c1 -W2 192.168.24.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
+else
+  na "Silenus guests reachable" "Silenus is not answering on 192.168.124.2 or 192.168.8.2, so it is at the other site or switched off"
+fi
+printf '\n'
 printf '  A guest network answering on its bridge proves the routing. It does not\n'
 printf '  prove the firewall: traffic to the bridge address stops on that host and\n'
 printf '  never reaches the FORWARD chain. Only traffic to a real guest does, which\n'

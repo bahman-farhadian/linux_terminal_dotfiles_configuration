@@ -295,6 +295,48 @@ _reach() {   # 1 peer  2 subnet  3 probe address  4 its bridge  5 its host addre
 }
 _reach "Dionysus"   "192.168.32.0/24" 192.168.32.10 192.168.32.1 192.168.8.3
 _reach "Hephaestus" "192.168.40.0/24" 192.168.40.10 192.168.40.1 192.168.88.212
+
+# --- and now judge it, which needs knowing where this laptop is -------------
+# The assertions above never move when the machine does. These do, so the
+# expectation is derived from the site rather than written down: at home the
+# far peer is Hephaestus and must NOT be routed, at work it is Dionysus.
+_routed(){ # 1 probe address -> yes/no
+  local r gw
+  r=$(ip -4 route get "$1" 2>/dev/null | head -1)
+  gw=$(printf '%s\n' "$r" | sed -n 's/.* via \([0-9.]*\).*/\1/p')
+  [ -n "$r" ] || { echo no; return; }
+  if [ -n "$gw" ] && [ "$gw" = "$_defgw" ]; then echo no; else echo yes; fi
+}
+_site=unknown
+ip -4 -br addr show 2>/dev/null | grep -q ' 192\.168\.8\.'  && _site=home
+ip -4 -br addr show 2>/dev/null | grep -q ' 192\.168\.88\.' && _site=work
+_vpn=no;   ip -4 -br addr show 2>/dev/null | grep -q ' 192\.168\.80\.' && _vpn=yes
+_cable=no; [ "$(cat /sys/class/net/enp0s31f6/carrier 2>/dev/null)" = "1" ] && _cable=yes
+
+printf '  Position: %s, cable %s, VPN %s\n\n' \
+  "$([ "$_site" = unknown ] && echo 'site not recognised' || echo "at $_site")" "$_cable" "$_vpn"
+
+case "$_site" in
+  home)
+    ck "Dionysus guests routed"    "$(_routed 192.168.32.10)" "yes"
+    ck "Dionysus guests reachable" "$(ping -c1 -W2 192.168.32.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
+    ck "Hephaestus guests not routed here" "$(_routed 192.168.40.10)" "no"
+    if [ "$_vpn" = yes ]; then
+      ck "Hephaestus host over the VPN" "$(ping -c1 -W2 192.168.88.212 >/dev/null 2>&1 && echo yes || echo no)" "yes"
+    else
+      na "Hephaestus host over the VPN" "the tunnel is not up; it is what carries 192.168.88.0/24 from here"
+    fi
+    ;;
+  work)
+    ck "Hephaestus guests routed"    "$(_routed 192.168.40.10)" "yes"
+    ck "Hephaestus guests reachable" "$(ping -c1 -W2 192.168.40.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
+    ck "Dionysus guests not routed here" "$(_routed 192.168.32.10)" "no"
+    ;;
+  *)
+    na "reachability for this site" "no address on 192.168.8.0/24 or 192.168.88.0/24, so the expected peer cannot be derived"
+    ;;
+esac
+printf '\n'
 printf '  A guest network answering on its bridge proves the routing. It does not\n'
 printf '  prove the firewall: traffic to the bridge address stops on that host and\n'
 printf '  never reaches the FORWARD chain. Only traffic to a real guest does, which\n'
