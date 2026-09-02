@@ -188,6 +188,50 @@ means a tunnel — and a tunnel between two always-on servers should not run
 through a laptop that is sometimes shut. Across sites, log into the guest's own
 host and reach it from there — see below.
 
+## What has been verified
+
+Configured means the route or rule exists and `check.sh` asserts it. Proven
+means a packet has actually travelled that path. The two are not the same, and
+the difference is where the surprises live.
+
+| Path | Tier | Configured | Proven |
+|---|---|---|---|
+| Silenus → Dionysus guests, over the cable | 100 | yes | yes — `ttl=63`, one routing hop |
+| Silenus → Dionysus guests, over the home LAN | 200 | yes | yes — after unplugging the cable |
+| Dionysus → Silenus guests, over the cable | 100 | yes | yes — `ttl=63` |
+| Dionysus → Silenus guests, over the home LAN | 200 | yes | yes |
+| guest ↔ guest, Silenus ↔ Dionysus, cable | — | yes | yes — `ttl=62`, both directions |
+| guest ↔ guest, Silenus ↔ Dionysus, home LAN | — | yes | yes |
+| failover, cable unplugged and replaced | — | yes | yes — the route moves on its own |
+| Silenus → Hephaestus guests, over the cable | 100 | yes | **no** — needs the cable at work |
+| Silenus → Hephaestus guests, over the work WiFi | 200 | yes | **no** — needs to be at work |
+| Hephaestus → Silenus guests, over the cable | 100 | yes | **no** |
+| Hephaestus → Silenus guests, over the work WiFi | 200 | yes | **no** — this is the gatewayless + `proxy_arp` pair |
+| guest ↔ guest, Silenus ↔ Hephaestus | — | yes | **no** |
+| Silenus → the Hephaestus *host*, over the VPN | — | n/a | yes — answers on `192.168.88.212` |
+| Silenus → Hephaestus *guests*, over the VPN | — | **impossible** | — |
+| Dionysus guests ↔ Hephaestus guests | — | **impossible** | — |
+
+The two impossible rows are not work left undone. The VPN carries
+`192.168.88.0/24`, so the host answers, but a packet for `192.168.40.0/24` sent
+down the tunnel reaches the VPN server, which routes by destination and has no
+route for it. And the two headless hosts sit in different buildings with no path
+between them, which no routing on a laptop that is never at both can join.
+
+Positions checked so far, all with `0 FAIL`:
+
+| Where | Cable | Checked |
+|---|---|---|
+| home, cable in, VPN up | Dionysus | yes |
+| home, cable in, no VPN | Dionysus | yes |
+| home, no cable | — | yes — the fallback carried it |
+| work, cable in | Hephaestus | **not yet** |
+| work, no cable | — | **not yet** |
+
+Everything unproven is on the Hephaestus leg and needs one trip to that site.
+Its configuration is identical in shape to the Dionysus leg, which passed
+everything, so what is missing is the exercise rather than the design.
+
 ## Reaching a guest
 
 Hosts are reachable in more places than guest subnets are routed. Where a route
