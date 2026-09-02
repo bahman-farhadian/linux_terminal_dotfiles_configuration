@@ -1415,7 +1415,8 @@ Needs Dionysus up on the other end.
 - The metrics are what express "prefer the cable". Same destination, two next hops, lower metric wins. `ip -4 route get 192.168.32.10` is the way to ask the kernel which it would actually use, rather than reading the table and inferring.
 - **The route alone does not make guests reachable.** A libvirt NAT network permits outbound traffic and `RELATED,ESTABLISHED` return traffic; a connection opened from outside into `192.168.32.0/24` is not in either category and is dropped on Dionysus. Dionysus.md Step 11 carries the forwarding rule that allows it. Test with `ping` to a guest, not by reading the routing table.
 - The fallback path leans on Dionysus forwarding between `enp4s0` and `virbr1`, which is what `net.ipv4.ip_forward` in Dionysus.md Step 10 enables.
-- Unplugging the cable takes the profile down with it. Since neither autoconnects, plugging it back in leaves the port idle until you bring the profile up again — the cost of never guessing which peer is on the other end.
+- Unplugging the cable takes the profile down with it, and the metric 200 route over the local network takes over on its own. Plugging it back in does **not** undo that: neither profile autoconnects, so the port stays idle until you run `nmcli con up`. That is the cost of never guessing which peer is on the other end.
+- **A plugged cable is not a configured one, and the peer does not know the difference.** Dionysus and Hephaestus both autoconnect their end, so the moment the cable carries a link they route to this host over it — at `192.168.124.2` or `192.168.124.6`, addresses that do not exist here until the matching profile is up. Their traffic goes nowhere and their own `check.sh` reports the guest network as unreachable while the route looks fine. The fix is always the same and always on this side: `nmcli con up Dionysus`, or `Hephaestus` at the other site.
 
 ### Step 14 — Firewall
 
