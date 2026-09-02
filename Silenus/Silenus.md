@@ -1568,13 +1568,43 @@ use, which is correct at home and would be a fault at work.
 `bridge answers` is a ping to the peer's `virbr1` address. It proves the routing
 works end to end and proves nothing about the firewall, because that packet
 stops on the peer and never reaches its `FORWARD` chain. Only traffic to a real
-guest does, which is sub-step 5.
+guest does, which is sub-step 6.
 
 A peer host table follows it, because a host answering while its guest network
 does not is the ordinary state from home over the VPN and reads as a fault
 until you have seen it once.
 
-#### 4. Run it from each position
+#### 4. Read the undocumented state section
+
+Everything above it asks whether what the documents describe is present. This
+asks the opposite, and reproducing a host depends on the answer:
+
+```
+  PASS  no network namespaces              none
+  PASS  virbr1 carries only guest taps     none
+  PASS  no extra sysctl drop-ins           none
+  PASS  no extra sshd drop-ins             none
+  PASS  no undocumented next hops          none
+```
+
+**A machine can pass every other check and still not match a fresh build.** The
+checks are one-directional: they find what is missing, never what is extra. Work
+done by hand leaves residue — a namespace from a test, a route added while
+debugging, a drop-in written once and forgotten — and residue nothing looks for
+survives into the next rebuild as a difference nobody can explain.
+
+The section is deliberately narrow, covering only what this build owns:
+namespaces, what is attached to `virbr1`, the two drop-in directories, and any
+next hop for a guest or point-to-point subnet that no step here writes. It
+cannot police a whole machine, and it is not meant to. It polices the parts that
+would otherwise make two supposedly identical hosts behave differently.
+
+The residue it was written for was real: a namespace from sub-step 5, left up,
+kept `virbr1` alive and made a peer's `bridge answers` read `yes` when a clean
+host would have said `no`. Every check passed while a test result was being
+produced by something no document mentions.
+
+#### 5. Run it from each position
 
 The `PASS`/`FAIL` assertions test configuration, which does not change when the
 laptop moves. What moves is the reachability block and a handful of `N/A` lines.
@@ -1599,7 +1629,7 @@ The `N/A` lines are the exception and do move. `p2p link up` is `N/A` whenever
 the cable is out, and that is the check declining to fail over a cable being
 where it belongs.
 
-#### 5. The reachability drill
+#### 6. The reachability drill
 
 `check.sh` never writes, so it cannot do the two things that actually prove the
 path: put an address on a guest network, and take a link down to force the
@@ -1642,7 +1672,8 @@ nmcli con up Dionysus
 The route must move from `via 192.168.124.1 dev enp0s31f6` to
 `via 192.168.8.3 dev wlp0s20f3` on its own, and the ping must keep working.
 
-Tear down on both hosts:
+Tear down on both hosts. This is not tidying — sub-step 4 fails until you do,
+because a namespace left up keeps `virbr1` alive and changes what the peer sees:
 
 ```bash
 ip netns del g24; ip link del v24h 2>/dev/null || true

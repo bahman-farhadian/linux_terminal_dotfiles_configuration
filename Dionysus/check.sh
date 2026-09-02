@@ -295,6 +295,26 @@ printf '  prove the firewall: traffic to the bridge address stops on that host a
 printf '  never reaches the FORWARD chain. Only traffic to a real guest does, which\n'
 printf '  is what the reachability drill in the guide covers.\n'
 
+
+printf '\n--- Undocumented state ---\n'
+# Everything above asks "is what the documents describe present?". This asks the
+# opposite, and a rebuild depends on it: is anything here that the documents do
+# not account for? A host can pass every check above and still differ from a
+# fresh build, because ad-hoc work leaves residue and residue nothing looks for
+# survives into the next machine as an unexplained difference.
+_ns=$(ip netns list 2>/dev/null | awk '{print $1}' | sort | tr '\n' ' ')
+ck "no network namespaces" "${_ns:-none}" "none"
+_brif=$(ls /sys/class/net/virbr1/brif 2>/dev/null | grep -v '^vnet' | sort | tr '\n' ' ')
+ck "virbr1 carries only guest taps" "${_brif:-none}" "none"
+_sy=$(ls /etc/sysctl.d/ 2>/dev/null | grep -vxE '99-kvm\.conf|README\.sysctl' | sort | tr '\n' ' ')
+ck "no extra sysctl drop-ins" "${_sy:-none}" "none"
+_sd=$(ls /etc/ssh/sshd_config.d/ 2>/dev/null | grep -vx '99-local\.conf' | sort | tr '\n' ' ')
+ck "no extra sshd drop-ins" "${_sd:-none}" "none"
+# Any next hop for a subnet this build owns that the documents do not name.
+_badr=$(for s in 192.168.24.0/24 192.168.32.0/24 192.168.124.0/24; do ip -4 route show "$s" 2>/dev/null; done \
+        | sed -n 's/.*via \([0-9.]*\).*/\1/p' | grep -vxE '192.168.124.2|192.168.8.2' | sort -u | tr '\n' ' ')
+ck "no undocumented next hops" "${_badr:-none}" "none"
+
 printf '\n========================================\n'
 printf '  PASS %s   FAIL %s   N/A %s\n' "$pass" "$fail" "$skip"
 printf '========================================\n'
