@@ -1547,28 +1547,32 @@ prints `PASS` or `FAIL` for each one.
 The last line gives the counts. Any failure names what it found and what it
 expected, so it points at the step to redo.
 
-#### 3. Read the reachability block
+#### 3. Read the connectivity matrix
 
-Below the totals, `check.sh` reports which path it would take to each peer's
-guest network and whether that peer answers. Nothing there counts toward `PASS`
-or `FAIL`, because the right answer depends on where this laptop is: a peer at
-the other site reading `NOT routed from here` is correct, not broken.
+`check.sh` prints one below the totals. It is the whole reachability picture on
+four columns, and the two on the left are the ones people conflate:
 
 ```
-  Dionysus
-    guest network 192.168.32.0/24  routed via 192.168.124.1 on enp0s31f6
-    its bridge 192.168.32.1        answers, so the route works end to end
-    the host itself 192.168.8.3    answers
-
-  Hephaestus
-    guest network 192.168.40.0/24  NOT routed from here, leaving by the default gateway
-    its bridge 192.168.40.1        no reply
-    the host itself 192.168.88.212 answers
+  guest network     tier 100  tier 200  live path                   bridge answers
+  ----------------- --------  --------  --------------------------- --------------
+  192.168.32.0/24   yes       yes       192.168.124.1 on enp0s31f6  yes
+  192.168.40.0/24   yes       yes       -                           no
 ```
 
-That last line is the shape to recognise from home on the VPN: the host answers
-because the tunnel carries `192.168.88.0/24`, while its guests do not, because
-nothing carries `192.168.40.0/24`.
+**Configured** is `tier 100` and `tier 200`: the route is written on a profile
+and survives a reboot. **Live** is the path the kernel is using now. They differ
+whenever a profile is down, which is the normal state for a link to the site you
+are not at — the row above shows both tiers to Hephaestus present and neither in
+use, which is correct at home and would be a fault at work.
+
+`bridge answers` is a ping to the peer's `virbr1` address. It proves the routing
+works end to end and proves nothing about the firewall, because that packet
+stops on the peer and never reaches its `FORWARD` chain. Only traffic to a real
+guest does, which is sub-step 5.
+
+A peer host table follows it, because a host answering while its guest network
+does not is the ordinary state from home over the VPN and reads as a fault
+until you have seen it once.
 
 #### 4. Run it from each position
 
