@@ -224,14 +224,16 @@ _reach() {   # 1 peer  2 subnet  3 probe address  4 its bridge  5 its host addre
   gw=$(printf '%s\n' "$r" | sed -n 's/.* via \([0-9.]*\).*/\1/p')
   dev=$(printf '%s\n' "$r" | sed -n 's/.* dev \([a-zA-Z0-9]*\).*/\1/p')
   printf '  %s\n' "$1"
-  if [ -z "$dev" ]; then
-    printf '    guest network %-16s no route at all\n' "$2"
-  elif [ -n "$gw" ] && [ "$gw" = "$_defgw" ]; then
-    printf '    guest network %-16s NOT routed from here, leaving by the default gateway\n' "$2"
+  # Judged on whether a route for this exact prefix exists, not on comparing the
+  # next hop to the default gateway. A policy-routing proxy such as nekoray-tun
+  # installs gatewayless catch-all routes in a table of its own, which the older
+  # comparison read as "specifically routed" when it is the opposite.
+  if [ -z "$(ip -4 route show "$2" 2>/dev/null)" ]; then
+    printf '    guest network %-16s NOT routed from here\n' "$2"
   elif [ -n "$gw" ]; then
     printf '    guest network %-16s routed via %s on %s\n' "$2" "$gw" "$dev"
   else
-    printf '    guest network %-16s on-link on %s\n' "$2" "$dev"
+    printf '    guest network %-16s routed on-link on %s\n' "$2" "$dev"
   fi
   ping -c1 -W2 "$4" >/dev/null 2>&1 \
     && printf '    its bridge %-19s answers, so the route works end to end\n' "$4" \
@@ -248,14 +250,10 @@ _reach "Silenus" "192.168.24.0/24" 192.168.24.10 192.168.24.1 192.168.8.2
 # cannot know. So the route is asserted — it is configuration and must always
 # hold — while reachability is only asserted when the laptop is actually
 # answering. Absent, it is untestable rather than broken.
-_routed(){ # 1 probe address -> yes/no
-  local r gw
-  r=$(ip -4 route get "$1" 2>/dev/null | head -1)
-  gw=$(printf '%s\n' "$r" | sed -n 's/.* via \([0-9.]*\).*/\1/p')
-  [ -n "$r" ] || { echo no; return; }
-  if [ -n "$gw" ] && [ "$gw" = "$_defgw" ]; then echo no; else echo yes; fi
+_routed(){ # 1 subnet -> yes/no. A route for this exact prefix, or none.
+  [ -n "$(ip -4 route show "$1" 2>/dev/null)" ] && echo yes || echo no
 }
-ck "Silenus guests routed" "$(_routed 192.168.24.10)" "yes"
+ck "Silenus guests routed" "$(_routed 192.168.24.0/24)" "yes"
 _peer=""
 for a in 192.168.124.2 192.168.8.2; do
   ping -c1 -W2 "$a" >/dev/null 2>&1 && { _peer=$a; break; }

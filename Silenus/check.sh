@@ -284,14 +284,16 @@ _reach() {   # 1 peer  2 subnet  3 probe address  4 its bridge  5 its host addre
   gw=$(printf '%s\n' "$r" | sed -n 's/.* via \([0-9.]*\).*/\1/p')
   dev=$(printf '%s\n' "$r" | sed -n 's/.* dev \([a-zA-Z0-9]*\).*/\1/p')
   printf '  %s\n' "$1"
-  if [ -z "$dev" ]; then
-    printf '    guest network %-16s no route at all\n' "$2"
-  elif [ -n "$gw" ] && [ "$gw" = "$_defgw" ]; then
-    printf '    guest network %-16s NOT routed from here, leaving by the default gateway\n' "$2"
+  # Judged on whether a route for this exact prefix exists, not on comparing the
+  # next hop to the default gateway. A policy-routing proxy such as nekoray-tun
+  # installs gatewayless catch-all routes in a table of its own, which the older
+  # comparison read as "specifically routed" when it is the opposite.
+  if [ -z "$(ip -4 route show "$2" 2>/dev/null)" ]; then
+    printf '    guest network %-16s NOT routed from here\n' "$2"
   elif [ -n "$gw" ]; then
     printf '    guest network %-16s routed via %s on %s\n' "$2" "$gw" "$dev"
   else
-    printf '    guest network %-16s on-link on %s\n' "$2" "$dev"
+    printf '    guest network %-16s routed on-link on %s\n' "$2" "$dev"
   fi
   ping -c1 -W2 "$4" >/dev/null 2>&1 \
     && printf '    its bridge %-19s answers, so the route works end to end\n' "$4" \
@@ -308,12 +310,8 @@ _reach "Hephaestus" "192.168.40.0/24" 192.168.40.10 192.168.40.1 192.168.88.212
 # The assertions above never move when the machine does. These do, so the
 # expectation is derived from the site rather than written down: at home the
 # far peer is Hephaestus and must NOT be routed, at work it is Dionysus.
-_routed(){ # 1 probe address -> yes/no
-  local r gw
-  r=$(ip -4 route get "$1" 2>/dev/null | head -1)
-  gw=$(printf '%s\n' "$r" | sed -n 's/.* via \([0-9.]*\).*/\1/p')
-  [ -n "$r" ] || { echo no; return; }
-  if [ -n "$gw" ] && [ "$gw" = "$_defgw" ]; then echo no; else echo yes; fi
+_routed(){ # 1 subnet -> yes/no. A route for this exact prefix, or none.
+  [ -n "$(ip -4 route show "$1" 2>/dev/null)" ] && echo yes || echo no
 }
 _site=unknown
 ip -4 -br addr show 2>/dev/null | grep -q ' 192\.168\.8\.'  && _site=home
@@ -326,9 +324,9 @@ printf '  Position: %s, cable %s, VPN %s\n\n' \
 
 case "$_site" in
   home)
-    ck "Dionysus guests routed"    "$(_routed 192.168.32.10)" "yes"
+    ck "Dionysus guests routed"    "$(_routed 192.168.32.0/24)" "yes"
     ck "Dionysus guests reachable" "$(ping -c1 -W2 192.168.32.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
-    ck "Hephaestus guests not routed here" "$(_routed 192.168.40.10)" "no"
+    ck "Hephaestus guests not routed here" "$(_routed 192.168.40.0/24)" "no"
     if [ "$_vpn" = yes ]; then
       ck "Hephaestus host over the VPN" "$(ping -c1 -W2 192.168.88.212 >/dev/null 2>&1 && echo yes || echo no)" "yes"
     else
@@ -336,9 +334,9 @@ case "$_site" in
     fi
     ;;
   work)
-    ck "Hephaestus guests routed"    "$(_routed 192.168.40.10)" "yes"
+    ck "Hephaestus guests routed"    "$(_routed 192.168.40.0/24)" "yes"
     ck "Hephaestus guests reachable" "$(ping -c1 -W2 192.168.40.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
-    ck "Dionysus guests not routed here" "$(_routed 192.168.32.10)" "no"
+    ck "Dionysus guests not routed here" "$(_routed 192.168.32.0/24)" "no"
     ;;
   *)
     na "reachability for this site" "no address on 192.168.8.0/24 or 192.168.88.0/24, so the expected peer cannot be derived"
