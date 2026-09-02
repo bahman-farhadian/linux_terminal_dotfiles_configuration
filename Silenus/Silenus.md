@@ -1556,7 +1556,32 @@ That last line is the shape to recognise from home on the VPN: the host answers
 because the tunnel carries `192.168.88.0/24`, while its guests do not, because
 nothing carries `192.168.40.0/24`.
 
-#### 4. The reachability drill
+#### 4. Run it from each position
+
+The `PASS`/`FAIL` assertions test configuration, which does not change when the
+laptop moves. What moves is the reachability block and a handful of `N/A` lines.
+So a green run at home proves nothing about work, and this is the matrix that
+does. Run `./check.sh` in each position and read the block, not the totals:
+
+| Where you are | Cable | Reachability block should say |
+|---|---|---|
+| home, cable in | Dionysus | Dionysus routed via `192.168.124.1` on `enp0s31f6`; Hephaestus **not routed** |
+| home, no cable | — | Dionysus routed via `192.168.8.3` on `wlp0s20f3`; Hephaestus **not routed** |
+| home, on the VPN | — | as above, and Hephaestus's *host* answers on `192.168.88.212` while its guests stay **not routed** |
+| work, cable in | Hephaestus | Hephaestus routed via `192.168.124.5` on `enp0s31f6`; Dionysus **not routed** |
+| work, no cable | — | Hephaestus routed via `192.168.88.212` on the WiFi; Dionysus **not routed** |
+
+Two things to hold on to while reading it. **`not routed` for the far site is
+the correct answer**, every time — the two peers are in different buildings and
+only one is ever reachable. And **the totals should not move between positions**:
+a `FAIL` that appears only in one place is a profile that did not come up, not a
+routing decision.
+
+The `N/A` lines are the exception and do move. `p2p link up` is `N/A` whenever
+the cable is out, and that is the check declining to fail over a cable being
+where it belongs.
+
+#### 5. The reachability drill
 
 `check.sh` never writes, so it cannot do the two things that actually prove the
 path: put an address on a guest network, and take a link down to force the
