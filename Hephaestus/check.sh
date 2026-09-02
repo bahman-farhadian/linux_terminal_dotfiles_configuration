@@ -263,7 +263,16 @@ for a in 192.168.124.6; do
 done
 if [ -n "$_peer" ]; then
   printf '  Silenus is answering on %s\n' "$_peer"
-  ck "Silenus guests reachable" "$(ping -c1 -W2 192.168.24.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
+  if ping -c1 -W2 192.168.24.1 >/dev/null 2>&1; then
+    ck "Silenus guests reachable" "yes" "yes"
+  else
+    # The host answers and its guest bridge does not. Traffic to that bridge
+    # address ends on Silenus itself and never meets a firewall rule, so this is
+    # not a filtering problem. The usual cause is that this host is routing over
+    # the cable to an address Silenus has not brought up: its point-to-point
+    # profiles do not autoconnect, so a plugged cable is not a configured one.
+    ck "Silenus guests reachable" "no" "yes"
+  fi
 else
   na "Silenus guests reachable" "Silenus is not answering on 192.168.124.6, the far end of the cable, so it is at the other site or switched off"
 fi

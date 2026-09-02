@@ -186,9 +186,17 @@ ck "guest route cable" "$(nmcli -g ipv4.routes connection show Dionysus 2>/dev/n
 # Everything above reads the stored profile, which proves the configuration
 # survives. This asks the kernel what it would actually do, which is a
 # different question and the one a reboot answers.
-if [ "$(cat /sys/class/net/enp0s31f6/carrier 2>/dev/null)" = "1" ]; then
+_p2p_up=$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null | awk -F: '$2=="enp0s31f6"{print $1; exit}')
+if [ "$(cat /sys/class/net/enp0s31f6/carrier 2>/dev/null)" = "1" ] && [ -n "$_p2p_up" ]; then
   ck "kernel routes via cable" "$(ip -4 route get 192.168.32.10 2>/dev/null|grep -c 'via 192.168.124.1 dev enp0s31f6')" "1"
   ck "p2p installs no default" "$(ip -4 route show default|grep -c 'dev enp0s31f6')" "0"
+elif [ "$(cat /sys/class/net/enp0s31f6/carrier 2>/dev/null)" = "1" ]; then
+  # Carrier without a profile is the expected state here, not a fault: neither
+  # point-to-point profile autoconnects, so plugging the cable in does nothing
+  # until one is chosen. It is worth naming because the far end does autoconnect
+  # and is by now routing to an address this host has not configured.
+  na "kernel routes via cable" "cable is in but no profile is up on enp0s31f6. Neither autoconnects by design; run: nmcli con up Dionysus (or Hephaestus). Until then the peer routes to an address that does not exist here"
+  ck "kernel routes via LAN"  "$(ip -4 route get 192.168.32.10 2>/dev/null|grep -c 'via 192.168.8.3')" "1"
 else
   na "kernel routes via cable" "no cable in enp0s31f6. With it plugged in, ip -4 route get 192.168.32.10 must answer via 192.168.124.1"
   ck "kernel routes via LAN"  "$(ip -4 route get 192.168.32.10 2>/dev/null|grep -c 'via 192.168.8.3')" "1"
