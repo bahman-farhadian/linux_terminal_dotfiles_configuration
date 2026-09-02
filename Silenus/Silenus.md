@@ -1241,6 +1241,26 @@ Both routes are permanent. NetworkManager withdraws a connection's routes when
 it goes down, so unplugging the cable removes the metric-100 route and the
 metric-200 one takes over with no manual step.
 
+**The routing tiers, in full.** Every route below is `metric`-ordered, so the
+kernel picks the best live path with nothing to run by hand:
+
+| To | Metric | Via | Lives on | Live when |
+|---|---|---|---|---|
+| `192.168.32.0/24` | 100 | `192.168.124.1` | `Dionysus` profile | at home, cable in |
+| `192.168.32.0/24` | 200 | `192.168.8.3` | home WiFi profile | at home, no cable |
+| `192.168.40.0/24` | 100 | `192.168.124.5` | `Hephaestus` profile | at work, cable in |
+| `192.168.40.0/24` | 200 | `192.168.88.212` | work WiFi profile | at work, no cable |
+
+**There is no third tier over the VPN, and it is not a gap to be filled later.**
+From home the tunnel carries `192.168.88.0/24`, so Hephaestus itself answers on
+`192.168.88.212` — but a packet for `192.168.40.10` sent down `tun1` reaches the
+VPN server, which routes by destination and has no route for that subnet, and
+drops it. Naming `192.168.88.212` as the next hop does not help: `tun1` is layer
+3, so the gateway never goes on the wire, and `proxy_arp` has no broadcast
+domain to answer in. Making it work needs a route on the office router or a
+tunnel between the two hosts. Neither is configuration on a machine here, which
+is why the answer from home is to log into Hephaestus and go on from there.
+
 #### 1. Confirm which interface the cable is in
 
 ```bash
