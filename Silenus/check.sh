@@ -28,6 +28,17 @@ same(){
     _note "$1: $3 differs from $REPO/$2 — diff them, then either commit the change or re-run install.sh"
   fi
 }
+# same_root() is same() for the copies install.sh puts in /root. Those were
+# deployed and never verified, so a hand-edit there was invisible.
+same_root(){ # 1 label  2 repo-relative  3 path under /root
+  if ! sudo test -e "$3"; then
+    na "$1" "$3 does not exist. install.sh writes it when it has sudo; ./install.sh --root manages /root fully"
+  elif sudo cmp -s "$REPO/$2" "$3"; then
+    ck "$1" "matches" "matches"
+  else
+    ck "$1" "differs" "matches"
+  fi
+}
 _note(){ failed="$failed  - $1\n"; }
 # na() is for a check that cannot be run here rather than one that failed —
 # something the document makes conditional, or that depends on hardware being
@@ -144,6 +155,14 @@ same ".bash_aliases" bash/bash_aliases "$HOME/.bash_aliases"
 same ".bash_profile" bash/bash_profile "$HOME/.bash_profile"
 same ".tmux.conf"    tmux/tmux.conf    "$HOME/.tmux.conf"
 same ".hushlogin"    hushlogin         "$HOME/.hushlogin"
+if [ -e /etc/dotfiles-root-configured ]; then
+  same_root "root .bashrc"       bash/bashrc       /root/.bashrc
+  same_root "root .bash_profile" bash/bash_profile /root/.bash_profile
+  same_root "root .bash_aliases" bash/bash_aliases /root/.bash_aliases
+else
+  na "root bash dotfiles" "root is not managed on this host; ./install.sh --root adds it"
+fi
+same_root "root .tmux.conf" tmux/tmux.conf /root/.tmux.conf
 hf "tmux completion" "$HOME/.local/share/bash-completion/completions/tmux"
 if [ -e /etc/dotfiles-root-configured ]; then
   ck "tmux completion (root)" "$(sudo test -r /root/.local/share/bash-completion/completions/tmux && echo yes || echo no)" "yes"
@@ -276,35 +295,35 @@ ck "sshd active" "$(systemctl is-active ssh)" "active"
 # and which cable is in; "not routed from here" is the correct answer for a
 # host at the other site, not a fault. Reads only, like everything above.
 # ---------------------------------------------------------------------------
-printf '\n--- Reachability from here, right now ---\n\n'
+printf '\n--- Connectivity matrix ---\n\n'
 _defgw=$(ip -4 route show default 2>/dev/null | awk '{print $3; exit}')
-_reach() {   # 1 peer  2 subnet  3 probe address  4 its bridge  5 its host address
-  local r gw dev
-  r=$(ip -4 route get "$3" 2>/dev/null | head -1)
-  gw=$(printf '%s\n' "$r" | sed -n 's/.* via \([0-9.]*\).*/\1/p')
-  dev=$(printf '%s\n' "$r" | sed -n 's/.* dev \([a-zA-Z0-9]*\).*/\1/p')
-  printf '  %s\n' "$1"
-  # Judged on whether a route for this exact prefix exists, not on comparing the
-  # next hop to the default gateway. A policy-routing proxy such as nekoray-tun
-  # installs gatewayless catch-all routes in a table of its own, which the older
-  # comparison read as "specifically routed" when it is the opposite.
-  if [ -z "$(ip -4 route show "$2" 2>/dev/null)" ]; then
-    printf '    guest network %-16s NOT routed from here\n' "$2"
-  elif [ -n "$gw" ]; then
-    printf '    guest network %-16s routed via %s on %s\n' "$2" "$gw" "$dev"
-  else
-    printf '    guest network %-16s routed on-link on %s\n' "$2" "$dev"
-  fi
-  ping -c1 -W2 "$4" >/dev/null 2>&1 \
-    && printf '    its bridge %-19s answers, so the route works end to end\n' "$4" \
-    || printf '    its bridge %-19s no reply\n' "$4"
-  ping -c1 -W2 "$5" >/dev/null 2>&1 \
-    && printf '    the host itself %-14s answers\n' "$5" \
-    || printf '    the host itself %-14s no reply\n' "$5"
-  printf '\n'
-}
-_reach "Dionysus"   "192.168.32.0/24" 192.168.32.10 192.168.32.1 192.168.8.3
-_reach "Hephaestus" "192.168.40.0/24" 192.168.40.10 192.168.40.1 192.168.88.212
+# Configured: the route is written on some profile and survives a reboot.
+# Live: the kernel is using it now. The two differ whenever a profile is down,
+# which is most of the time for a link to the site you are not at.
+_cfg(){ nmcli -t -g NAME connection show 2>/dev/null | while IFS= read -r c; do
+          nmcli -g ipv4.routes connection show "$c" 2>/dev/null; done \
+        | grep -qF "$1" && echo yes || echo NO; }
+_live(){ local r gw dev
+  r=$(ip -4 route show "$1" 2>/dev/null | head -1)
+  [ -z "$r" ] && { echo "-"; return; }
+  gw=$(printf '%s\n' "$r" | sed -n 's/.*via \([0-9.]*\).*/\1/p')
+  dev=$(printf '%s\n' "$r" | sed -n 's/.*dev \([a-zA-Z0-9]*\).*/\1/p')
+  [ -n "$gw" ] && echo "$gw on $dev" || echo "on-link $dev"; }
+_ans(){ ping -c1 -W2 "$1" >/dev/null 2>&1 && echo yes || echo no; }
+
+printf '  %-17s %-9s %-9s %-27s %s\n' "guest network" "tier 100" "tier 200" "live path" "bridge answers"
+printf '  %-17s %-9s %-9s %-27s %s\n' "-----------------" "--------" "--------" "---------------------------" "--------------"
+printf '  %-17s %-9s %-9s %-27s %s\n' "192.168.32.0/24" \
+  "$(_cfg '192.168.32.0/24 192.168.124.1 100')" "$(_cfg '192.168.32.0/24 192.168.8.3 200')" \
+  "$(_live 192.168.32.0/24)" "$(_ans 192.168.32.1)"
+printf '  %-17s %-9s %-9s %-27s %s\n' "192.168.40.0/24" \
+  "$(_cfg '192.168.40.0/24 192.168.124.5 100')" "$(_cfg '192.168.40.0/24 192.168.88.212 200')" \
+  "$(_live 192.168.40.0/24)" "$(_ans 192.168.40.1)"
+printf '\n  %-17s %-18s %s\n' "peer host" "address" "answers"
+printf '  %-17s %-18s %s\n' "-----------------" "------------------" "-------"
+printf '  %-17s %-18s %s\n' "Dionysus"   "192.168.8.3"    "$(_ans 192.168.8.3)"
+printf '  %-17s %-18s %s\n' "Hephaestus" "192.168.88.212" "$(_ans 192.168.88.212)"
+printf '\n'
 
 # --- and now judge it, which needs knowing where this laptop is -------------
 # The assertions above never move when the machine does. These do, so the
