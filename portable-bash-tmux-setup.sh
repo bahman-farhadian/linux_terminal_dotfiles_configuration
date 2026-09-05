@@ -444,7 +444,18 @@ pubkey() {
     return 1
 }
 alias pubkeys='ls ~/.ssh/*.pub 2>/dev/null | xargs -I{} sh -c "echo \"=== {} ===\"; cat {}"'
-alias password='openssl rand -base64 48'
+# openssl's base64 alphabet includes +, / and the = padding, none of which
+# belong in a password meant to be typed or pasted anywhere. Strip those and
+# keep generating until 48 alphanumeric characters have accumulated, then cut
+# to exactly that length — a single pass is virtually always enough, so the
+# loop only ever matters on the rare draw that falls short.
+password() {
+    local s=""
+    while [ "${#s}" -lt 48 ]; do
+        s+=$(openssl rand -base64 48 | tr -dc 'a-zA-Z0-9')
+    done
+    printf '%s\n' "${s:0:48}"
+}
 
 # System update — apt and flatpak together.
 # Functions rather than aliases: an alias cannot decide whether sudo is needed.

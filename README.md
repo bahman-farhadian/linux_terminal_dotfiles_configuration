@@ -592,7 +592,7 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 | `EN` | keyboard: US English and Persian |
 | `kbd` | show the current input sources |
 | `pubkey` | print the first SSH public key, and copy it to the clipboard |
-| `password` | random base64-48 string |
+| `password` | random 48-character string, letters and digits only |
 | `pubip` / `privip` | external IP / every private address, by interface |
 | `ports` | listening TCP and UDP sockets, with the process holding each |
 | `cpy` | pipe filter — `cmd 2>&1 \| cpy` prints and copies |
