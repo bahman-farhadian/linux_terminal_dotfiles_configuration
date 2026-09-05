@@ -66,6 +66,14 @@ no X server. It includes enrolling a Machine Owner Key, which a server with
 Secure Boot needs and a VM usually does not. It names no host here and can be
 used on its own.
 
+So is [portable-bash-tmux-setup.sh](portable-bash-tmux-setup.sh) — a single
+self-contained script carrying only the parts of this setup that owe nothing to
+any specific machine: the prompt, the aliases, and the tmux config, plus the
+handful of packages they need. Nothing here reads from the rest of the
+repository; copy the one file to any Debian 13 box and run it. See
+[Portable setup](#portable-setup) below for what it does and, as importantly,
+what it leaves out on purpose.
+
 Each host directory holds a complete, self-contained copy of what that machine
 installs. The three duplicate one another rather than sharing a common
 directory, which is the point: one directory can be copied to a new box and run
@@ -280,6 +288,8 @@ one of the two, the path works one way and reads as a routing fault.
 .
 ├── README.md              this file, covering all three hosts
 ├── NVIDIA-GPU-Driver.md   GPU driver on a headless server, metal or VM
+├── portable-bash-tmux-setup.sh
+│                          bash + tmux for any Debian 13 box, no host tie-in
 ├── Silenus/               ThinkPad T14 Gen 4 (Intel) workstation
 │   ├── bash/
 │   │   ├── bash_profile   → ~/.bash_profile
@@ -314,6 +324,40 @@ one of the two, the path works one way and reads as a routing fault.
     ├── check.sh
     └── Hephaestus.md
 ```
+
+## Portable setup
+
+`portable-bash-tmux-setup.sh` is the subset of this configuration that owes
+nothing to any of the three hosts above: the prompt, the aliases, and the tmux
+config, plus the packages they need. Every file it writes is embedded in the
+script itself — it does not read from this repository, does not clone it, and
+does not care whether this repository is reachable at all. Copy the one file
+anywhere and run it:
+
+```bash
+scp portable-bash-tmux-setup.sh you@some-debian-13-box:
+ssh you@some-debian-13-box ./portable-bash-tmux-setup.sh
+```
+
+or paste its contents directly into a root shell on a box you're already in.
+It installs `bash-completion`, `tmux`, `git`, `vim`, `curl`, `jq`, `tree`,
+`openssl`, and `btop` (falling back to `htop`); backs up any `.bashrc`,
+`.bash_aliases`, `.bash_profile`, `.tmux.conf` or `.hushlogin` already there,
+timestamped, before overwriting; writes the five files; fetches tmux's bash
+completion, since Debian packages none; and drops you into the new shell.
+Idempotent — running it again just repeats all of that.
+
+It works as root or as an ordinary sudo user, and needs nothing beyond apt and
+outbound HTTPS for the one completion fetch — which fails soft, with no tab
+completion for tmux subcommands as the only consequence, if that reaches
+nothing.
+
+What it leaves out is as deliberate as what it includes: no SSH client or
+server settings, no MOTD or login banner, no system-wide history policy,
+nothing under `/etc` at all. Those are choices for a specific fleet, made
+elsewhere in this repository with the reasoning that justifies them — dropping
+them onto an arbitrary box without that context is how `StrictHostKeyChecking
+no` ends up somewhere it was never meant to be.
 
 ## Prerequisites
 
