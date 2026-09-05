@@ -597,6 +597,17 @@ Needs a true-colour terminal. GNOME Terminal qualifies.
 | `ports` | listening TCP and UDP sockets, with the process holding each |
 | `cpy` | pipe filter — `cmd 2>&1 \| cpy` prints and copies |
 
+`password` was an alias until it needed to guarantee a length and a character
+set rather than just hope for one, which a function can do and an alias
+cannot. Re-running `install.sh` after a change like that updates the file on
+disk but not a shell that is already open: bash expands an alias before it
+looks for a function of the same name, so a shell that sourced the old
+`password` alias keeps expanding it — silently, with no error — even after
+`~/.bash_aliases` is re-sourced in that same shell. New shells are unaffected,
+since nothing carries an alias across a fresh `bash` process. Open a new
+terminal or tmux window, or run `reload`, which uses `exec` for exactly this
+reason; plain `source ~/.bashrc` in the old shell is not enough.
+
 `ports`, `update` and `upgrade` are functions, not aliases, because they decide
 whether `sudo` is needed: as root they run the commands directly, otherwise through
 `sudo`. `update` changes nothing beyond refreshing the package lists.

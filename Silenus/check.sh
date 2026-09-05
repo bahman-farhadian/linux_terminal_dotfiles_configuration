@@ -172,6 +172,13 @@ fi
 hf "keyboard script" "$HOME/.local/bin/lock-keyboard-en.sh"
 ck "script executable" "$([ -x "$HOME/.local/bin/lock-keyboard-en.sh" ] && echo yes || echo no)" "yes"
 ck "functions" "$(bash -ic 'type -t update upgrade ports _asroot' 2>/dev/null|grep -c function)" "4"
+# password is a function now, not an alias, so its length and character set
+# are guaranteed rather than hoped for. Checked by running it, not by checking
+# it exists — this proves the deployed file is correct. It cannot prove an
+# already-open shell has picked it up: bash -ic here starts a fresh subshell,
+# which never carries a stale alias from before. A shell that sourced the old
+# alias earlier keeps it until it restarts; see the note in README.md.
+ck "password format" "$(bash -ic 'password' 2>/dev/null|grep -Ec '^[A-Za-z0-9]{48}$')" "1"
 ck "aliases"   "$(bash -ic 'alias DE EN kbd' 2>/dev/null|grep -c ^alias)" "3"
 ck "window-size" "$(tmux show-options -g window-size 2>/dev/null|awk '{print $2}')" "smallest"
 ck "gtk3 prefers dark" "$(grep -c '^gtk-application-prefer-dark-theme=1' "$HOME/.config/gtk-3.0/settings.ini" 2>/dev/null)" "1"
