@@ -10,6 +10,23 @@ filetype plugin indent on
 syntax on
 set encoding=utf-8
 
+" Leader — Ctrl-v, not the default backslash, and not any of the handful of
+" keys this project's tmux.conf claims for itself. Has to be set before any
+" mapping below uses <leader>, since the substitution happens once, at the
+" point each mapping is defined.
+"
+" Ctrl-v is what vim itself uses, in Normal mode with nothing set, to enter
+" Visual Block. That meaning is not lost, only moved: Ctrl-q now does it,
+" chosen because vim ships no default meaning for it in Normal mode (see
+" :help i_CTRL-Q — the "same as Ctrl-v" note there is Insert and
+" command-line mode only, a literal-next-character insert, unrelated to
+" Visual Block) and tmux does not claim it either, stock or in this
+" project's tmux.conf. Visual mode's own Ctrl-v — switching an already-open
+" selection to blockwise — is untouched, since only Normal-mode mappings
+" are changed here.
+let mapleader = "\<C-v>"
+nnoremap <C-q> <C-v>
+
 " Colour scheme — vendored at colors/gruvbox.vim, not fetched. Same hex
 " values as the tmux status bar and the bash prompt elsewhere in this
 " project, so a terminal running all three reads as one system.
@@ -31,11 +48,14 @@ set smartindent
 " one tab open, the way an editor with a permanent tab bar would.
 set showtabline=2
 
-" Shift+Left/Right move between tabs with no leader, mirroring the exact
-" convention this project's tmux.conf already uses for windows — one reflex,
-" whether the terminal is inside vim or inside tmux.
-nnoremap <S-Left>  :tabprevious<CR>
-nnoremap <S-Right> :tabnext<CR>
+" Switching tabs needs no mapping at all: gt and gT are vim's own defaults,
+" already unclaimed by tmux since they are plain letters and tmux only ever
+" claims specific chords and function keys, never ordinary keystrokes. An
+" earlier version of this file bound Shift-Left/Shift-Right instead, which
+" this project's tmux.conf binds first, at its root key table with no
+" prefix needed — meaning tmux, not vim, always saw those two keys, and the
+" mapping never once fired inside a tmux pane. gt/gT sidestep the whole
+" problem rather than finding a key tmux happens not to want yet.
 
 " Search — highlighted and incremental as you type; case-insensitive unless
 " the pattern itself contains a capital, which is smartcase's whole point.
@@ -58,17 +78,22 @@ endif
 command! -nargs=+ -complete=file Search silent! grep! <args> | copen
 nnoremap <leader>f :Search<Space>
 
-" File tree — Ctrl-b toggles a left-hand explorer, using netrw, which ships
-" with vim already. :Lexplore is netrw's own toggle: called again while the
-" tree is open, it closes it, so no custom logic is needed here. The trade is
-" losing Ctrl-b's default meaning, a page back; Ctrl-u (half page) and
-" PageUp still do that job.
+" File tree — leader e (mnemonic: Explorer) toggles a left-hand explorer,
+" using netrw, which ships with vim already. :Lexplore is netrw's own
+" toggle: called again while the tree is open, it closes it, so no custom
+" logic is needed here.
+"
+" Not bound to bare Ctrl-b, which an earlier version of this file used:
+" Ctrl-b is this project's tmux prefix, unconditionally, on every host —
+" tmux consumes it before vim, or anything else running in the pane, ever
+" sees it. A mapping on the prefix key itself cannot work inside tmux, which
+" is where vim runs here essentially all the time.
 let g:netrw_banner = 0
 let g:netrw_liststyle = 3
 let g:netrw_winsize = 25
 let g:netrw_browse_split = 4
 let g:netrw_altv = 1
-nnoremap <silent> <C-b> :Lexplore<CR>
+nnoremap <silent> <leader>e :Lexplore<CR>
 
 " Clicking a file in that tree, or anywhere else, should do what it looks
 " like it does.

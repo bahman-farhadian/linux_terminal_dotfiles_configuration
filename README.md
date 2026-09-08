@@ -398,22 +398,45 @@ Deliberately narrow, matching what was actually asked for:
 | | |
 |---|---|
 | Same colour scheme | `colors/gruvbox.vim` — hand-written to the exact hex values the tmux status bar and bash prompt already use, not vendored from upstream Gruvbox. No plugin manager, nothing fetched at install time. |
-| Tabs | 4-space, `expandtab`, a persistent tab line, `Shift+Left`/`Shift+Right` to switch — the same reflex this project's tmux.conf already binds to switching windows. |
+| Tabs | 4-space, `expandtab`, a persistent tab line, `gt`/`gT` to switch — vim's own defaults, needing no mapping. |
 | Search | Incremental, case-insensitive unless the pattern itself is not, `Ctrl-l` clears stale highlighting. Project-wide search through the quickfix list, ripgrep-backed when ripgrep is present and vim's own (slower) grep otherwise. |
-| Navigate like an editor with a sidebar | `Ctrl-b` toggles a left-hand file tree — netrw, which ships with vim, toggled with its own built-in `:Lexplore` command. No plugin. |
+| Navigate like an editor with a sidebar | `Ctrl-v e` toggles a left-hand file tree — netrw, which ships with vim, toggled with its own built-in `:Lexplore` command. No plugin. |
+
+### Why the leader is Ctrl-v, not the default backslash
+
+Every binding in this file has to work inside tmux, since that is where vim
+runs here essentially all the time — `.bashrc` starts a tmux session for
+every login. Two keys an earlier version of this config used turned out to
+be dead on arrival inside one: `Ctrl-b` is this project's tmux prefix, so
+tmux consumes it before vim ever sees it, on every host; `Shift-Left` and
+`Shift-Right` are bound at tmux's root key table with no prefix needed,
+which claims them the same way, unconditionally. Both mappings looked
+configured and neither ever fired in the one place this config is actually
+used.
+
+`Ctrl-v` is untouched by tmux everywhere except inside `copy-mode` — a
+separate scrollback overlay, not normal pane input, so it never competes with
+vim. Using it as leader costs vim's own default meaning of bare `Ctrl-v` in
+Normal mode, entering Visual Block; `Ctrl-q` now does that instead, chosen
+because vim assigns it no Normal-mode meaning of its own (`:help i_CTRL-Q`'s
+"same as Ctrl-v" note is Insert and command-line mode only, and means
+something unrelated there — inserting the next character literally) and
+tmux does not claim it either, stock or in this project's tmux.conf. Visual
+mode's own `Ctrl-v` — switching a selection already in progress to
+blockwise — is untouched, since only Normal-mode mappings changed.
 
 ### Keys
 
-This project's own bindings — the leader key is vim's default, `\`, since
-nothing here sets `mapleader`:
+This project's own bindings:
 
 | Keys | Action |
 |---|---|
-| `Ctrl-b` | Toggle the file tree |
+| `Ctrl-v e` | Toggle the file tree (mnemonic: Explorer) |
+| `Ctrl-v f` then a pattern, `Enter` | Search the project; results land in the quickfix list (mnemonic: Find) |
+| `Ctrl-q` | Enter Visual Block — where bare `Ctrl-v` would, if it were not the leader |
 | `Ctrl-l` | Clear search highlighting |
-| `Shift-Left` / `Shift-Right` | Previous / next tab |
-| `\f` then a pattern, `Enter` | Search the project; results land in the quickfix list |
-| `:copen` / `:cclose` | Show / hide that list |
+| `gt` / `gT` | Next / previous tab — vim's own default, not a mapping this config adds |
+| `:copen` / `:cclose` | Show / hide the quickfix list |
 | `:cnext` / `:cprev` | Jump to the next / previous match — built into vim, no mapping needed |
 
 Inside the file tree, these are netrw's own — this project sets none of them,

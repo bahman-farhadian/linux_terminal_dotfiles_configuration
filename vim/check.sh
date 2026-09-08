@@ -48,6 +48,32 @@ ck "tabstop 4"           "$(printf '%s' "$_out" | sed -n 's/^tabstop=//p')" "4"
 ck "expandtab on"        "$(printf '%s' "$_out" | sed -n 's/^expandtab=//p')" "1"
 ck "hlsearch on"         "$(printf '%s' "$_out" | sed -n 's/^hlsearch=//p')" "1"
 
+printf '\n--- Keys that must not collide with tmux ---\n'
+# 22 is Ctrl-V's character code. Asserted by value, not by re-simulating a
+# keypress: an earlier version of this check tried to fake actual key
+# sequences through -es batch mode and got unreliable results doing it —
+# introspecting vim's own tables is what the install this verifies actually
+# depends on.
+_map_out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
+  -c "redir! > /tmp/vimcheck3.$$" \
+  -c "echo 'mapleader_code=' . char2nr(mapleader)" \
+  -c "echo 'leader_e=' . maparg('<leader>e', 'n')" \
+  -c "echo 'leader_f=' . maparg('<leader>f', 'n')" \
+  -c "echo 'ctrlq=' . strtrans(maparg('<C-q>', 'n'))" \
+  -c "echo 'ctrlb=' . strtrans(maparg('<C-b>', 'n'))" \
+  -c "echo 'shiftleft=' . strtrans(maparg('<S-Left>', 'n'))" \
+  -c "redir END" -c "qa!" /dev/null 2>&1; cat "/tmp/vimcheck3.$$" 2>/dev/null; rm -f "/tmp/vimcheck3.$$")
+
+ck "leader is Ctrl-v"      "$(printf '%s' "$_map_out" | sed -n 's/^mapleader_code=//p')" "22"
+ck "leader-e opens tree"   "$(printf '%s' "$_map_out" | sed -n 's/^leader_e=//p')" ":Lexplore<CR>"
+ck "leader-f runs search"  "$(printf '%s' "$_map_out" | sed -n 's/^leader_f=//p')" ":Search "
+ck "Ctrl-q is visual block" "$(printf '%s' "$_map_out" | sed -n 's/^ctrlq=//p')" "<C-V>"
+# The two keys tmux's root table swallows before vim ever sees them. Nothing
+# here should be mapped to either — a mapping on a dead key is worse than no
+# mapping, since it looks configured and never fires.
+ck "Ctrl-b left unmapped"      "$(printf '%s' "$_map_out" | sed -n 's/^ctrlb=//p')" ""
+ck "Shift-Left left unmapped"  "$(printf '%s' "$_map_out" | sed -n 's/^shiftleft=//p')" ""
+
 if command -v rg &>/dev/null; then
   _rg_out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
     -c "redir! > /tmp/vimcheck2.$$" -c "echo 'grepprg=' . &grepprg" -c "redir END" -c "qa!" /dev/null 2>&1
