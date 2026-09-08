@@ -295,6 +295,7 @@ one of the two, the path works one way and reads as a routing fault.
 │   ├── colors/
 │   │   └── gruvbox.vim    → ~/.vim/colors/gruvbox.vim
 │   ├── install.sh
+│   ├── uninstall.sh
 │   └── check.sh
 ├── Silenus/               ThinkPad T14 Gen 4 (Intel) workstation
 │   ├── bash/
@@ -380,6 +381,17 @@ It installs vim if it is missing, backs up any `~/.vimrc` or
 `~/.vim/colors/gruvbox.vim`. `vim/check.sh` verifies the result the same way
 every host's `check.sh` verifies its own build — byte-for-byte against the
 repository, plus a real headless run of vim checked for startup errors.
+
+`vim/uninstall.sh` reverses it: backs up whatever is currently at those two
+paths — timestamped, into its own directory so it never collides with a
+backup `install.sh` made earlier — and removes them. It only ever touches
+those two files. `~/.vim` itself is left alone even when it is now empty of
+everything *this* project put there, and removed only if genuinely nothing
+else remains in it; a plugin manager or anything else living under `~/.vim`
+survives untouched, since none of it is this project's to delete. Vim the
+package is left installed too — the rest of this project's dotfiles set
+`EDITOR=vim` regardless of whether this config is in use, so removing the
+binary is out of scope for undoing *this* config.
 
 Deliberately narrow, matching what was actually asked for:
 
