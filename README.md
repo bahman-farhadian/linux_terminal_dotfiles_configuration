@@ -290,6 +290,12 @@ one of the two, the path works one way and reads as a routing fault.
 ├── NVIDIA-GPU-Driver.md   GPU driver on a headless server, metal or VM
 ├── portable-bash-tmux-setup.sh
 │                          bash + tmux for any Debian 13 box, no host tie-in
+├── vim/                   optional — vim/install.sh deploys it, no host does
+│   ├── vimrc              → ~/.vimrc
+│   ├── colors/
+│   │   └── gruvbox.vim    → ~/.vim/colors/gruvbox.vim
+│   ├── install.sh
+│   └── check.sh
 ├── Silenus/               ThinkPad T14 Gen 4 (Intel) workstation
 │   ├── bash/
 │   │   ├── bash_profile   → ~/.bash_profile
@@ -358,6 +364,36 @@ nothing under `/etc` at all. Those are choices for a specific fleet, made
 elsewhere in this repository with the reasoning that justifies them — dropping
 them onto an arbitrary box without that context is how `StrictHostKeyChecking
 no` ends up somewhere it was never meant to be.
+
+## Optional: vim
+
+`vim/` is not deployed by any host's `install.sh` and is not on by default
+anywhere. Vim is optional here; if you want it, run `vim/install.sh` yourself:
+
+```bash
+vim/install.sh
+```
+
+It installs vim if it is missing, backs up any `~/.vimrc` or
+`~/.vim/colors/gruvbox.vim` already there, timestamped, then writes
+`vim/vimrc` to `~/.vimrc` and `vim/colors/gruvbox.vim` to
+`~/.vim/colors/gruvbox.vim`. `vim/check.sh` verifies the result the same way
+every host's `check.sh` verifies its own build — byte-for-byte against the
+repository, plus a real headless run of vim checked for startup errors.
+
+Deliberately narrow, matching what was actually asked for:
+
+| | |
+|---|---|
+| Same colour scheme | `colors/gruvbox.vim` — hand-written to the exact hex values the tmux status bar and bash prompt already use, not vendored from upstream Gruvbox. No plugin manager, nothing fetched at install time. |
+| Tabs | 4-space, `expandtab`, a persistent tab line, `Shift+Left`/`Shift+Right` to switch — the same reflex this project's tmux.conf already binds to switching windows. |
+| Search | Incremental, case-insensitive unless the pattern itself is not, `Ctrl-l` clears stale highlighting. Project-wide search through the quickfix list, ripgrep-backed when ripgrep is present and vim's own (slower) grep otherwise. |
+| Navigate like an editor with a sidebar | `Ctrl-b` toggles a left-hand file tree — netrw, which ships with vim, toggled with its own built-in `:Lexplore` command. No plugin. |
+
+Zero plugins, zero plugin manager, zero network fetches at install time — the
+colour scheme is a file in this repository, not a `git clone` of someone
+else's. That was a deliberate choice for a config the project treats as worth
+testing before it is trusted anywhere, not an accident of it being small.
 
 ## Prerequisites
 

@@ -1,0 +1,84 @@
+" ~/.vimrc — minimal, Gruvbox dark, zero plugins.
+"
+" Deliberately narrow: tabs, the same colour scheme as the rest of this
+" project, search, and a file tree for navigating a project the way an editor
+" with a sidebar does. Nothing here traces to anything else, on purpose —
+" this file is optional and lives apart from every host's own install.sh.
+
+set nocompatible
+filetype plugin indent on
+syntax on
+set encoding=utf-8
+
+" Colour scheme — vendored at colors/gruvbox.vim, not fetched. Same hex
+" values as the tmux status bar and the bash prompt elsewhere in this
+" project, so a terminal running all three reads as one system.
+set background=dark
+silent! colorscheme gruvbox
+
+" Tabs — spaces, not literal tab characters, so width holds regardless of the
+" editor or terminal reading the file afterwards. 4 is a general default; a
+" project with its own convention should override this per-filetype rather
+" than change it here.
+set tabstop=4
+set shiftwidth=4
+set softtabstop=4
+set expandtab
+set autoindent
+set smartindent
+
+" The tab line (buffer/window tabs across the top) stays visible with even
+" one tab open, the way an editor with a permanent tab bar would.
+set showtabline=2
+
+" Shift+Left/Right move between tabs with no leader, mirroring the exact
+" convention this project's tmux.conf already uses for windows — one reflex,
+" whether the terminal is inside vim or inside tmux.
+nnoremap <S-Left>  :tabprevious<CR>
+nnoremap <S-Right> :tabnext<CR>
+
+" Search — highlighted and incremental as you type; case-insensitive unless
+" the pattern itself contains a capital, which is smartcase's whole point.
+" Ctrl-l already redraws the screen; clearing stale highlighting rides on the
+" same key rather than claiming a new one, since a redraw is usually wanted
+" for the same reason the highlighting is stale.
+set incsearch
+set hlsearch
+set ignorecase
+set smartcase
+nnoremap <silent> <C-l> :nohlsearch<CR><C-l>
+
+" Project-wide search through the quickfix list. Uses ripgrep when it is on
+" the machine; falls back to vim's own (slow) internal grep otherwise rather
+" than erroring, since a build without rg should still be able to search.
+if executable('rg')
+    set grepprg=rg\ --vimgrep\ --no-heading\ --smart-case
+    set grepformat=%f:%l:%c:%m
+endif
+command! -nargs=+ -complete=file Search silent! grep! <args> | copen
+nnoremap <leader>f :Search<Space>
+
+" File tree — Ctrl-b toggles a left-hand explorer, using netrw, which ships
+" with vim already. :Lexplore is netrw's own toggle: called again while the
+" tree is open, it closes it, so no custom logic is needed here. The trade is
+" losing Ctrl-b's default meaning, a page back; Ctrl-u (half page) and
+" PageUp still do that job.
+let g:netrw_banner = 0
+let g:netrw_liststyle = 3
+let g:netrw_winsize = 25
+let g:netrw_browse_split = 4
+let g:netrw_altv = 1
+nnoremap <silent> <C-b> :Lexplore<CR>
+
+" Clicking a file in that tree, or anywhere else, should do what it looks
+" like it does.
+set mouse=a
+
+" Line numbers, sane split directions, and a fixed backspace — vim's own
+" default (indent,eol,start unset) refuses to delete past where insert mode
+" began, which reads as broken to anyone arriving from another editor.
+set number
+set nowrap
+set splitright
+set splitbelow
+set backspace=indent,eol,start
