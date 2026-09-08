@@ -402,6 +402,35 @@ Deliberately narrow, matching what was actually asked for:
 | Search | Incremental, case-insensitive unless the pattern itself is not, `Ctrl-l` clears stale highlighting. Project-wide search through the quickfix list, ripgrep-backed when ripgrep is present and vim's own (slower) grep otherwise. |
 | Navigate like an editor with a sidebar | `Ctrl-b` toggles a left-hand file tree — netrw, which ships with vim, toggled with its own built-in `:Lexplore` command. No plugin. |
 
+### Keys
+
+This project's own bindings — the leader key is vim's default, `\`, since
+nothing here sets `mapleader`:
+
+| Keys | Action |
+|---|---|
+| `Ctrl-b` | Toggle the file tree |
+| `Ctrl-l` | Clear search highlighting |
+| `Shift-Left` / `Shift-Right` | Previous / next tab |
+| `\f` then a pattern, `Enter` | Search the project; results land in the quickfix list |
+| `:copen` / `:cclose` | Show / hide that list |
+| `:cnext` / `:cprev` | Jump to the next / previous match — built into vim, no mapping needed |
+
+Inside the file tree, these are netrw's own — this project sets none of them,
+and they exist whether or not `vim/install.sh` has ever run. Documented here
+because nothing else does, not because this config added them:
+
+| Keys | Action |
+|---|---|
+| `Enter` | Open the file under the cursor, or enter the directory |
+| `-` | Go up one directory |
+| `o` / `v` / `t` | Open in a horizontal split / vertical split / new tab |
+| `gh` | Toggle hidden (dot) files |
+| `i` | Cycle listing style — thin, long, wide, tree |
+| `qf` | Show information about the file under the cursor |
+
+The full list is netrw's own `:help netrw-quickhelp`, once the tree has focus.
+
 Zero plugins, zero plugin manager, zero network fetches at install time — the
 colour scheme is a file in this repository, not a `git clone` of someone
 else's. That was a deliberate choice for a config the project treats as worth
