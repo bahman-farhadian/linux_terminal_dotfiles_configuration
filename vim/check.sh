@@ -34,7 +34,12 @@ same(){ # 1 label  2 repo file  3 deployed path
 
 _home="$(mktemp -d)"
 trap 'rm -rf "$_home"' EXIT
-_vim() { env -i HOME="$_home" TERM="$TERM" vim -es --not-a-term "$@"; }
+# Plain headless mode, not -es (Ex mode, silent): -es skips /etc/vim/vimrc
+# entirely, confirmed directly (&compatible came back 1, meaning debian.vim
+# never even ran, under -es; 0, correctly, in a real terminal and under
+# plain --not-a-term) — an earlier version of this script used -es and every
+# check below was silently testing nothing, not a real deployment failure.
+_vim() { env -i HOME="$_home" TERM="$TERM" vim --not-a-term "$@"; }
 
 printf '\n--- Deployed files ---\n'
 ck "vim installed" "$(command -v vim >/dev/null && echo yes || echo no)" "yes"
@@ -50,12 +55,17 @@ printf '\n--- Starts clean, for a user with no vimrc of their own ---\n'
 # and this file already hit that limit once, silently — every value in this
 # block came back empty, not just the two just-added ones, because vim
 # never even started once the count was over.
-_out=$(_vim \
+# Plain (non-Ex) mode echoes each :echo to its own message area as well as
+# into the redir file, unlike -es — captured separately so that leak doesn't
+# duplicate every setting below. messages runs after redir END, so it was
+# never in the file to begin with; it needs the raw output, discarded here.
+_msgs=$(_vim \
   -c "redir! > /tmp/vimcheck.$$" \
   -c "echo 'colors_name=' . get(g:, 'colors_name', 'UNSET') | echo 'background=' . &background | echo 'tabstop=' . &tabstop | echo 'expandtab=' . &expandtab | echo 'hlsearch=' . &hlsearch | echo 'normal_bg=' . (has_key(hlget('Normal')[0], 'guibg') ? 'set' : 'inherits') | echo 'signcol_bg=' . (has_key(hlget('SignColumn')[0], 'guibg') ? 'set' : 'inherits') | echo 'shortmess_I=' . (&shortmess =~# 'I' ? 'yes' : 'no') | echo 'vimenter_autocmd=' . exists('#VimEnter') | echo 'mouse=[' . &mouse . ']' | echo 'skip_defaults=' . get(g:, 'skip_defaults_vim', 'UNSET')" \
-  -c "redir END" -c "messages" -c "qa!" /dev/null 2>&1; cat "/tmp/vimcheck.$$" 2>/dev/null; rm -f "/tmp/vimcheck.$$")
+  -c "redir END" -c "messages" -c "qa!" /dev/null 2>&1)
+_out=$(cat "/tmp/vimcheck.$$" 2>/dev/null); rm -f "/tmp/vimcheck.$$"
 
-ck "no startup errors" "$(printf '%s' "$_out" | grep -Ec '^E[0-9]+:')" "0"
+ck "no startup errors" "$(printf '%s' "$_msgs" | grep -Ec '^E[0-9]+:')" "0"
 ck "colorscheme loaded" "$(printf '%s' "$_out" | sed -n 's/^colors_name=//p')" "gruvbox"
 ck "background dark"    "$(printf '%s' "$_out" | sed -n 's/^background=//p')" "dark"
 ck "tabstop 4"           "$(printf '%s' "$_out" | sed -n 's/^tabstop=//p')" "4"
@@ -98,7 +108,8 @@ _map_out=$(_vim \
   -c "echo 'ctrlq=' . strtrans(maparg('<C-q>', 'n'))" \
   -c "echo 'ctrlb=' . strtrans(maparg('<C-b>', 'n'))" \
   -c "echo 'shiftleft=' . strtrans(maparg('<S-Left>', 'n'))" \
-  -c "redir END" -c "qa!" /dev/null 2>&1; cat "/tmp/vimcheck3.$$" 2>/dev/null; rm -f "/tmp/vimcheck3.$$")
+  -c "redir END" -c "qa!" /dev/null >/dev/null 2>&1
+cat "/tmp/vimcheck3.$$" 2>/dev/null; rm -f "/tmp/vimcheck3.$$")
 
 ck "leader is Ctrl-v"      "$(printf '%s' "$_map_out" | sed -n 's/^mapleader_code=//p')" "22"
 ck "leader-e opens tree"   "$(printf '%s' "$_map_out" | sed -n 's/^leader_e=//p')" "wired"
@@ -151,7 +162,7 @@ _bd_out=$(_vim \
   -c "Bd" \
   -c "redir! >> /tmp/vimcheck5.$$" \
   -c "echo 'after=' . len(getbufinfo({'buflisted':1})) . ' switched=' . (bufname('%') =~# 'vimcheck_bd1' ? 'yes' : 'no')" \
-  -c "redir END" -c "qa!" 2>&1
+  -c "redir END" -c "qa!" >/dev/null 2>&1
   cat "/tmp/vimcheck5.$$" 2>/dev/null; rm -f "/tmp/vimcheck5.$$" "/tmp/vimcheck_bd1.$$" "/tmp/vimcheck_bd2.$$")
 
 ck "Bd closes a buffer"    "$(printf '%s' "$_bd_out" | sed -n 's/^before=//p')" "2"
@@ -166,7 +177,8 @@ _clip_out=$(_vim \
   -c "redir! > /tmp/vimcheck6.$$" \
   -c "echo 'y=' . strtrans(maparg('<leader>y', 'v'))" \
   -c "echo 'p=' . strtrans(maparg('<leader>p', 'n'))" \
-  -c "redir END" -c "qa!" /dev/null 2>&1; cat "/tmp/vimcheck6.$$" 2>/dev/null; rm -f "/tmp/vimcheck6.$$")
+  -c "redir END" -c "qa!" /dev/null >/dev/null 2>&1
+cat "/tmp/vimcheck6.$$" 2>/dev/null; rm -f "/tmp/vimcheck6.$$")
 
 if command -v xclip &>/dev/null && [ -n "${DISPLAY:-}" ]; then
   ck "clipboard yank mapped"  "$(printf '%s' "$_clip_out" | sed -n 's/^y=//p')" ":w !xclip -selection clipboard<CR><CR>"
@@ -177,7 +189,7 @@ fi
 
 if command -v rg &>/dev/null; then
   _rg_out=$(_vim \
-    -c "redir! > /tmp/vimcheck2.$$" -c "echo 'grepprg=' . &grepprg" -c "redir END" -c "qa!" /dev/null 2>&1
+    -c "redir! > /tmp/vimcheck2.$$" -c "echo 'grepprg=' . &grepprg" -c "redir END" -c "qa!" /dev/null >/dev/null 2>&1
     cat "/tmp/vimcheck2.$$" 2>/dev/null; rm -f "/tmp/vimcheck2.$$")
   ck "ripgrep wired in" "$(printf '%s' "$_rg_out" | grep -c '^grepprg=rg ')" "1"
 else
