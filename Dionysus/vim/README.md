@@ -5,7 +5,7 @@ over paragraphs. Already fluent in vim? [Keys](#keys) at the bottom is
 probably all you need.
 
 Installed by every host's own `install.sh`, for every account on the
-machine — see the root [README.md](../README.md#vim) for the file list and
+machine — see the root [README.md](../../README.md#vim) for the file list and
 how this fits the project as a whole.
 
 ```bash

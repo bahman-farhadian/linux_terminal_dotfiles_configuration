@@ -74,7 +74,7 @@ repository; copy the one file to any Debian 13 box and run it. See
 [Portable setup](#portable-setup) below for what it does and, as importantly,
 what it leaves out on purpose.
 
-[vim/README.md](vim/README.md) stands apart the same way, in what it does
+[vim/README.md](Silenus/vim/README.md) stands apart the same way, in what it does
 rather than where it lives: the one place this project teaches something
 rather than just building it, covering vim's own modes and movement
 alongside every key this specific config adds, for whoever wants vim
@@ -297,18 +297,6 @@ one of the two, the path works one way and reads as a routing fault.
 ├── NVIDIA-GPU-Driver.md   GPU driver on a headless server, metal or VM
 ├── portable-bash-tmux-setup.sh
 │                          bash + tmux for any Debian 13 box, no host tie-in
-├── vim/                   system-wide — every host's install.sh deploys it,
-│                          when root is configured; needs sudo, for every user
-│   ├── vimrc              → /etc/vim/vimrc.local
-│   ├── colors/
-│   │   └── gruvbox.vim    → /usr/share/vim/vimfiles/colors/gruvbox.vim
-│   ├── pack/dist/start/   both vendored from amix/vimrc
-│   │   ├── nerdtree/      → /usr/share/.../pack/dist/start/nerdtree/
-│   │   └── lightline/     → /usr/share/.../pack/dist/start/lightline/
-│   ├── install.sh
-│   ├── uninstall.sh
-│   ├── check.sh
-│   └── README.md          how to use it — vim's own modes up, not just keys
 ├── Silenus/               ThinkPad T14 Gen 4 (Intel) workstation
 │   ├── bash/
 │   │   ├── bash_profile   → ~/.bash_profile
@@ -319,9 +307,21 @@ one of the two, the path works one way and reads as a routing fault.
 │   ├── ssh/
 │   │   └── config         → managed block in ~/.ssh/config
 │   ├── hushlogin          → ~/.hushlogin
+│   ├── vim/               system-wide, deployed by install.sh when root is
+│   │   │                  configured — needs sudo, for every user
+│   │   ├── vimrc          → /etc/vim/vimrc.local
+│   │   ├── colors/
+│   │   │   └── gruvbox.vim   → /usr/share/vim/vimfiles/colors/gruvbox.vim
+│   │   ├── pack/dist/start/  both vendored from amix/vimrc
+│   │   │   ├── nerdtree/     → /usr/share/.../pack/dist/start/nerdtree/
+│   │   │   └── lightline/    → /usr/share/.../pack/dist/start/lightline/
+│   │   ├── install.sh
+│   │   ├── uninstall.sh
+│   │   ├── check.sh
+│   │   └── README.md      how to use it — vim's own modes up, not just keys
 │   ├── kvm/
 │   │   └── static_network_24.xml   the one libvirt network on this host
-│   ├── install.sh         bash, tmux, ssh, and the GNOME parts
+│   ├── install.sh         bash, tmux, ssh, vim, and the GNOME parts
 │   ├── check.sh
 │   ├── gnome-app-folders.py
 │   └── Silenus.md
@@ -330,19 +330,27 @@ one of the two, the path works one way and reads as a routing fault.
 │   ├── tmux/
 │   ├── ssh/
 │   ├── hushlogin
+│   ├── vim/               identical to Silenus/vim/
 │   ├── kvm/
 │   │   └── static_network_32.xml   guest network, 192.168.32.0/24
-│   ├── install.sh         bash, tmux, ssh only — no GNOME
+│   ├── install.sh         bash, tmux, ssh, vim — no GNOME
 │   ├── check.sh
 │   └── Dionysus.md
 └── Hephaestus/            second headless KVM host, no GPU
-    ├── bash/  tmux/  ssh/  hushlogin
+    ├── bash/  tmux/  ssh/  hushlogin  vim/
     ├── kvm/
     │   └── static_network_40.xml   guest network, 192.168.40.0/24
     ├── install.sh         identical to Dionysus/install.sh
     ├── check.sh
     └── Hephaestus.md
 ```
+
+Each host's `vim/` is a full, independent copy — this repository duplicates
+directories across hosts rather than sharing them (see above), and vim is
+no exception. Identical content everywhere for now; nothing about it is
+GUI-specific (the clipboard integration already checks for a display at
+runtime rather than assuming one), but each copy can diverge independently
+if a host ever needs its own.
 
 ## Portable setup
 
@@ -383,23 +391,29 @@ no` ends up somewhere it was never meant to be.
 Deployed by every host's `install.sh` as part of the standard run, when
 root is configured (the same `y` at the "Configure root user as well?"
 prompt — see [Deploy](#deploy) above) — for every account on the machine,
-not just the one running `install.sh`. Also runnable on its own, at any
-point, the same way:
+not just the one running `install.sh`. Lives inside each host's own
+directory, not shared, the same as `bash/`, `tmux/` and `ssh/` — see
+[Layout](#layout) above. Also runnable on its own, at any point, from
+inside that directory:
 
 ```bash
+cd Silenus     # or: cd Dionysus, cd Hephaestus
 sudo vim/install.sh
 ```
 
 | File | What it is |
 |---|---|
-| [vim/install.sh](vim/install.sh) | Installs vim if missing, writes the paths below system-wide, backs up anything already there, timestamped |
-| [vim/vimrc](vim/vimrc) | → `/etc/vim/vimrc.local` — the same Gruvbox palette as the tmux bar and bash prompt, tabs, search, a file tree, closing a file without closing vim, copy/paste with the system clipboard. No mouse. |
-| [vim/colors/gruvbox.vim](vim/colors/gruvbox.vim) | → `/usr/share/vim/vimfiles/colors/gruvbox.vim` — hand-written to this project's own hex values, not vendored from upstream Gruvbox |
-| [vim/pack/dist/start/nerdtree/](vim/pack/dist/start/nerdtree/) | → `/usr/share/vim/vimfiles/pack/dist/start/nerdtree/` — the file tree, vendored from [amix/vimrc](https://github.com/amix/vimrc) (WTFPL). Loaded via vim 8's own native package system — no plugin manager. |
-| [vim/pack/dist/start/lightline/](vim/pack/dist/start/lightline/) | → `/usr/share/vim/vimfiles/pack/dist/start/lightline/` — the status line, vendored the same way (MIT), coloured with this project's own palette at `.../colorscheme/gruvbox.vim` |
-| [vim/check.sh](vim/check.sh) | Verifies the install actually took — byte-for-byte against the repository, a real headless vim run checked for startup errors, and real functional checks for the things that are more than a setting |
-| [vim/uninstall.sh](vim/uninstall.sh) | Reverses it — see the file's own comments for exactly what it touches and what it deliberately leaves alone |
-| [vim/README.md](vim/README.md) | Everything about actually using it — vim's own modes and movement, search and replace, Visual Block editing, copy/paste, every key this config adds — taught from the basics up, not only a keybinding table |
+| [Silenus/vim/install.sh](Silenus/vim/install.sh) | Installs vim if missing, writes the paths below system-wide, backs up anything already there, timestamped |
+| [Silenus/vim/vimrc](Silenus/vim/vimrc) | → `/etc/vim/vimrc.local` — the same Gruvbox palette as the tmux bar and bash prompt, tabs, search, a file tree, closing a file without closing vim, copy/paste with the system clipboard. No mouse. |
+| [Silenus/vim/colors/gruvbox.vim](Silenus/vim/colors/gruvbox.vim) | → `/usr/share/vim/vimfiles/colors/gruvbox.vim` — hand-written to this project's own hex values, not vendored from upstream Gruvbox |
+| [Silenus/vim/pack/dist/start/nerdtree/](Silenus/vim/pack/dist/start/nerdtree/) | → `/usr/share/vim/vimfiles/pack/dist/start/nerdtree/` — the file tree, vendored from [amix/vimrc](https://github.com/amix/vimrc) (WTFPL). Loaded via vim 8's own native package system — no plugin manager. |
+| [Silenus/vim/pack/dist/start/lightline/](Silenus/vim/pack/dist/start/lightline/) | → `/usr/share/vim/vimfiles/pack/dist/start/lightline/` — the status line, vendored the same way (MIT), coloured with this project's own palette at `.../colorscheme/gruvbox.vim` |
+| [Silenus/vim/check.sh](Silenus/vim/check.sh) | Verifies the install actually took — byte-for-byte against the repository, a real headless vim run checked for startup errors, and real functional checks for the things that are more than a setting |
+| [Silenus/vim/uninstall.sh](Silenus/vim/uninstall.sh) | Reverses it — see the file's own comments for exactly what it touches and what it deliberately leaves alone |
+| [Silenus/vim/README.md](Silenus/vim/README.md) | Everything about actually using it — vim's own modes and movement, search and replace, Visual Block editing, copy/paste, every key this config adds — taught from the basics up, not only a keybinding table |
+
+Shown once, from `Silenus/` — `Dionysus/vim/` and `Hephaestus/vim/` are
+identical copies, same as their `bash/`, `tmux/` and `ssh/`.
 
 Every claim in `vim/README.md` about what a key does was checked against a
 real headless vim run before being written down, the same standard as

@@ -49,7 +49,14 @@ trap 'rm -rf "$_home"' EXIT
 # never even ran, under -es; 0, correctly, in a real terminal and under
 # plain --not-a-term) — an earlier version of this script used -es and every
 # check below was silently testing nothing, not a real deployment failure.
-_vim() { env -i HOME="$_home" TERM="$TERM" vim --not-a-term "$@"; }
+# DISPLAY carried through on purpose, unlike everything else env -i strips:
+# it isolates "no personal vimrc," not "no display." Without this, the
+# clipboard check below sees DISPLAY in its own, unisolated shell and
+# expects the mapping, while this deliberately bare vim - correctly - never
+# sees DISPLAY at all and never maps it: a real, if quiet, mismatch that
+# only ever showed up by running this on an actual GUI machine, not the
+# headless VM this was otherwise checked against.
+_vim() { env -i HOME="$_home" TERM="$TERM" DISPLAY="${DISPLAY:-}" vim --not-a-term "$@"; }
 
 printf '\n--- Deployed files ---\n'
 ck "vim installed" "$(command -v vim >/dev/null && echo yes || echo no)" "yes"

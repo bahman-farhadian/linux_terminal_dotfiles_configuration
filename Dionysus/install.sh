@@ -223,7 +223,7 @@ _hdr "vim"
 # same sudo the rest of this section already asked for. See vim/README.md
 # for what it actually configures.
 if [ "$HAS_SUDO" = true ]; then
-    sudo bash "$REPO/../vim/install.sh"
+    sudo bash "$REPO/vim/install.sh"
 else
     _skip "vim needs sudo — installs and configures it for every user on the machine"
 fi
