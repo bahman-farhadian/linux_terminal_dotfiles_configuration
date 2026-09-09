@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 # vim/check.sh — verifies vim/install.sh actually took, and that vim starts
-# clean under it. Reads only, never writes. Run as your own user, not root:
-# it is your ~/.vimrc being checked.
-
-if [ "$(id -u)" -eq 0 ]; then
-  echo "STOP: run as your normal user, not root. It is your ~/.vimrc and ~/.vim being checked."; exit 1
-fi
+# clean under it. Reads only, never writes.
+#
+# The system-wide checks below run vim with HOME pointed at an empty,
+# throwaway directory and no -u override — the same as any real user with no
+# ~/.vimrc of their own gets: vim's normal startup, through the real, unedited
+# /etc/vim/vimrc, into vimrc.local, and (since that throwaway HOME has
+# nothing of its own) into $VIMRUNTIME/defaults.vim too. That last step
+# matters: defaults.vim turns the mouse back on for anyone without a personal
+# vimrc, unless vimrc.local says not to — confirmed directly against the real
+# defaults.vim on this host, not assumed. Passing -u /etc/vim/vimrc instead
+# would not have caught that: naming a vimrc with -u makes vim skip
+# defaults.vim regardless, whether or not the guard actually works.
 
 _here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 pass=0; fail=0; skip=0; failed=""; skipped=""
@@ -26,23 +32,27 @@ same(){ # 1 label  2 repo file  3 deployed path
   fi
 }
 
+_home="$(mktemp -d)"
+trap 'rm -rf "$_home"' EXIT
+_vim() { env -i HOME="$_home" TERM="$TERM" vim -es --not-a-term "$@"; }
+
 printf '\n--- Deployed files ---\n'
 ck "vim installed" "$(command -v vim >/dev/null && echo yes || echo no)" "yes"
-same "vimrc"    vimrc              "$HOME/.vimrc"
-same "gruvbox"  colors/gruvbox.vim "$HOME/.vim/colors/gruvbox.vim"
+same "vimrc"    vimrc              "/etc/vim/vimrc.local"
+same "gruvbox"  colors/gruvbox.vim "/usr/share/vim/vimfiles/colors/gruvbox.vim"
 
-printf '\n--- Starts clean ---\n'
-# A real smoke test, not a guess: start vim against the deployed vimrc with no
-# terminal, ask it what settings actually took, and check its own message log
-# for anything vim itself considers an error.
+printf '\n--- Starts clean, for a user with no vimrc of their own ---\n'
+# A real smoke test, not a guess: start vim exactly as a fresh account would,
+# ask it what settings actually took, and check its own message log for
+# anything vim itself considers an error.
 # Merged into one -c with | rather than one -c per echo: vim refuses more
 # than about ten -c/--cmd arguments total ("Too many -c command... arguments")
 # and this file already hit that limit once, silently — every value in this
 # block came back empty, not just the two just-added ones, because vim
 # never even started once the count was over.
-_out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
+_out=$(_vim \
   -c "redir! > /tmp/vimcheck.$$" \
-  -c "echo 'colors_name=' . get(g:, 'colors_name', 'UNSET') | echo 'background=' . &background | echo 'tabstop=' . &tabstop | echo 'expandtab=' . &expandtab | echo 'hlsearch=' . &hlsearch | echo 'normal_bg=' . (has_key(hlget('Normal')[0], 'guibg') ? 'set' : 'inherits') | echo 'signcol_bg=' . (has_key(hlget('SignColumn')[0], 'guibg') ? 'set' : 'inherits') | echo 'shortmess_I=' . (&shortmess =~# 'I' ? 'yes' : 'no') | echo 'vimenter_autocmd=' . exists('#VimEnter')" \
+  -c "echo 'colors_name=' . get(g:, 'colors_name', 'UNSET') | echo 'background=' . &background | echo 'tabstop=' . &tabstop | echo 'expandtab=' . &expandtab | echo 'hlsearch=' . &hlsearch | echo 'normal_bg=' . (has_key(hlget('Normal')[0], 'guibg') ? 'set' : 'inherits') | echo 'signcol_bg=' . (has_key(hlget('SignColumn')[0], 'guibg') ? 'set' : 'inherits') | echo 'shortmess_I=' . (&shortmess =~# 'I' ? 'yes' : 'no') | echo 'vimenter_autocmd=' . exists('#VimEnter') | echo 'mouse=[' . &mouse . ']' | echo 'skip_defaults=' . get(g:, 'skip_defaults_vim', 'UNSET')" \
   -c "redir END" -c "messages" -c "qa!" /dev/null 2>&1; cat "/tmp/vimcheck.$$" 2>/dev/null; rm -f "/tmp/vimcheck.$$")
 
 ck "no startup errors" "$(printf '%s' "$_out" | grep -Ec '^E[0-9]+:')" "0"
@@ -60,6 +70,12 @@ ck "sign column inherits terminal"    "$(printf '%s' "$_out" | sed -n 's/^signco
 ck "expandtab on"        "$(printf '%s' "$_out" | sed -n 's/^expandtab=//p')" "1"
 ck "hlsearch on"         "$(printf '%s' "$_out" | sed -n 's/^hlsearch=//p')" "1"
 ck "no splash screen"    "$(printf '%s' "$_out" | sed -n 's/^shortmess_I=//p')" "yes"
+# defaults.vim turns the mouse back on for a user with no vimrc of their own,
+# unless g:skip_defaults_vim is set first — confirmed directly against the
+# real defaults.vim on this host. Both asserted here, on the real chain, not
+# just on vim/vimrc read in isolation.
+ck "defaults.vim guarded" "$(printf '%s' "$_out" | sed -n 's/^skip_defaults=//p')" "1"
+ck "mouse stays off, even without a personal vimrc" "$(printf '%s' "$_out" | sed -n 's/^mouse=\[\(.*\)\]/\1/p')" ""
 # Confirms the autocmd is registered, not that startinsert actually landed in
 # Insert mode — :help :startinsert states plainly that it only takes effect
 # once the calling script has finished, so nothing running inside this
@@ -74,10 +90,10 @@ printf '\n--- Keys that must not collide with tmux ---\n'
 # sequences through -es batch mode and got unreliable results doing it —
 # introspecting vim's own tables is what the install this verifies actually
 # depends on.
-_map_out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
+_map_out=$(_vim \
   -c "redir! > /tmp/vimcheck3.$$" \
   -c "echo 'mapleader_code=' . char2nr(mapleader)" \
-  -c "echo 'leader_e=' . maparg('<leader>e', 'n')" \
+  -c "echo 'leader_e=' . (maparg('<leader>e', 'n') =~# 'ToggleExplorer' ? 'wired' : 'MISSING')" \
   -c "echo 'leader_f=' . maparg('<leader>f', 'n')" \
   -c "echo 'ctrlq=' . strtrans(maparg('<C-q>', 'n'))" \
   -c "echo 'ctrlb=' . strtrans(maparg('<C-b>', 'n'))" \
@@ -85,7 +101,7 @@ _map_out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
   -c "redir END" -c "qa!" /dev/null 2>&1; cat "/tmp/vimcheck3.$$" 2>/dev/null; rm -f "/tmp/vimcheck3.$$")
 
 ck "leader is Ctrl-v"      "$(printf '%s' "$_map_out" | sed -n 's/^mapleader_code=//p')" "22"
-ck "leader-e opens tree"   "$(printf '%s' "$_map_out" | sed -n 's/^leader_e=//p')" ":Lexplore<CR>"
+ck "leader-e opens tree"   "$(printf '%s' "$_map_out" | sed -n 's/^leader_e=//p')" "wired"
 ck "leader-f runs search"  "$(printf '%s' "$_map_out" | sed -n 's/^leader_f=//p')" ":Search "
 ck "Ctrl-q is visual block" "$(printf '%s' "$_map_out" | sed -n 's/^ctrlq=//p')" "<C-V>"
 # The two keys tmux's root table swallows before vim ever sees them. Nothing
@@ -94,12 +110,40 @@ ck "Ctrl-q is visual block" "$(printf '%s' "$_map_out" | sed -n 's/^ctrlq=//p')"
 ck "Ctrl-b left unmapped"      "$(printf '%s' "$_map_out" | sed -n 's/^ctrlb=//p')" ""
 ck "Shift-Left left unmapped"  "$(printf '%s' "$_map_out" | sed -n 's/^shiftleft=//p')" ""
 
+printf '\n--- Opening a directory does not open two file trees ---\n'
+# Reproduced directly in a real terminal before this fix existed: vim . fills
+# the only window with netrw's own directory listing, then leader-e opened a
+# second, identical tree beside it, since :Lexplore had no way to know the
+# first one was already there. Headless equivalents of this (-es batch mode,
+# :normal, feedkeys()) do not reliably reproduce netrw's own directory-open
+# behaviour, so this uses a real pty via tmux instead — the same tool this
+# was first diagnosed with.
+if command -v tmux &>/dev/null; then
+  _dtmp="$(mktemp -d)"; touch "$_dtmp/a.txt"
+  tmux kill-session -t vimcheck_dir 2>/dev/null
+  tmux new-session -d -s vimcheck_dir -x 200 -y 50 \
+    "env HOME=$_home vim $_dtmp" 2>/dev/null
+  sleep 1
+  tmux send-keys -t vimcheck_dir C-v; sleep 0.2
+  tmux send-keys -t vimcheck_dir e; sleep 0.3
+  tmux send-keys -t vimcheck_dir Escape
+  tmux send-keys -t vimcheck_dir ':echo winnr("$")' Enter; sleep 0.3
+  _windows="$(tmux capture-pane -t vimcheck_dir -p | grep -E '^[0-9]+$' | tail -1)"
+  tmux send-keys -t vimcheck_dir Escape
+  tmux send-keys -t vimcheck_dir ':qa!' Enter; sleep 0.3
+  tmux kill-session -t vimcheck_dir 2>/dev/null
+  rm -rf "$_dtmp"
+  ck "leader-e after 'vim .' stays at one window" "${_windows:-ERR}" "1"
+else
+  na "directory-open explorer" "tmux not installed — this check needs a real terminal, not just batch mode"
+fi
+
 printf '\n--- Closing a file does not close vim ---\n'
 # A real functional test, not just "does :Bd exist": open two files, close
 # one, confirm vim switched to the other rather than exiting or erroring. No
 # /dev/null file argument here, unlike the checks above — that would open a
 # third buffer of its own and throw off the count this check depends on.
-_bd_out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
+_bd_out=$(_vim \
   -c "edit /tmp/vimcheck_bd1.$$" -c "edit /tmp/vimcheck_bd2.$$" \
   -c "redir! > /tmp/vimcheck5.$$" \
   -c "echo 'before=' . len(getbufinfo({'buflisted':1}))" \
@@ -118,7 +162,7 @@ printf '\n--- Clipboard (checked by mapping, not by using the clipboard) ---\n'
 # state — trying an actual copy/paste round trip here would overwrite
 # whatever they currently have on it. Introspection only: is the mapping
 # present when xclip and a display are, and correctly absent when not.
-_clip_out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
+_clip_out=$(_vim \
   -c "redir! > /tmp/vimcheck6.$$" \
   -c "echo 'y=' . strtrans(maparg('<leader>y', 'v'))" \
   -c "echo 'p=' . strtrans(maparg('<leader>p', 'n'))" \
@@ -132,7 +176,7 @@ else
 fi
 
 if command -v rg &>/dev/null; then
-  _rg_out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
+  _rg_out=$(_vim \
     -c "redir! > /tmp/vimcheck2.$$" -c "echo 'grepprg=' . &grepprg" -c "redir END" -c "qa!" /dev/null 2>&1
     cat "/tmp/vimcheck2.$$" 2>/dev/null; rm -f "/tmp/vimcheck2.$$")
   ck "ripgrep wired in" "$(printf '%s' "$_rg_out" | grep -c '^grepprg=rg ')" "1"

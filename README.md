@@ -297,10 +297,11 @@ one of the two, the path works one way and reads as a routing fault.
 ├── NVIDIA-GPU-Driver.md   GPU driver on a headless server, metal or VM
 ├── portable-bash-tmux-setup.sh
 │                          bash + tmux for any Debian 13 box, no host tie-in
-├── vim/                   optional — vim/install.sh deploys it, no host does
-│   ├── vimrc              → ~/.vimrc
+├── vim/                   optional, system-wide — vim/install.sh deploys it,
+│                          no host does; needs sudo, for every user
+│   ├── vimrc              → /etc/vim/vimrc.local
 │   ├── colors/
-│   │   └── gruvbox.vim    → ~/.vim/colors/gruvbox.vim
+│   │   └── gruvbox.vim    → /usr/share/vim/vimfiles/colors/gruvbox.vim
 │   ├── install.sh
 │   ├── uninstall.sh
 │   ├── check.sh
@@ -377,17 +378,19 @@ no` ends up somewhere it was never meant to be.
 ## Optional: vim
 
 `vim/` is not deployed by any host's `install.sh` and is not on by default
-anywhere. Vim is optional here; if you want it, run `vim/install.sh` yourself:
+anywhere. Vim is optional here; if you want it, run `vim/install.sh` yourself
+— it needs `sudo`, since it sets vim up for every account on the machine, not
+just the one running it:
 
 ```bash
-vim/install.sh
+sudo vim/install.sh
 ```
 
 | File | What it is |
 |---|---|
-| [vim/install.sh](vim/install.sh) | Installs vim if missing, writes the two files below, backs up anything already there, timestamped |
-| [vim/vimrc](vim/vimrc) | → `~/.vimrc` — the same Gruvbox palette as the tmux bar and bash prompt, tabs, search, a file tree, closing a file without closing vim, and copy/paste with the system clipboard. Zero plugins. |
-| [vim/colors/gruvbox.vim](vim/colors/gruvbox.vim) | → `~/.vim/colors/gruvbox.vim` — hand-written to this project's own hex values, not vendored from upstream Gruvbox |
+| [vim/install.sh](vim/install.sh) | Installs vim if missing, writes the two files below system-wide, backs up anything already there, timestamped |
+| [vim/vimrc](vim/vimrc) | → `/etc/vim/vimrc.local` — the same Gruvbox palette as the tmux bar and bash prompt, tabs, search, a file tree, closing a file without closing vim, copy/paste with the system clipboard. No mouse, no plugins. |
+| [vim/colors/gruvbox.vim](vim/colors/gruvbox.vim) | → `/usr/share/vim/vimfiles/colors/gruvbox.vim` — hand-written to this project's own hex values, not vendored from upstream Gruvbox |
 | [vim/check.sh](vim/check.sh) | Verifies the install actually took — byte-for-byte against the repository, a real headless vim run checked for startup errors, and real functional checks for the two things that are more than a setting |
 | [vim/uninstall.sh](vim/uninstall.sh) | Reverses it — see the file's own comments for exactly what it touches and what it deliberately leaves alone |
 | [vim/README.md](vim/README.md) | Everything about actually using it — vim's own modes and movement, search and replace, Visual Block editing, copy/paste, every key this config adds — taught from the basics up, not only a keybinding table |

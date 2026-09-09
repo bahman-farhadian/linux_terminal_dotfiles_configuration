@@ -4,15 +4,15 @@ Teaches vim itself, grounded in this config — not a full manual, tables
 over paragraphs. Already fluent in vim? [Keys](#keys) at the bottom is
 probably all you need.
 
-Optional, separate from every host's own `install.sh`. See the root
-[README.md](../README.md#optional-vim) for the file list and how this fits
-the project as a whole.
+Optional, separate from every host's own `install.sh`. Installed once, for
+every user on the machine — see the root [README.md](../README.md#optional-vim)
+for the file list and how this fits the project as a whole.
 
 ```bash
-vim/install.sh      # installs vim if missing, writes ~/.vimrc and the
-                     # colour scheme, backs up anything already there
-vim/check.sh        # verifies the install actually took
-vim/uninstall.sh    # reverses it
+sudo vim/install.sh   # installs vim if missing, writes the config and colour
+                      # scheme for every user, backs up anything already there
+vim/check.sh          # verifies the install actually took
+sudo vim/uninstall.sh # reverses it
 ```
 
 ## Modes
@@ -144,17 +144,16 @@ root /var/www;                # root /var/www;
 1. Put the cursor on `server_name`'s line, `Ctrl-v`, then `j` to extend the
    block down to `root`'s line too.
 2. `I`, type `# `, `Esc` — inserted at the start of both selected lines at
-   once. Verified directly: ran exactly this on three lines and all three
-   came back commented.
+   once.
 
 `A` instead of `I` appends at the end of each line rather than the start —
 same idea, useful for adding a trailing `;` to several lines instead of a
 leading `#`.
 
-(`Ctrl-v` is this config's leader, so that combination only differs from
-plain Visual Block if the very next key is `e`, `f`, `q`, `y` or `p` —
-this config's five mapped letters. Anything else, `Ctrl-v` behaves exactly
-as vim always has. `Ctrl-q` sidesteps the question entirely.)
+`Ctrl-v` is also this config's leader (below), which only matters if the
+very next key you press is `e`, `f`, `q`, `y` or `p`. Any other key, and
+`Ctrl-v` is plain Visual Block, same as always. `Ctrl-q` always is, no
+exceptions, if you'd rather not think about it.
 
 ## Copy and paste
 
@@ -236,6 +235,10 @@ pressing `.` repeats it exactly, no selection needed.
 | `:cnext` / `:cprev` | Next / previous match |
 | `gt` / `gT` | Next / previous tab |
 
+Opening a directory instead of a file (`vim .`, or `vim somedir/`) shows this
+same tree right away, filling the whole window — no need to press `Ctrl-v e`
+first.
+
 The file tree is netrw, which ships with vim. Once it has focus, these are
 netrw's own keys — documented here because nothing else does, not added by
 this config:
@@ -276,27 +279,20 @@ Vim's own defaults, worth knowing, unchanged by this config:
 
 ## Why the leader is Ctrl-v
 
-Every binding here has to survive tmux, since vim runs inside it almost
-always — `.bashrc` starts a tmux session per login. `Ctrl-b` (this
-project's tmux prefix) and `Shift-Left`/`Shift-Right` (bound at tmux's
-root key table) both looked configured in an earlier version of this file
-and never fired inside one. `Ctrl-v` is unclaimed by tmux everywhere except
-`copy-mode`, a separate scrollback overlay — so it's the leader instead.
-What that costs Visual Block, and why it's small, is covered where it's
-actually used: [Visual mode](#visual-mode-selecting-text) above.
+Vim almost always runs inside tmux here, and tmux claims some keys before
+vim ever sees them — `Ctrl-b`, `Shift-Left`, `Shift-Right`. `Ctrl-v` is one
+of the few keys tmux never touches, so it's the leader instead of vim's own
+default backslash. What that costs Visual Block is covered above, under
+[Visual mode](#visual-mode-selecting-text) — small, and `Ctrl-q` avoids it
+entirely.
 
 ## The colour scheme
 
-`colors/gruvbox.vim` — the exact hex values the tmux bar and bash prompt
-already use, hand-written rather than vendored from upstream Gruvbox.
-Needs a true-colour terminal, same as the bash prompt.
+`colors/gruvbox.vim` — the same hex values as the tmux bar and bash prompt,
+hand-written rather than vendored from upstream Gruvbox. Needs a true-colour
+terminal, same as the bash prompt.
 
-The editing area sets no background colour at all — the same `bg=default`
-approach this project's own `tmux.conf` already uses for its status bar,
-rather than forcing a fixed dark tone that only matches a terminal profile
-set to this exact palette. Vim inherits whatever the terminal's own
-background is, transparency included, so it matches whatever terminal
-you're actually running rather than a specific hex this file would
-otherwise have to guess at. Only the things meant to visibly stand out —
-the cursor line, a selection, the status line, tabs — keep a fixed colour,
-the same way `tmux.conf`'s window tabs do beside its own `bg=default` bar.
+The editing area itself has no background colour set, so it just shows
+whatever the terminal's own background is — same idea as `tmux.conf`'s own
+status bar. Only things meant to stand out — the cursor line, a selection,
+the status line, tabs — keep a fixed colour.

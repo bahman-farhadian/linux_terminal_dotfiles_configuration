@@ -1,73 +1,48 @@
-" ~/.vimrc — minimal, Gruvbox dark, zero plugins.
+" vim config, minimal, Gruvbox dark, zero plugins. Installed system-wide, at
+" /etc/vim/vimrc.local — see vim/install.sh.
 "
-" Deliberately narrow: tabs, the same colour scheme as the rest of this
-" project, search, a file tree for navigating a project the way an editor
-" with a sidebar does, closing a file without closing vim, and copying to
-" and from the system clipboard. Nothing here traces to anything else, on
-" purpose — this file is optional and lives apart from every host's own
-" install.sh. README.md's "Optional: vim" section is the place for how to
-" actually use any of this — search and replace, block-visual multi-line
-" editing, copy/paste — most of which needs no mapping at all, only knowing
-" it is there.
+" Only settings that change vim's own default behaviour live here. See
+" vim/README.md for how to actually use any of this.
 
-set nocompatible
+" Deployed as /etc/vim/vimrc.local, which Debian's own /etc/vim/vimrc loads
+" last — but only for users who have no personal ~/.vimrc of their own does
+" vim then also load its own $VIMRUNTIME/defaults.vim, afterwards, silently
+" overriding some of the settings below (mouse=a among them). This line is
+" defaults.vim's own documented guard against exactly that, confirmed by
+" reading it directly on this host, not assumed from memory.
+let g:skip_defaults_vim = 1
+
 filetype plugin indent on
 syntax on
+
+" Not every host's locale defaults to UTF-8 (a bare C/POSIX locale falls
+" back to latin1) — pinned so every host reads files the same way.
 set encoding=utf-8
 
-" No splash screen ("VIM - Vi IMproved", the Uganda notice, :help pointers)
-" on an empty start — it is not a dialog to dismiss, it clears on the first
-" keystroke either way, but skipping it means the very first thing on
-" screen is the file, not a wall of text about how to quit.
+" No splash screen on an empty start — it clears on the first keystroke
+" either way, but this puts the file on screen first, not a wall of text.
 set shortmess+=I
 
-" Opening vim with nothing to open lands in Insert mode immediately — typing
-" bare `vim` means "I want to start typing", the way opening a blank
-" document in any other editor does, not "browse a file". Only for that one
-" case: `vim somefile.txt` still opens in Normal mode, as always, since
-" there is a real file to look at first. :help :startinsert is explicit
-" that it only takes effect once the script that calls it has finished —
-" true here too, verified by testing it the wrong way first and finding
-" that documented line, not by assuming a script-context test would show it
-" synchronously.
+" Typing bare `vim`, with nothing to open, starts in Insert mode straight
+" away — there is nothing to look at first, so "start typing" is right.
+" `vim somefile.txt` still opens in Normal mode, since there is something
+" to look at.
 autocmd VimEnter * if argc() == 0 && line('$') == 1 && getline(1) ==# '' | startinsert | endif
 
-" Leader — Ctrl-v, not the default backslash, and not any of the handful of
-" keys this project's tmux.conf claims for itself. Has to be set before any
-" mapping below uses <leader>, since the substitution happens once, at the
-" point each mapping is defined.
-"
-" Ctrl-v is what vim itself uses, in Normal mode with nothing set, to enter
-" Visual Block, and that is barely affected: vim only defers to a leader
-" mapping when the very next key completes one (here, e or f); anything
-" else — j, a digit, whatever a real block selection actually starts with —
-" falls straight through to Visual Block immediately, because vim can
-" already see that next key queued up and does not need to wait it out.
-" Verified with feedkeys(), not assumed: "<C-v>jjy" on three lines produced
-" a genuine blockwise yank (getregtype() came back "\x161", vim's own
-" blockwise marker) with these mappings active. The actual, narrow cost is
-" pressing Ctrl-v and then literally e or f as the first motion of a block
-" selection — Ctrl-q sidesteps even that, with no ambiguity to resolve.
-" Chosen because vim ships no Normal-mode meaning for it at all (see
-" :help i_CTRL-Q — the "same as Ctrl-v" note there is Insert and
-" command-line mode only, a literal-next-character insert, unrelated to
-" Visual Block), and tmux does not claim it either, stock or in this
-" project's tmux.conf. Visual mode's own Ctrl-v — switching an already-open
-" selection to blockwise — is untouched either way, since only Normal-mode
-" mappings are changed here.
+" Leader is Ctrl-v, not vim's own default backslash, so it survives inside
+" tmux the same way every binding below does. See "Why the leader is
+" Ctrl-v" in vim/README.md for the full reasoning. Set before any mapping
+" below uses <leader>.
 let mapleader = "\<C-v>"
 nnoremap <C-q> <C-v>
 
-" Colour scheme — vendored at colors/gruvbox.vim, not fetched. Same hex
-" values as the tmux status bar and the bash prompt elsewhere in this
-" project, so a terminal running all three reads as one system.
+" Same colours as the tmux status bar and bash prompt, hand-written at
+" colors/gruvbox.vim.
 set background=dark
 silent! colorscheme gruvbox
 
-" Tabs — spaces, not literal tab characters, so width holds regardless of the
-" editor or terminal reading the file afterwards. 4 is a general default; a
-" project with its own convention should override this per-filetype rather
-" than change it here.
+" Tabs as spaces, width 4 — vim's own default is width-8 real tab
+" characters.
 set tabstop=4
 set shiftwidth=4
 set softtabstop=4
@@ -75,33 +50,22 @@ set expandtab
 set autoindent
 set smartindent
 
-" The tab line (buffer/window tabs across the top) stays visible with even
-" one tab open, the way an editor with a permanent tab bar would.
+" Buffer/window tabs stay visible even with only one open.
 set showtabline=2
 
-" Switching tabs needs no mapping at all: gt and gT are vim's own defaults,
-" already unclaimed by tmux since they are plain letters and tmux only ever
-" claims specific chords and function keys, never ordinary keystrokes. An
-" earlier version of this file bound Shift-Left/Shift-Right instead, which
-" this project's tmux.conf binds first, at its root key table with no
-" prefix needed — meaning tmux, not vim, always saw those two keys, and the
-" mapping never once fired inside a tmux pane. gt/gT sidestep the whole
-" problem rather than finding a key tmux happens not to want yet.
+" gt/gT switch tabs — vim's own default, no mapping needed.
 
-" Search — highlighted and incremental as you type; case-insensitive unless
-" the pattern itself contains a capital, which is smartcase's whole point.
-" Ctrl-l already redraws the screen; clearing stale highlighting rides on the
-" same key rather than claiming a new one, since a redraw is usually wanted
-" for the same reason the highlighting is stale.
+" Search — highlighted and incremental as you type, case-insensitive
+" unless the pattern itself has a capital letter. None of this is on by
+" default.
 set incsearch
 set hlsearch
 set ignorecase
 set smartcase
 nnoremap <silent> <C-l> :nohlsearch<CR><C-l>
 
-" Project-wide search through the quickfix list. Uses ripgrep when it is on
-" the machine; falls back to vim's own (slow) internal grep otherwise rather
-" than erroring, since a build without rg should still be able to search.
+" Project-wide search into the quickfix list. Uses ripgrep when it's on
+" the machine; vim's own (slower) grep otherwise.
 if executable('rg')
     set grepprg=rg\ --vimgrep\ --no-heading\ --smart-case
     set grepformat=%f:%l:%c:%m
@@ -109,32 +73,29 @@ endif
 command! -nargs=+ -complete=file Search silent! grep! <args> | copen
 nnoremap <leader>f :Search<Space>
 
-" File tree — leader e (mnemonic: Explorer) toggles a left-hand explorer,
-" using netrw, which ships with vim already. :Lexplore is netrw's own
-" toggle: called again while the tree is open, it closes it, so no custom
-" logic is needed here.
-"
-" Not bound to bare Ctrl-b, which an earlier version of this file used:
-" Ctrl-b is this project's tmux prefix, unconditionally, on every host —
-" tmux consumes it before vim, or anything else running in the pane, ever
-" sees it. A mapping on the prefix key itself cannot work inside tmux, which
-" is where vim runs here essentially all the time.
+" File tree — leader-e toggles it, using netrw, which ships with vim.
 let g:netrw_banner = 0
 let g:netrw_liststyle = 3
 let g:netrw_winsize = 25
 let g:netrw_browse_split = 4
 let g:netrw_altv = 1
-nnoremap <silent> <leader>e :Lexplore<CR>
 
-" Closing the file you are looking at is not the same thing as closing vim,
-" and :q/:x conflate them the moment only one window is open — which it
-" usually is. :q closes the current *window*; with nothing else open, vim
-" has nothing left to show and exits, which is correct, not a bug, but reads
-" as "vim just quit on me" to anyone who meant "I am done with this file."
-" Bd instead closes the *buffer*: with another one still open it switches to
-" it, and with none left it leaves an empty buffer and keeps running either
-" way. Verified both cases directly — two files open, Bd on one lands on the
-" other; Bd again, on the last one, still leaves vim running.
+" Opening a directory (e.g. `vim .`) already fills the one window with a
+" netrw listing before this mapping ever runs. Plain :Lexplore doesn't
+" know that, and opens a second, identical tree next to it — reproduced
+" directly, not assumed. Only open a new one when the current window
+" isn't already netrw.
+function! s:ToggleExplorer() abort
+    if exists('t:netrw_lexbufnr') || &filetype !=# 'netrw'
+        Lexplore
+    endif
+endfunction
+nnoremap <silent> <leader>e :call <SID>ToggleExplorer()<CR>
+
+" :q and :x close the current *window* — with only one open, that's vim
+" itself, which reads as "vim just quit on me" when what was meant was
+" "close this file." Bd closes the *buffer* instead: switches to another
+" one if there is one, otherwise leaves an empty buffer and stays open.
 function! CloseBuffer() abort
     let l:buf = bufnr('%')
     if len(getbufinfo({'buflisted': 1})) > 1
@@ -145,35 +106,23 @@ endfunction
 command! Bd call CloseBuffer()
 nnoremap <silent> <leader>q :Bd<CR>
 
-" Copy and paste to the system clipboard, not just vim's own registers — so
-" text copied here can be pasted into another tmux pane, and the reverse.
-" This vim package ships without +clipboard (confirmed with vim --version;
-" true on every host here, not just this one), so the built-in "+ register
-" does nothing. Piped through xclip instead, the same tool this project's
-" own `cpy` bash function already uses, and guarded the same way: no
-" display, no mapping, silently — correct on the headless hosts, where
-" there is nothing to pipe to.
-"
-" leader-y in Visual mode: pressing : from an active selection has vim
-" prepend '<,'> automatically, scoping the write to exactly what is
-" selected, not the whole file. leader-p in Normal mode reads the clipboard
-" into the buffer below the cursor. Both verified with a real xclip round
-" trip, not assumed: yanked two of three lines, only those two arrived;
-" pasted a marker, it landed on exactly the expected line.
+" System clipboard, not just vim's own registers — so text copied here
+" can be pasted into another tmux pane, and back. Piped through xclip:
+" this vim package has no +clipboard, so "+y/"+p do nothing on their own.
+" Silently absent with no display or no xclip — correct on headless hosts.
 if executable('xclip') && !empty($DISPLAY)
     vnoremap <leader>y :w !xclip -selection clipboard<CR><CR>
     nnoremap <leader>p :r !xclip -selection clipboard -o<CR>
 endif
 
-" Clicking a file in that tree, or anywhere else, should do what it looks
-" like it does.
-set mouse=a
-
-" Line numbers, sane split directions, and a fixed backspace — vim's own
-" default (indent,eol,start unset) refuses to delete past where insert mode
-" began, which reads as broken to anyone arriving from another editor.
+" Line numbers, sane split directions.
 set number
 set nowrap
 set splitright
 set splitbelow
+
+" Pinned rather than left at vim's default: recent vim already defaults
+" to this, but Debian 11's vim 8.2 does not, and this line costs nothing
+" either way. Without it, Insert mode refuses to delete past where it
+" started, which reads as broken to anyone used to another editor.
 set backspace=indent,eol,start
