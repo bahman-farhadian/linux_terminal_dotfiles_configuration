@@ -74,6 +74,13 @@ repository; copy the one file to any Debian 13 box and run it. See
 [Portable setup](#portable-setup) below for what it does and, as importantly,
 what it leaves out on purpose.
 
+[vim/](vim/README.md) stands apart the same way, and is the one place this
+project teaches something rather than just building it: vim's own modes and
+movement alongside every key this specific config adds, for whoever wants
+vim configured here but does not already use it fluently. See
+[Optional: vim](#optional-vim) below for the files, and `vim/README.md`
+itself for the guide.
+
 Each host directory holds a complete, self-contained copy of what that machine
 installs. The three duplicate one another rather than sharing a common
 directory, which is the point: one directory can be copied to a new box and run
@@ -296,7 +303,8 @@ one of the two, the path works one way and reads as a routing fault.
 │   │   └── gruvbox.vim    → ~/.vim/colors/gruvbox.vim
 │   ├── install.sh
 │   ├── uninstall.sh
-│   └── check.sh
+│   ├── check.sh
+│   └── README.md          how to use it — vim's own modes up, not just keys
 ├── Silenus/               ThinkPad T14 Gen 4 (Intel) workstation
 │   ├── bash/
 │   │   ├── bash_profile   → ~/.bash_profile
@@ -375,166 +383,18 @@ anywhere. Vim is optional here; if you want it, run `vim/install.sh` yourself:
 vim/install.sh
 ```
 
-It installs vim if it is missing, backs up any `~/.vimrc` or
-`~/.vim/colors/gruvbox.vim` already there, timestamped, then writes
-`vim/vimrc` to `~/.vimrc` and `vim/colors/gruvbox.vim` to
-`~/.vim/colors/gruvbox.vim`. `vim/check.sh` verifies the result the same way
-every host's `check.sh` verifies its own build — byte-for-byte against the
-repository, a real headless run of vim checked for startup errors, and real
-functional checks for the two things below that are more than a setting:
-closing a buffer actually switches rather than quitting, and the clipboard
-mappings are present exactly when `xclip` and a display are (never tested by
-actually using the clipboard — that would be the user's real clipboard
-content, and `check.sh` promises never to write).
-
-`vim/uninstall.sh` reverses it: backs up whatever is currently at those two
-paths — timestamped, into its own directory so it never collides with a
-backup `install.sh` made earlier — and removes them. It only ever touches
-those two files. `~/.vim` itself is left alone even when it is now empty of
-everything *this* project put there, and removed only if genuinely nothing
-else remains in it; a plugin manager or anything else living under `~/.vim`
-survives untouched, since none of it is this project's to delete. Vim the
-package is left installed too — the rest of this project's dotfiles set
-`EDITOR=vim` regardless of whether this config is in use, so removing the
-binary is out of scope for undoing *this* config.
-
-Deliberately narrow, matching what was actually asked for:
-
-| | |
+| File | What it is |
 |---|---|
-| Same colour scheme | `colors/gruvbox.vim` — hand-written to the exact hex values the tmux status bar and bash prompt already use, not vendored from upstream Gruvbox. No plugin manager, nothing fetched at install time. |
-| Tabs | 4-space, `expandtab`, a persistent tab line, `gt`/`gT` to switch — vim's own defaults, needing no mapping. |
-| Search | Incremental, case-insensitive unless the pattern itself is not, `Ctrl-l` clears stale highlighting. Project-wide search through the quickfix list, ripgrep-backed when ripgrep is present and vim's own (slower) grep otherwise. |
-| Navigate like an editor with a sidebar | `Ctrl-v e` toggles a left-hand file tree — netrw, which ships with vim, toggled with its own built-in `:Lexplore` command. No plugin. |
-| Closing a file does not close vim | `Ctrl-v q` closes the buffer and switches to whatever else is open, rather than quitting the window — which, with only one open, quits vim. |
-| Copy and paste with the world outside vim | `Ctrl-v y` / `Ctrl-v p` pipe through `xclip`, present only where `xclip` and a display are. |
+| [vim/install.sh](vim/install.sh) | Installs vim if missing, writes the two files below, backs up anything already there, timestamped |
+| [vim/vimrc](vim/vimrc) | → `~/.vimrc` — the same Gruvbox palette as the tmux bar and bash prompt, tabs, search, a file tree, closing a file without closing vim, and copy/paste with the system clipboard. Zero plugins. |
+| [vim/colors/gruvbox.vim](vim/colors/gruvbox.vim) | → `~/.vim/colors/gruvbox.vim` — hand-written to this project's own hex values, not vendored from upstream Gruvbox |
+| [vim/check.sh](vim/check.sh) | Verifies the install actually took — byte-for-byte against the repository, a real headless vim run checked for startup errors, and real functional checks for the two things that are more than a setting |
+| [vim/uninstall.sh](vim/uninstall.sh) | Reverses it — see the file's own comments for exactly what it touches and what it deliberately leaves alone |
+| [vim/README.md](vim/README.md) | Everything about actually using it — vim's own modes and movement, search and replace, Visual Block editing, copy/paste, every key this config adds — taught from the basics up, not only a keybinding table |
 
-### How to actually use it
-
-The parts of editing that come up constantly, in one place, rather than
-scattered across why a key was chosen. Everything below is vim doing what it
-already does — nothing here needed a plugin.
-
-**Close this file, not vim.** `:q` and `:x` close the current *window*, and
-with only one open — the ordinary case — that closes vim too. Correct vim
-behaviour, and not what "I am done with this file" usually means. `Ctrl-v q`
-closes the *buffer* instead: with another file open it switches to that one,
-and with none left it leaves an empty buffer, either way keeping vim open.
-
-**Search and replace.**
-
-| Command | Does |
-|---|---|
-| `:%s/old/new/g` | Every match, whole file |
-| `:%s/old/new/gc` | Same, asking before each one — `y`/`n`/`a` (all)/`q` |
-| `:s/old/new/g` | Just the current line |
-| Select lines in Visual mode, then `:` | vim fills in `:'<,'>s/old/new/g` on its own, scoped to exactly what is selected |
-
-**Edit several lines at once — Visual Block.**
-
-1. `Ctrl-v` (or `Ctrl-q`), then `j`/`k` to select a block down the left edge
-   of several lines — or `$` first, to select to the end of each line
-   regardless of length.
-2. `I`, type the text, `Esc` — inserted at the start of every selected line.
-   `A` instead of `I` appends at the end of each line.
-
-This is the one place `Ctrl-v` being the leader is worth a sentence: that
-combination only behaves differently from plain Visual Block if the very
-next key is `e` or `f`, the two letters this config actually maps. Followed
-by anything else — `j`, `3j`, `$` — it is exactly vim's own Visual Block,
-immediately, with nothing to wait for. `Ctrl-q` is there for not having to
-remember that at all: it enters Visual Block with nothing to disambiguate,
-ever. Verified with a real key sequence, not assumed — `Ctrl-v jjy` on three
-lines produced a genuine blockwise yank, and `Ctrl-v jjI- Esc` on three more
-put `- ` at the start of all three.
-
-**Copy and paste.**
-
-| | |
-|---|---|
-| `y` / `d` or `x` / `p` or `P` | Yank / cut / paste — vim's own registers. Works across every buffer and tab in the session, untouched by anything in this config. |
-| `Ctrl-v y` (Visual mode) | Yank the selection to the system clipboard, so it can be pasted into another tmux pane or application |
-| `Ctrl-v p` (Normal mode) | Paste the system clipboard below the cursor |
-
-The second pair only exists where `xclip` and a display do — this vim
-package ships without `+clipboard` (confirmed with `vim --version`; true on
-every host here), so vim's own `"+` register does nothing regardless.
-Piped through `xclip` instead, the same tool this project's own `cpy` bash
-function already uses, and silently absent the same way on the headless
-hosts: no display, no mapping, nothing to fail.
-
-### Why the leader is Ctrl-v, not the default backslash
-
-Every binding in this file has to work inside tmux, since that is where vim
-runs here essentially all the time — `.bashrc` starts a tmux session for
-every login. Two keys an earlier version of this config used turned out to
-be dead on arrival inside one: `Ctrl-b` is this project's tmux prefix, so
-tmux consumes it before vim ever sees it, on every host; `Shift-Left` and
-`Shift-Right` are bound at tmux's root key table with no prefix needed,
-which claims them the same way, unconditionally. Both mappings looked
-configured and neither ever fired in the one place this config is actually
-used.
-
-`Ctrl-v` is untouched by tmux everywhere except inside `copy-mode` — a
-separate scrollback overlay, not normal pane input, so it never competes with
-vim.
-
-**Correction, since an earlier version of this note overstated the trade:**
-using `Ctrl-v` as leader barely touches vim's own Visual Block. vim only
-defers to a leader mapping when the very next key completes one — here, `e`
-or `f` — so pressing `Ctrl-v` and then any other key, a motion like `j` or a
-count, falls straight through to Visual Block immediately, because vim can
-already see that next key waiting and never has to pause to disambiguate.
-Verified with `feedkeys()` rather than assumed: `Ctrl-v jjy` on three lines
-produced a genuine blockwise yank, `getregtype()` reporting vim's own
-blockwise marker, with these mappings active. The actual cost is narrower —
-pressing `Ctrl-v` and then literally `e` or `f` as the first motion of a
-block selection. `Ctrl-q` exists for that case and for anyone who would
-rather not think about it at all: it enters Visual Block with nothing to
-disambiguate, ever. Chosen because vim assigns it no Normal-mode meaning of
-its own (`:help i_CTRL-Q`'s "same as Ctrl-v" note is Insert and
-command-line mode only, and means something unrelated there — inserting the
-next character literally) and tmux does not claim it either, stock or in
-this project's tmux.conf. Visual mode's own `Ctrl-v` — switching a selection
-already in progress to blockwise — is untouched either way, since only
-Normal-mode mappings changed.
-
-### Keys
-
-This project's own bindings:
-
-| Keys | Action |
-|---|---|
-| `Ctrl-v e` | Toggle the file tree (mnemonic: Explorer) |
-| `Ctrl-v f` then a pattern, `Enter` | Search the project; results land in the quickfix list (mnemonic: Find) |
-| `Ctrl-v q` | Close this buffer, not vim (mnemonic: Quit — the one that usually means it) |
-| `Ctrl-v y` (Visual mode) | Yank the selection to the system clipboard |
-| `Ctrl-v p` | Paste the system clipboard below the cursor |
-| `Ctrl-q` | Enter Visual Block — where bare `Ctrl-v` would, if it were not the leader |
-| `Ctrl-l` | Clear search highlighting |
-| `gt` / `gT` | Next / previous tab — vim's own default, not a mapping this config adds |
-| `:copen` / `:cclose` | Show / hide the quickfix list |
-| `:cnext` / `:cprev` | Jump to the next / previous match — built into vim, no mapping needed |
-
-Inside the file tree, these are netrw's own — this project sets none of them,
-and they exist whether or not `vim/install.sh` has ever run. Documented here
-because nothing else does, not because this config added them:
-
-| Keys | Action |
-|---|---|
-| `Enter` | Open the file under the cursor, or enter the directory |
-| `-` | Go up one directory |
-| `o` / `v` / `t` | Open in a horizontal split / vertical split / new tab |
-| `gh` | Toggle hidden (dot) files |
-| `i` | Cycle listing style — thin, long, wide, tree |
-| `qf` | Show information about the file under the cursor |
-
-The full list is netrw's own `:help netrw-quickhelp`, once the tree has focus.
-
-Zero plugins, zero plugin manager, zero network fetches at install time — the
-colour scheme is a file in this repository, not a `git clone` of someone
-else's. That was a deliberate choice for a config the project treats as worth
-testing before it is trusted anywhere, not an accident of it being small.
+Every claim in `vim/README.md` about what a key does was checked against a
+real headless vim run before being written down, the same standard as
+everywhere else in this project.
 
 ## Prerequisites
 
