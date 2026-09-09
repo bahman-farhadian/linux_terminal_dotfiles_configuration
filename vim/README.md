@@ -245,11 +245,11 @@ using the identical, correctly-tracked tree either way, so `Ctrl-v e`
 afterward closes it rather than opening a second one.
 
 The file tree is NERDTree (`pack/dist/start/nerdtree`, vendored from
-[amix/vimrc](https://github.com/amix/vimrc), WTFPL) — the one plugin in
-this setup, replacing vim's own netrw (which had exactly this
-already-open-or-not confusion, and would occasionally show two trees at
-once). Once it has focus, these are NERDTree's own keys — documented here
-because nothing else does, not added by this config:
+[amix/vimrc](https://github.com/amix/vimrc), WTFPL), replacing vim's own
+netrw (which had exactly this already-open-or-not confusion, and would
+occasionally show two trees at once). Once it has focus, these are
+NERDTree's own keys — documented here because nothing else does, not added
+by this config:
 
 | Keys | Does |
 |---|---|
@@ -307,3 +307,14 @@ The editing area itself has no background colour set, so it just shows
 whatever the terminal's own background is — same idea as `tmux.conf`'s own
 status bar. Only things meant to stand out — the cursor line, a selection,
 the status line, tabs — keep a fixed colour.
+
+## The status line
+
+lightline (`pack/dist/start/lightline`, vendored from
+[amix/vimrc](https://github.com/amix/vimrc), MIT) — the mode you're in,
+the filename, and its position, always visible along the bottom, coloured
+to match everything else
+(`pack/dist/start/lightline/autoload/lightline/colorscheme/gruvbox.vim`,
+hand-written the same way `colors/gruvbox.vim` is). Replaces vim's own
+`-- INSERT --` message in the corner, which would otherwise say the same
+thing lightline already shows.

@@ -1,5 +1,6 @@
-" vim config, minimal, Gruvbox dark, one plugin (NERDTree, for the file
-" tree). Installed system-wide, at /etc/vim/vimrc.local — see vim/install.sh.
+" vim config, minimal, Gruvbox dark, two plugins (NERDTree for the file
+" tree, lightline for the status line). Installed system-wide, at
+" /etc/vim/vimrc.local — see vim/install.sh.
 "
 " Only settings that change vim's own default behaviour live here. See
 " vim/README.md for how to actually use any of this.
@@ -40,6 +41,19 @@ nnoremap <C-q> <C-v>
 " colors/gruvbox.vim.
 set background=dark
 silent! colorscheme gruvbox
+
+" Status line — lightline (pack/dist/start/lightline, vendored from
+" amix/vimrc, MIT), coloured to match at
+" pack/dist/start/lightline/autoload/lightline/colorscheme/gruvbox.vim,
+" the same way the file tree is a vendored plugin but the palette is
+" always hand-written here. laststatus=2 keeps it shown with only one
+" window open — vim's own default (1) hides it in exactly that case, the
+" ordinary one. noshowmode turns off vim's own "-- INSERT --" message,
+" since lightline shows the mode itself; without it the two would say the
+" same thing twice, one above the other.
+set laststatus=2
+set noshowmode
+let g:lightline = {'colorscheme': 'gruvbox'}
 
 " Tabs as spaces, width 4 — vim's own default is width-8 real tab
 " characters.

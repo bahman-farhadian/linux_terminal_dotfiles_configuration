@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # vim/uninstall.sh — reverses vim/install.sh. Removes only what it deployed
 # — /etc/vim/vimrc.local, /usr/share/vim/vimfiles/colors/gruvbox.vim, and
-# /usr/share/vim/vimfiles/pack/dist/start/nerdtree — after backing all three up.
+# /usr/share/vim/vimfiles/pack/dist/start/{nerdtree,lightline} — after
+# backing all of it up.
 #
 # Does not touch vim itself: install.sh installs the package only if it was
 # missing, and this project's other dotfiles set EDITOR=vim regardless of
@@ -48,7 +49,9 @@ _take_dir() { # 1 path being removed, 2 repository original
     rm -rf "$1"
     _did_something=true
 }
-_take_dir "/usr/share/vim/vimfiles/pack/dist/start/nerdtree" "$_here/pack/dist/start/nerdtree"
+for _plugin in nerdtree lightline; do
+    _take_dir "/usr/share/vim/vimfiles/pack/dist/start/$_plugin" "$_here/pack/dist/start/$_plugin"
+done
 
 # Only clears the directories this project creates, and only if nothing else
 # is left in them — never rm -rf a shared directory, since another tool

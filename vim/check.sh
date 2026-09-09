@@ -55,7 +55,8 @@ printf '\n--- Deployed files ---\n'
 ck "vim installed" "$(command -v vim >/dev/null && echo yes || echo no)" "yes"
 same "vimrc"    vimrc              "/etc/vim/vimrc.local"
 same "gruvbox"  colors/gruvbox.vim "/usr/share/vim/vimfiles/colors/gruvbox.vim"
-same_dir "nerdtree" pack/dist/start/nerdtree "/usr/share/vim/vimfiles/pack/dist/start/nerdtree"
+same_dir "nerdtree"  pack/dist/start/nerdtree  "/usr/share/vim/vimfiles/pack/dist/start/nerdtree"
+same_dir "lightline" pack/dist/start/lightline "/usr/share/vim/vimfiles/pack/dist/start/lightline"
 
 printf '\n--- Your own account does not have a personal vimrc shadowing this ---\n'
 # Every check below runs with a throwaway, empty $HOME, on purpose — it is
@@ -97,7 +98,7 @@ printf '\n--- Starts clean, for a user with no vimrc of their own ---\n'
 # never in the file to begin with; it needs the raw output, discarded here.
 _msgs=$(_vim \
   -c "redir! > /tmp/vimcheck.$$" \
-  -c "echo 'colors_name=' . get(g:, 'colors_name', 'UNSET') | echo 'background=' . &background | echo 'tabstop=' . &tabstop | echo 'expandtab=' . &expandtab | echo 'hlsearch=' . &hlsearch | echo 'normal_bg=' . (has_key(hlget('Normal')[0], 'guibg') ? 'set' : 'inherits') | echo 'signcol_bg=' . (has_key(hlget('SignColumn')[0], 'guibg') ? 'set' : 'inherits') | echo 'shortmess_I=' . (&shortmess =~# 'I' ? 'yes' : 'no') | echo 'vimenter_autocmd=' . exists('#VimEnter') | echo 'mouse=[' . &mouse . ']' | echo 'skip_defaults=' . get(g:, 'skip_defaults_vim', 'UNSET')" \
+  -c "echo 'colors_name=' . get(g:, 'colors_name', 'UNSET') | echo 'background=' . &background | echo 'tabstop=' . &tabstop | echo 'expandtab=' . &expandtab | echo 'hlsearch=' . &hlsearch | echo 'normal_bg=' . (has_key(hlget('Normal')[0], 'guibg') ? 'set' : 'inherits') | echo 'signcol_bg=' . (has_key(hlget('SignColumn')[0], 'guibg') ? 'set' : 'inherits') | echo 'shortmess_I=' . (&shortmess =~# 'I' ? 'yes' : 'no') | echo 'vimenter_autocmd=' . exists('#VimEnter') | echo 'mouse=[' . &mouse . ']' | echo 'skip_defaults=' . get(g:, 'skip_defaults_vim', 'UNSET') | echo 'laststatus=' . &laststatus | echo 'showmode=' . &showmode | echo 'lightline_scheme=' . get(get(g:, 'lightline', {}), 'colorscheme', 'UNSET') | echo 'lightline_bg=' . synIDattr(hlID('LightlineLeft_normal_0'), 'bg')" \
   -c "redir END" -c "messages" -c "qa!" /dev/null 2>&1)
 _out=$(cat "/tmp/vimcheck.$$" 2>/dev/null); rm -f "/tmp/vimcheck.$$"
 
@@ -122,6 +123,17 @@ ck "no splash screen"    "$(printf '%s' "$_out" | sed -n 's/^shortmess_I=//p')" 
 # just on vim/vimrc read in isolation.
 ck "defaults.vim guarded" "$(printf '%s' "$_out" | sed -n 's/^skip_defaults=//p')" "1"
 ck "mouse stays off, even without a personal vimrc" "$(printf '%s' "$_out" | sed -n 's/^mouse=\[\(.*\)\]/\1/p')" ""
+# laststatus 2, not vim's own default (1, hidden with a single window) -
+# lightline needs it shown always. showmode 0: lightline shows the mode
+# itself, so vim's own "-- INSERT --" message would just repeat it.
+ck "statusline always shown"    "$(printf '%s' "$_out" | sed -n 's/^laststatus=//p')" "2"
+ck "vim's own mode message off" "$(printf '%s' "$_out" | sed -n 's/^showmode=//p')" "0"
+ck "lightline colorscheme set"  "$(printf '%s' "$_out" | sed -n 's/^lightline_scheme=//p')" "gruvbox"
+# #b8bb26 is this project's own green, hand-written into lightline's own
+# colorscheme format at pack/dist/start/lightline/.../colorscheme/gruvbox.vim
+# - checked against the live highlight group lightline actually defined,
+# not just that a colorscheme name string was set.
+ck "lightline uses this project's palette" "$(printf '%s' "$_out" | sed -n 's/^lightline_bg=//p')" "#b8bb26"
 # Confirms the autocmd is registered, not that startinsert actually landed in
 # Insert mode — :help :startinsert states plainly that it only takes effect
 # once the calling script has finished, so nothing running inside this

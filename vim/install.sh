@@ -10,7 +10,7 @@
 #                                      no per-user setup of their own.
 #   /usr/share/vim/vimfiles/colors/   vim's own site-wide colour directory,
 #                                      already on every user's runtimepath.
-#   /usr/share/vim/vimfiles/pack/dist/start/nerdtree/
+#   /usr/share/vim/vimfiles/pack/dist/start/{nerdtree,lightline}/
 #                                      vim 8's native package loading, same
 #                                      site-wide directory — no plugin manager.
 #
@@ -36,7 +36,9 @@ _backup="/etc/vim-config-backup-$(date +%Y%m%d%H%M%S)"
 mkdir -p "$_backup"
 [ -e /etc/vim/vimrc.local ] && cp -a /etc/vim/vimrc.local "$_backup/"
 [ -e /usr/share/vim/vimfiles/colors/gruvbox.vim ] && cp -a /usr/share/vim/vimfiles/colors/gruvbox.vim "$_backup/"
-[ -e /usr/share/vim/vimfiles/pack/dist/start/nerdtree ] && cp -a /usr/share/vim/vimfiles/pack/dist/start/nerdtree "$_backup/"
+for _plugin in nerdtree lightline; do
+    [ -e "/usr/share/vim/vimfiles/pack/dist/start/$_plugin" ] && cp -a "/usr/share/vim/vimfiles/pack/dist/start/$_plugin" "$_backup/"
+done
 echo "    saved to $_backup (only if anything existed)"
 
 echo "==> writing /etc/vim/vimrc.local"
@@ -46,10 +48,12 @@ echo "==> writing /usr/share/vim/vimfiles/colors/gruvbox.vim"
 mkdir -p /usr/share/vim/vimfiles/colors
 cp "$_here/colors/gruvbox.vim" /usr/share/vim/vimfiles/colors/gruvbox.vim
 
-echo "==> writing /usr/share/vim/vimfiles/pack/dist/start/nerdtree"
 mkdir -p /usr/share/vim/vimfiles/pack/dist/start
-rm -rf /usr/share/vim/vimfiles/pack/dist/start/nerdtree
-cp -a "$_here/pack/dist/start/nerdtree" /usr/share/vim/vimfiles/pack/dist/start/nerdtree
+for _plugin in nerdtree lightline; do
+    echo "==> writing /usr/share/vim/vimfiles/pack/dist/start/$_plugin"
+    rm -rf "/usr/share/vim/vimfiles/pack/dist/start/$_plugin"
+    cp -a "$_here/pack/dist/start/$_plugin" "/usr/share/vim/vimfiles/pack/dist/start/$_plugin"
+done
 
 echo "==> done. Every user gets this from their next vim start, no setup of their own needed."
 echo "    <leader>e   toggle the file tree (NERDTree)"
