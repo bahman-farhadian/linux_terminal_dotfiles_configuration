@@ -380,7 +380,12 @@ It installs vim if it is missing, backs up any `~/.vimrc` or
 `vim/vimrc` to `~/.vimrc` and `vim/colors/gruvbox.vim` to
 `~/.vim/colors/gruvbox.vim`. `vim/check.sh` verifies the result the same way
 every host's `check.sh` verifies its own build — byte-for-byte against the
-repository, plus a real headless run of vim checked for startup errors.
+repository, a real headless run of vim checked for startup errors, and real
+functional checks for the two things below that are more than a setting:
+closing a buffer actually switches rather than quitting, and the clipboard
+mappings are present exactly when `xclip` and a display are (never tested by
+actually using the clipboard — that would be the user's real clipboard
+content, and `check.sh` promises never to write).
 
 `vim/uninstall.sh` reverses it: backs up whatever is currently at those two
 paths — timestamped, into its own directory so it never collides with a
@@ -401,6 +406,62 @@ Deliberately narrow, matching what was actually asked for:
 | Tabs | 4-space, `expandtab`, a persistent tab line, `gt`/`gT` to switch — vim's own defaults, needing no mapping. |
 | Search | Incremental, case-insensitive unless the pattern itself is not, `Ctrl-l` clears stale highlighting. Project-wide search through the quickfix list, ripgrep-backed when ripgrep is present and vim's own (slower) grep otherwise. |
 | Navigate like an editor with a sidebar | `Ctrl-v e` toggles a left-hand file tree — netrw, which ships with vim, toggled with its own built-in `:Lexplore` command. No plugin. |
+| Closing a file does not close vim | `Ctrl-v q` closes the buffer and switches to whatever else is open, rather than quitting the window — which, with only one open, quits vim. |
+| Copy and paste with the world outside vim | `Ctrl-v y` / `Ctrl-v p` pipe through `xclip`, present only where `xclip` and a display are. |
+
+### How to actually use it
+
+The parts of editing that come up constantly, in one place, rather than
+scattered across why a key was chosen. Everything below is vim doing what it
+already does — nothing here needed a plugin.
+
+**Close this file, not vim.** `:q` and `:x` close the current *window*, and
+with only one open — the ordinary case — that closes vim too. Correct vim
+behaviour, and not what "I am done with this file" usually means. `Ctrl-v q`
+closes the *buffer* instead: with another file open it switches to that one,
+and with none left it leaves an empty buffer, either way keeping vim open.
+
+**Search and replace.**
+
+| Command | Does |
+|---|---|
+| `:%s/old/new/g` | Every match, whole file |
+| `:%s/old/new/gc` | Same, asking before each one — `y`/`n`/`a` (all)/`q` |
+| `:s/old/new/g` | Just the current line |
+| Select lines in Visual mode, then `:` | vim fills in `:'<,'>s/old/new/g` on its own, scoped to exactly what is selected |
+
+**Edit several lines at once — Visual Block.**
+
+1. `Ctrl-v` (or `Ctrl-q`), then `j`/`k` to select a block down the left edge
+   of several lines — or `$` first, to select to the end of each line
+   regardless of length.
+2. `I`, type the text, `Esc` — inserted at the start of every selected line.
+   `A` instead of `I` appends at the end of each line.
+
+This is the one place `Ctrl-v` being the leader is worth a sentence: that
+combination only behaves differently from plain Visual Block if the very
+next key is `e` or `f`, the two letters this config actually maps. Followed
+by anything else — `j`, `3j`, `$` — it is exactly vim's own Visual Block,
+immediately, with nothing to wait for. `Ctrl-q` is there for not having to
+remember that at all: it enters Visual Block with nothing to disambiguate,
+ever. Verified with a real key sequence, not assumed — `Ctrl-v jjy` on three
+lines produced a genuine blockwise yank, and `Ctrl-v jjI- Esc` on three more
+put `- ` at the start of all three.
+
+**Copy and paste.**
+
+| | |
+|---|---|
+| `y` / `d` or `x` / `p` or `P` | Yank / cut / paste — vim's own registers. Works across every buffer and tab in the session, untouched by anything in this config. |
+| `Ctrl-v y` (Visual mode) | Yank the selection to the system clipboard, so it can be pasted into another tmux pane or application |
+| `Ctrl-v p` (Normal mode) | Paste the system clipboard below the cursor |
+
+The second pair only exists where `xclip` and a display do — this vim
+package ships without `+clipboard` (confirmed with `vim --version`; true on
+every host here), so vim's own `"+` register does nothing regardless.
+Piped through `xclip` instead, the same tool this project's own `cpy` bash
+function already uses, and silently absent the same way on the headless
+hosts: no display, no mapping, nothing to fail.
 
 ### Why the leader is Ctrl-v, not the default backslash
 
@@ -446,6 +507,9 @@ This project's own bindings:
 |---|---|
 | `Ctrl-v e` | Toggle the file tree (mnemonic: Explorer) |
 | `Ctrl-v f` then a pattern, `Enter` | Search the project; results land in the quickfix list (mnemonic: Find) |
+| `Ctrl-v q` | Close this buffer, not vim (mnemonic: Quit — the one that usually means it) |
+| `Ctrl-v y` (Visual mode) | Yank the selection to the system clipboard |
+| `Ctrl-v p` | Paste the system clipboard below the cursor |
 | `Ctrl-q` | Enter Visual Block — where bare `Ctrl-v` would, if it were not the leader |
 | `Ctrl-l` | Clear search highlighting |
 | `gt` / `gT` | Next / previous tab — vim's own default, not a mapping this config adds |

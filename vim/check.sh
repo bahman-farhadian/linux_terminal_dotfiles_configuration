@@ -8,10 +8,13 @@ if [ "$(id -u)" -eq 0 ]; then
 fi
 
 _here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-pass=0; fail=0; failed=""
+pass=0; fail=0; skip=0; failed=""; skipped=""
 _note(){ failed="$failed  - $1\n"; }
 ck(){ if [ "$2" = "$3" ]; then printf '  PASS  %-28s %s\n' "$1" "$2"; pass=$((pass+1));
       else printf '  FAIL  %-28s got[%s] want[%s]\n' "$1" "$2" "$3"; fail=$((fail+1)); _note "$1: got [$2], wanted [$3]"; fi; }
+# na() is for something this host cannot test right now — no xclip, no
+# DISPLAY — rather than something that failed. It does not count as FAIL.
+na(){ printf '  N/A   %-28s %s\n' "$1" "$2"; skip=$((skip+1)); skipped="$skipped  - $1: $2\n"; }
 same(){ # 1 label  2 repo file  3 deployed path
   if [ ! -f "$3" ]; then
     printf '  FAIL  %-28s missing %s\n' "$1" "$3"; fail=$((fail+1)); _note "$1: $3 is missing"
@@ -74,19 +77,59 @@ ck "Ctrl-q is visual block" "$(printf '%s' "$_map_out" | sed -n 's/^ctrlq=//p')"
 ck "Ctrl-b left unmapped"      "$(printf '%s' "$_map_out" | sed -n 's/^ctrlb=//p')" ""
 ck "Shift-Left left unmapped"  "$(printf '%s' "$_map_out" | sed -n 's/^shiftleft=//p')" ""
 
+printf '\n--- Closing a file does not close vim ---\n'
+# A real functional test, not just "does :Bd exist": open two files, close
+# one, confirm vim switched to the other rather than exiting or erroring. No
+# /dev/null file argument here, unlike the checks above — that would open a
+# third buffer of its own and throw off the count this check depends on.
+_bd_out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
+  -c "edit /tmp/vimcheck_bd1.$$" -c "edit /tmp/vimcheck_bd2.$$" \
+  -c "redir! > /tmp/vimcheck5.$$" \
+  -c "echo 'before=' . len(getbufinfo({'buflisted':1}))" \
+  -c "redir END" \
+  -c "Bd" \
+  -c "redir! >> /tmp/vimcheck5.$$" \
+  -c "echo 'after=' . len(getbufinfo({'buflisted':1})) . ' switched=' . (bufname('%') =~# 'vimcheck_bd1' ? 'yes' : 'no')" \
+  -c "redir END" -c "qa!" 2>&1
+  cat "/tmp/vimcheck5.$$" 2>/dev/null; rm -f "/tmp/vimcheck5.$$" "/tmp/vimcheck_bd1.$$" "/tmp/vimcheck_bd2.$$")
+
+ck "Bd closes a buffer"    "$(printf '%s' "$_bd_out" | sed -n 's/^before=//p')" "2"
+ck "Bd switches, not quits" "$(printf '%s' "$_bd_out" | sed -n 's/.*switched=//p')" "yes"
+
+printf '\n--- Clipboard (checked by mapping, not by using the clipboard) ---\n'
+# check.sh promises never to write, and the real clipboard is the user's own
+# state — trying an actual copy/paste round trip here would overwrite
+# whatever they currently have on it. Introspection only: is the mapping
+# present when xclip and a display are, and correctly absent when not.
+_clip_out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
+  -c "redir! > /tmp/vimcheck6.$$" \
+  -c "echo 'y=' . strtrans(maparg('<leader>y', 'v'))" \
+  -c "echo 'p=' . strtrans(maparg('<leader>p', 'n'))" \
+  -c "redir END" -c "qa!" /dev/null 2>&1; cat "/tmp/vimcheck6.$$" 2>/dev/null; rm -f "/tmp/vimcheck6.$$")
+
+if command -v xclip &>/dev/null && [ -n "${DISPLAY:-}" ]; then
+  ck "clipboard yank mapped"  "$(printf '%s' "$_clip_out" | sed -n 's/^y=//p')" ":w !xclip -selection clipboard<CR><CR>"
+  ck "clipboard paste mapped" "$(printf '%s' "$_clip_out" | sed -n 's/^p=//p')" ":r !xclip -selection clipboard -o<CR>"
+else
+  na "clipboard mappings" "no xclip, or no DISPLAY, on this host — correctly left unmapped rather than mapped to a command that would fail"
+fi
+
 if command -v rg &>/dev/null; then
   _rg_out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
     -c "redir! > /tmp/vimcheck2.$$" -c "echo 'grepprg=' . &grepprg" -c "redir END" -c "qa!" /dev/null 2>&1
     cat "/tmp/vimcheck2.$$" 2>/dev/null; rm -f "/tmp/vimcheck2.$$")
   ck "ripgrep wired in" "$(printf '%s' "$_rg_out" | grep -c '^grepprg=rg ')" "1"
 else
-  printf '  N/A   %-28s ripgrep not installed — grepprg stays at vim'"'"'s own default\n' "ripgrep wired in"
+  na "ripgrep wired in" "ripgrep not installed — grepprg stays at vim's own default"
 fi
 
 printf '\n========================================\n'
-printf '  PASS %s   FAIL %s\n' "$pass" "$fail"
+printf '  PASS %s   FAIL %s   N/A %s\n' "$pass" "$fail" "$skip"
 printf '========================================\n'
 if [ "$fail" -gt 0 ]; then
   printf '\nWhat failed:\n'; printf "$failed"
+fi
+if [ "$skip" -gt 0 ]; then
+  printf '\nNot tested here:\n'; printf "$skipped"
 fi
 [ "$fail" -eq 0 ]

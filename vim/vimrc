@@ -1,9 +1,14 @@
 " ~/.vimrc — minimal, Gruvbox dark, zero plugins.
 "
 " Deliberately narrow: tabs, the same colour scheme as the rest of this
-" project, search, and a file tree for navigating a project the way an editor
-" with a sidebar does. Nothing here traces to anything else, on purpose —
-" this file is optional and lives apart from every host's own install.sh.
+" project, search, a file tree for navigating a project the way an editor
+" with a sidebar does, closing a file without closing vim, and copying to
+" and from the system clipboard. Nothing here traces to anything else, on
+" purpose — this file is optional and lives apart from every host's own
+" install.sh. README.md's "Optional: vim" section is the place for how to
+" actually use any of this — search and replace, block-visual multi-line
+" editing, copy/paste — most of which needs no mapping at all, only knowing
+" it is there.
 
 set nocompatible
 filetype plugin indent on
@@ -103,6 +108,45 @@ let g:netrw_winsize = 25
 let g:netrw_browse_split = 4
 let g:netrw_altv = 1
 nnoremap <silent> <leader>e :Lexplore<CR>
+
+" Closing the file you are looking at is not the same thing as closing vim,
+" and :q/:x conflate them the moment only one window is open — which it
+" usually is. :q closes the current *window*; with nothing else open, vim
+" has nothing left to show and exits, which is correct, not a bug, but reads
+" as "vim just quit on me" to anyone who meant "I am done with this file."
+" Bd instead closes the *buffer*: with another one still open it switches to
+" it, and with none left it leaves an empty buffer and keeps running either
+" way. Verified both cases directly — two files open, Bd on one lands on the
+" other; Bd again, on the last one, still leaves vim running.
+function! CloseBuffer() abort
+    let l:buf = bufnr('%')
+    if len(getbufinfo({'buflisted': 1})) > 1
+        bnext
+    endif
+    execute 'bdelete' l:buf
+endfunction
+command! Bd call CloseBuffer()
+nnoremap <silent> <leader>q :Bd<CR>
+
+" Copy and paste to the system clipboard, not just vim's own registers — so
+" text copied here can be pasted into another tmux pane, and the reverse.
+" This vim package ships without +clipboard (confirmed with vim --version;
+" true on every host here, not just this one), so the built-in "+ register
+" does nothing. Piped through xclip instead, the same tool this project's
+" own `cpy` bash function already uses, and guarded the same way: no
+" display, no mapping, silently — correct on the headless hosts, where
+" there is nothing to pipe to.
+"
+" leader-y in Visual mode: pressing : from an active selection has vim
+" prepend '<,'> automatically, scoping the write to exactly what is
+" selected, not the whole file. leader-p in Normal mode reads the clipboard
+" into the buffer below the cursor. Both verified with a real xclip round
+" trip, not assumed: yanked two of three lines, only those two arrived;
+" pasted a marker, it landed on exactly the expected line.
+if executable('xclip') && !empty($DISPLAY)
+    vnoremap <leader>y :w !xclip -selection clipboard<CR><CR>
+    nnoremap <leader>p :r !xclip -selection clipboard -o<CR>
+endif
 
 " Clicking a file in that tree, or anywhere else, should do what it looks
 " like it does.
