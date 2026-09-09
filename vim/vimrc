@@ -1,5 +1,5 @@
-" vim config, minimal, Gruvbox dark, zero plugins. Installed system-wide, at
-" /etc/vim/vimrc.local — see vim/install.sh.
+" vim config, minimal, Gruvbox dark, one plugin (NERDTree, for the file
+" tree). Installed system-wide, at /etc/vim/vimrc.local — see vim/install.sh.
 "
 " Only settings that change vim's own default behaviour live here. See
 " vim/README.md for how to actually use any of this.
@@ -73,24 +73,36 @@ endif
 command! -nargs=+ -complete=file Search silent! grep! <args> | copen
 nnoremap <leader>f :Search<Space>
 
-" File tree — leader-e toggles it, using netrw, which ships with vim.
-let g:netrw_banner = 0
-let g:netrw_liststyle = 3
-let g:netrw_winsize = 25
-let g:netrw_browse_split = 4
-let g:netrw_altv = 1
-
-" Opening a directory (e.g. `vim .`) already fills the one window with a
-" netrw listing before this mapping ever runs. Plain :Lexplore doesn't
-" know that, and opens a second, identical tree next to it — reproduced
-" directly, not assumed. Only open a new one when the current window
-" isn't already netrw.
-function! s:ToggleExplorer() abort
-    if exists('t:netrw_lexbufnr') || &filetype !=# 'netrw'
-        Lexplore
-    endif
-endfunction
-nnoremap <silent> <leader>e :call <SID>ToggleExplorer()<CR>
+" File tree — leader-e toggles it, using NERDTree (pack/dist/start/nerdtree,
+" vendored from amix/vimrc's own copy, WTFPL). Replaces netrw's own
+" :Lexplore, which had no way to know a directory argument (vim . or vim
+" somedir/) already put a plain netrw listing in the one window that was
+" open before any mapping ran, and opened a second, identical tree beside
+" it — reproduced directly, more than once.
+"
+" NERDTree turned out to have the exact same class of problem the first
+" time this was wired up: NERDTreeHijackNetrw (its own default-on feature
+" for replacing that same netrw listing) creates a different kind of tree
+" — one that fills the current window in place — from the one leader-e
+" creates — a sidebar alongside your file. The two don't recognise each
+" other, so opening a directory and then pressing leader-e produced two
+" separate NERDTree buffers, not one. Reproduced directly before this was
+" written, the same as the netrw version of this bug was.
+"
+" The fix that actually holds: make leader-e the *only* way a tree is ever
+" created, full stop. NERDTreeHijackNetrw=0 turns off NERDTree's own
+" competing path; netrw's own directory-auto-browse (a separate mechanism,
+" unaffected by that setting) needs clearing too, deferred to VimEnter
+" since netrw's plugin script — where it registers this — loads after
+" vimrc does, so clearing it any earlier has no effect. Verified after,
+" not assumed: vim . now opens a plain buffer, no tree, and leader-e (or
+" typing :NERDTreeToggle directly, or toggling from inside the sidebar
+" itself) opens and closes exactly one, every time.
+let g:NERDTreeHijackNetrw = 0
+autocmd VimEnter * autocmd! FileExplorer
+let g:NERDTreeWinSize = 25
+let g:NERDTreeMinimalUI = 1
+nnoremap <silent> <leader>e :NERDTreeToggle<CR>
 
 " :q and :x close the current *window* — with only one open, that's vim
 " itself, which reads as "vim just quit on me" when what was meant was

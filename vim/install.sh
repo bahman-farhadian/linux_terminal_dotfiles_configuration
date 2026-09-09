@@ -5,14 +5,17 @@
 #
 # System-wide, using Debian's own extension points rather than overwriting a
 # package-owned file:
-#   /etc/vim/vimrc.local             Debian's own /etc/vim/vimrc sources this
-#                                     if it exists — every user gets it, with
-#                                     no per-user setup of their own.
-#   /usr/share/vim/vimfiles/colors/  vim's own site-wide colour directory,
-#                                     already on every user's runtimepath.
+#   /etc/vim/vimrc.local              Debian's own /etc/vim/vimrc sources this
+#                                      if it exists — every user gets it, with
+#                                      no per-user setup of their own.
+#   /usr/share/vim/vimfiles/colors/   vim's own site-wide colour directory,
+#                                      already on every user's runtimepath.
+#   /usr/share/vim/vimfiles/pack/dist/start/nerdtree/
+#                                      vim 8's native package loading, same
+#                                      site-wide directory — no plugin manager.
 #
-# Idempotent. Backs up anything already at either path, timestamped, before
-# overwriting. Needs root: it writes outside any one user's home.
+# Idempotent. Backs up anything already at any of these paths, timestamped,
+# before overwriting. Needs root: it writes outside any one user's home.
 set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -33,6 +36,7 @@ _backup="/etc/vim-config-backup-$(date +%Y%m%d%H%M%S)"
 mkdir -p "$_backup"
 [ -e /etc/vim/vimrc.local ] && cp -a /etc/vim/vimrc.local "$_backup/"
 [ -e /usr/share/vim/vimfiles/colors/gruvbox.vim ] && cp -a /usr/share/vim/vimfiles/colors/gruvbox.vim "$_backup/"
+[ -e /usr/share/vim/vimfiles/pack/dist/start/nerdtree ] && cp -a /usr/share/vim/vimfiles/pack/dist/start/nerdtree "$_backup/"
 echo "    saved to $_backup (only if anything existed)"
 
 echo "==> writing /etc/vim/vimrc.local"
@@ -42,8 +46,13 @@ echo "==> writing /usr/share/vim/vimfiles/colors/gruvbox.vim"
 mkdir -p /usr/share/vim/vimfiles/colors
 cp "$_here/colors/gruvbox.vim" /usr/share/vim/vimfiles/colors/gruvbox.vim
 
+echo "==> writing /usr/share/vim/vimfiles/pack/dist/start/nerdtree"
+mkdir -p /usr/share/vim/vimfiles/pack/dist/start
+rm -rf /usr/share/vim/vimfiles/pack/dist/start/nerdtree
+cp -a "$_here/pack/dist/start/nerdtree" /usr/share/vim/vimfiles/pack/dist/start/nerdtree
+
 echo "==> done. Every user gets this from their next vim start, no setup of their own needed."
-echo "    <leader>e   toggle the file tree"
+echo "    <leader>e   toggle the file tree (NERDTree)"
 echo "    <leader>f   search the project"
 echo "    <leader>q   close this file, not vim"
 echo "    gt / gT     switch tabs"

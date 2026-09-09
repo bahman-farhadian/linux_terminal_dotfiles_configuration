@@ -239,23 +239,31 @@ pressing `.` repeats it exactly, no selection needed.
 | `:cnext` / `:cprev` | Next / previous match |
 | `gt` / `gT` | Next / previous tab |
 
-Opening a directory instead of a file (`vim .`, or `vim somedir/`) shows this
-same tree right away, filling the whole window — no need to press `Ctrl-v e`
-first.
+Opening a directory instead of a file (`vim .`, or `vim somedir/`) does
+*not* show the tree on its own — press `Ctrl-v e` same as always. Earlier
+this auto-opened, using vim's own built-in netrw; dropped on purpose, since
+it and the leader-e sidebar didn't agree on what "already open" meant and
+would occasionally show two trees at once, right where a duplicate is
+hardest to notice.
 
-The file tree is netrw, which ships with vim. Once it has focus, these are
-netrw's own keys — documented here because nothing else does, not added by
-this config:
+The file tree is NERDTree (`pack/dist/start/nerdtree`, vendored from
+[amix/vimrc](https://github.com/amix/vimrc), WTFPL) — the one plugin in
+this setup, replacing vim's own netrw. Once it has focus, these are
+NERDTree's own keys — documented here because nothing else does, not added
+by this config:
 
 | Keys | Does |
 |---|---|
-| `Enter` | Open the file, or enter the directory |
-| `-` | Go up one directory |
-| `o` / `v` / `t` | Open in a horizontal split / vertical split / new tab |
-| `gh` | Toggle hidden (dot) files |
+| `Enter` / `o` | Open the file, or enter the directory |
+| `i` / `s` | Open in a horizontal split / vertical split |
+| `t` | Open in a new tab |
+| `u` | Go up one directory |
+| `I` | Toggle hidden (dot) files |
+| `R` | Refresh |
+| `q` | Close the tree |
 
-Full list: `:help netrw-quickhelp`, once the tree has focus. Project search
-falls back to vim's own (slower) grep when `ripgrep` isn't installed.
+Full list: `:help NERDTreeMappings`, once the tree has focus. Project
+search falls back to vim's own (slower) grep when `ripgrep` isn't installed.
 
 ## Keys
 

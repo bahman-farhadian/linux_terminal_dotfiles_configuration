@@ -302,6 +302,9 @@ one of the two, the path works one way and reads as a routing fault.
 │   ├── vimrc              → /etc/vim/vimrc.local
 │   ├── colors/
 │   │   └── gruvbox.vim    → /usr/share/vim/vimfiles/colors/gruvbox.vim
+│   ├── pack/dist/start/
+│   │   └── nerdtree/      → /usr/share/.../pack/dist/start/nerdtree/
+│   │                      the one plugin here, vendored from amix/vimrc
 │   ├── install.sh
 │   ├── uninstall.sh
 │   ├── check.sh
@@ -388,10 +391,11 @@ sudo vim/install.sh
 
 | File | What it is |
 |---|---|
-| [vim/install.sh](vim/install.sh) | Installs vim if missing, writes the two files below system-wide, backs up anything already there, timestamped |
-| [vim/vimrc](vim/vimrc) | → `/etc/vim/vimrc.local` — the same Gruvbox palette as the tmux bar and bash prompt, tabs, search, a file tree, closing a file without closing vim, copy/paste with the system clipboard. No mouse, no plugins. |
+| [vim/install.sh](vim/install.sh) | Installs vim if missing, writes the three paths below system-wide, backs up anything already there, timestamped |
+| [vim/vimrc](vim/vimrc) | → `/etc/vim/vimrc.local` — the same Gruvbox palette as the tmux bar and bash prompt, tabs, search, a file tree, closing a file without closing vim, copy/paste with the system clipboard. No mouse. |
 | [vim/colors/gruvbox.vim](vim/colors/gruvbox.vim) | → `/usr/share/vim/vimfiles/colors/gruvbox.vim` — hand-written to this project's own hex values, not vendored from upstream Gruvbox |
-| [vim/check.sh](vim/check.sh) | Verifies the install actually took — byte-for-byte against the repository, a real headless vim run checked for startup errors, and real functional checks for the two things that are more than a setting |
+| [vim/pack/dist/start/nerdtree/](vim/pack/dist/start/nerdtree/) | → `/usr/share/vim/vimfiles/pack/dist/start/nerdtree/` — the one plugin here, vendored from [amix/vimrc](https://github.com/amix/vimrc) (WTFPL), for the file tree. Loaded via vim 8's own native package system — no plugin manager. |
+| [vim/check.sh](vim/check.sh) | Verifies the install actually took — byte-for-byte against the repository, a real headless vim run checked for startup errors, and real functional checks for the things that are more than a setting |
 | [vim/uninstall.sh](vim/uninstall.sh) | Reverses it — see the file's own comments for exactly what it touches and what it deliberately leaves alone |
 | [vim/README.md](vim/README.md) | Everything about actually using it — vim's own modes and movement, search and replace, Visual Block editing, copy/paste, every key this config adds — taught from the basics up, not only a keybinding table |
 

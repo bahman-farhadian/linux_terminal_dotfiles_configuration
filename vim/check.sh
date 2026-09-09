@@ -31,6 +31,16 @@ same(){ # 1 label  2 repo file  3 deployed path
     _note "$1: $3 differs from $_here/$2"
   fi
 }
+same_dir(){ # 1 label  2 repo dir  3 deployed path
+  if [ ! -d "$3" ]; then
+    printf '  FAIL  %-28s missing %s\n' "$1" "$3"; fail=$((fail+1)); _note "$1: $3 is missing"
+  elif diff -rq "$_here/$2" "$3" >/dev/null 2>&1; then
+    printf '  PASS  %-28s matches the repository\n' "$1"; pass=$((pass+1))
+  else
+    printf '  FAIL  %-28s differs from the repository\n' "$1"; fail=$((fail+1))
+    _note "$1: $3 differs from $_here/$2"
+  fi
+}
 
 _home="$(mktemp -d)"
 trap 'rm -rf "$_home"' EXIT
@@ -45,6 +55,7 @@ printf '\n--- Deployed files ---\n'
 ck "vim installed" "$(command -v vim >/dev/null && echo yes || echo no)" "yes"
 same "vimrc"    vimrc              "/etc/vim/vimrc.local"
 same "gruvbox"  colors/gruvbox.vim "/usr/share/vim/vimfiles/colors/gruvbox.vim"
+same_dir "nerdtree" pack/dist/start/nerdtree "/usr/share/vim/vimfiles/pack/dist/start/nerdtree"
 
 printf '\n--- Your own account does not have a personal vimrc shadowing this ---\n'
 # Every check below runs with a throwaway, empty $HOME, on purpose — it is
@@ -128,7 +139,7 @@ printf '\n--- Keys that must not collide with tmux ---\n'
 _map_out=$(_vim \
   -c "redir! > /tmp/vimcheck3.$$" \
   -c "echo 'mapleader_code=' . char2nr(mapleader)" \
-  -c "echo 'leader_e=' . (maparg('<leader>e', 'n') =~# 'ToggleExplorer' ? 'wired' : 'MISSING')" \
+  -c "echo 'leader_e=' . (maparg('<leader>e', 'n') =~# 'NERDTreeToggle' ? 'wired' : 'MISSING')" \
   -c "echo 'leader_f=' . maparg('<leader>f', 'n')" \
   -c "echo 'ctrlq=' . strtrans(maparg('<C-q>', 'n'))" \
   -c "echo 'ctrlb=' . strtrans(maparg('<C-b>', 'n'))" \
@@ -146,36 +157,87 @@ ck "Ctrl-q is visual block" "$(printf '%s' "$_map_out" | sed -n 's/^ctrlq=//p')"
 ck "Ctrl-b left unmapped"      "$(printf '%s' "$_map_out" | sed -n 's/^ctrlb=//p')" ""
 ck "Shift-Left left unmapped"  "$(printf '%s' "$_map_out" | sed -n 's/^shiftleft=//p')" ""
 
-printf '\n--- Opening a directory does not open two file trees ---\n'
-# Reproduced directly in a real terminal before this fix existed: vim . fills
-# the only window with netrw's own directory listing, then leader-e opened a
-# second, identical tree beside it, since :Lexplore had no way to know the
-# first one was already there. Headless equivalents of this (-es batch mode,
-# :normal, feedkeys()) do not reliably reproduce netrw's own directory-open
-# behaviour, so this uses a real pty via tmux instead — the same tool this
-# was first diagnosed with.
+printf '\n--- The file tree only ever has one way to open ---\n'
+# This exact test passed with a single leader-e check the first time NERDTree
+# was wired in, while a second, real bug was still live: NERDTreeHijackNetrw
+# (its own default-on feature) creates a different kind of tree - one that
+# fills the window in place - from the sidebar leader-e creates, and the two
+# don't recognise each other. Reported directly by opening a directory and
+# pressing leader-e, exactly the one path the old version of this check
+# covered - which is why every path that can create a tree is covered here,
+# not just the mapping. Headless equivalents (-es batch mode, :normal,
+# feedkeys()) do not reliably reproduce directory-open or window-splitting
+# behaviour, so this uses a real pty via tmux, same as the original bug was
+# diagnosed with.
 if command -v tmux &>/dev/null; then
+  _winnr(){ tmux capture-pane -t "$1" -p | grep -oE '^[0-9]+' | tail -1; } # 1 session
   _dtmp="$(mktemp -d)"; touch "$_dtmp/a.txt"
-  tmux kill-session -t vimcheck_dir 2>/dev/null
-  tmux new-session -d -s vimcheck_dir -x 200 -y 50 \
-    "env HOME=$_home vim $_dtmp" 2>/dev/null
+
+  tmux kill-session -t vc_dir 2>/dev/null
+  tmux new-session -d -s vc_dir -x 200 -y 50 "env HOME=$_home vim $_dtmp" 2>/dev/null
   sleep 1
-  tmux send-keys -t vimcheck_dir C-v; sleep 0.2
-  tmux send-keys -t vimcheck_dir e; sleep 0.3
-  tmux send-keys -t vimcheck_dir Escape
-  tmux send-keys -t vimcheck_dir ':echo winnr("$")' Enter; sleep 0.3
-  # A wide pane puts vim's ruler on the same physical row as the echoed
-  # number ("1                    1,1  All") — anchoring the pattern to the
-  # end of the line, as an earlier version of this check did, never matched
-  # and always reported ERR regardless of the real result.
-  _windows="$(tmux capture-pane -t vimcheck_dir -p | grep -oE '^[0-9]+' | tail -1)"
-  tmux send-keys -t vimcheck_dir Escape
-  tmux send-keys -t vimcheck_dir ':qa!' Enter; sleep 0.3
-  tmux kill-session -t vimcheck_dir 2>/dev/null
+  tmux send-keys -t vc_dir Escape
+  # A fixed line offset (tail -N | head -1) is fragile: an empty buffer's
+  # own "~" filler lines shift where the echoed value actually lands,
+  # depending on the pane's exact layout, and that's exactly what happened
+  # here - caught by running this on the VM, not this session's own
+  # terminal, where the offset happened to still be right. Wrapping the
+  # value in a fixed prefix/suffix and matching that pattern instead, same
+  # fix already applied once to the window-count extraction above.
+  tmux send-keys -t vc_dir ':echo "ft=[" . &filetype . "]"' Enter; sleep 0.3
+  _ft_on_open="$(tmux capture-pane -t vc_dir -p | sed -n 's/^ft=\[\(.*\)\]$/\1/p' | tail -1)"
+  ck "vim . opens no tree on its own" "$_ft_on_open" ""
+
+  tmux send-keys -t vc_dir C-v; sleep 0.2
+  tmux send-keys -t vc_dir e; sleep 0.3
+  tmux send-keys -t vc_dir Escape
+  tmux send-keys -t vc_dir ':echo winnr("$")' Enter; sleep 0.3
+  ck "leader-e after vim . opens exactly one" "$(_winnr vc_dir)" "2"
+
+  tmux send-keys -t vc_dir C-v; sleep 0.2
+  tmux send-keys -t vc_dir e; sleep 0.3
+  tmux send-keys -t vc_dir Escape
+  tmux send-keys -t vc_dir ':echo winnr("$")' Enter; sleep 0.3
+  ck "leader-e again closes it" "$(_winnr vc_dir)" "1"
+
+  tmux send-keys -t vc_dir ':qa!' Enter; sleep 0.3
+  tmux kill-session -t vc_dir 2>/dev/null
+
+  # Typing the raw command, bypassing our mapping entirely — the actual path
+  # that exposed the NERDTreeHijackNetrw duplicate the first time.
+  tmux new-session -d -s vc_raw -x 200 -y 50 "env HOME=$_home vim $_dtmp" 2>/dev/null
+  sleep 1
+  tmux send-keys -t vc_raw Escape
+  tmux send-keys -t vc_raw ':NERDTreeToggle' Enter; sleep 0.3
+  tmux send-keys -t vc_raw ':echo winnr("$")' Enter; sleep 0.3
+  ck ":NERDTreeToggle directly opens exactly one" "$(_winnr vc_raw)" "2"
+  tmux send-keys -t vc_raw ':NERDTreeToggle' Enter; sleep 0.3
+  tmux send-keys -t vc_raw ':echo winnr("$")' Enter; sleep 0.3
+  ck ":NERDTreeToggle again closes it" "$(_winnr vc_raw)" "1"
+  tmux send-keys -t vc_raw ':qa!' Enter; sleep 0.3
+  tmux kill-session -t vc_raw 2>/dev/null
+
+  # Toggling from inside the sidebar itself, not just from the file window —
+  # a different code path in NERDTree, checked separately rather than
+  # assumed to behave the same as toggling from the file side.
+  tmux new-session -d -s vc_inside -x 200 -y 50 "cd $_dtmp && env HOME=$_home vim a.txt" 2>/dev/null
+  sleep 1
+  tmux send-keys -t vc_inside C-v; sleep 0.2
+  tmux send-keys -t vc_inside e; sleep 0.3
+  tmux send-keys -t vc_inside Escape
+  tmux send-keys -t vc_inside C-w; sleep 0.1
+  tmux send-keys -t vc_inside h; sleep 0.2
+  tmux send-keys -t vc_inside C-v; sleep 0.2
+  tmux send-keys -t vc_inside e; sleep 0.3
+  tmux send-keys -t vc_inside Escape
+  tmux send-keys -t vc_inside ':echo winnr("$")' Enter; sleep 0.3
+  ck "leader-e from inside the sidebar closes it" "$(_winnr vc_inside)" "1"
+  tmux send-keys -t vc_inside ':qa!' Enter; sleep 0.3
+  tmux kill-session -t vc_inside 2>/dev/null
+
   rm -rf "$_dtmp"
-  ck "leader-e after 'vim .' stays at one window" "${_windows:-ERR}" "1"
 else
-  na "directory-open explorer" "tmux not installed — this check needs a real terminal, not just batch mode"
+  na "file tree open paths" "tmux not installed — this check needs a real terminal, not just batch mode"
 fi
 
 printf '\n--- Closing a file does not close vim ---\n'
