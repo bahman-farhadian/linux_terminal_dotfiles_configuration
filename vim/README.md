@@ -4,9 +4,9 @@ Teaches vim itself, grounded in this config — not a full manual, tables
 over paragraphs. Already fluent in vim? [Keys](#keys) at the bottom is
 probably all you need.
 
-Optional, separate from every host's own `install.sh`. Installed once, for
-every user on the machine — see the root [README.md](../README.md#optional-vim)
-for the file list and how this fits the project as a whole.
+Installed by every host's own `install.sh`, for every account on the
+machine — see the root [README.md](../README.md#vim) for the file list and
+how this fits the project as a whole.
 
 ```bash
 sudo vim/install.sh   # installs vim if missing, writes the config and colour

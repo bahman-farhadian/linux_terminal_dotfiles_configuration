@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # vim/install.sh — deploys this vim config for every user on the machine, not
-# just whoever runs the script. Optional, and apart from every host's own
-# install.sh on purpose: nothing else in this repository runs this.
+# just whoever runs the script. Called by every host's own install.sh when
+# root is configured; also runnable on its own, the same way, at any point.
 #
 # System-wide, using Debian's own extension points rather than overwriting a
 # package-owned file:

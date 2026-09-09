@@ -74,12 +74,12 @@ repository; copy the one file to any Debian 13 box and run it. See
 [Portable setup](#portable-setup) below for what it does and, as importantly,
 what it leaves out on purpose.
 
-[vim/](vim/README.md) stands apart the same way, and is the one place this
-project teaches something rather than just building it: vim's own modes and
-movement alongside every key this specific config adds, for whoever wants
-vim configured here but does not already use it fluently. See
-[Optional: vim](#optional-vim) below for the files, and `vim/README.md`
-itself for the guide.
+[vim/README.md](vim/README.md) stands apart the same way, in what it does
+rather than where it lives: the one place this project teaches something
+rather than just building it, covering vim's own modes and movement
+alongside every key this specific config adds, for whoever wants vim
+configured here but does not already use it fluently. See [vim](#vim)
+below for the files and how it's deployed.
 
 Each host directory holds a complete, self-contained copy of what that machine
 installs. The three duplicate one another rather than sharing a common
@@ -297,8 +297,8 @@ one of the two, the path works one way and reads as a routing fault.
 ├── NVIDIA-GPU-Driver.md   GPU driver on a headless server, metal or VM
 ├── portable-bash-tmux-setup.sh
 │                          bash + tmux for any Debian 13 box, no host tie-in
-├── vim/                   optional, system-wide — vim/install.sh deploys it,
-│                          no host does; needs sudo, for every user
+├── vim/                   system-wide — every host's install.sh deploys it,
+│                          when root is configured; needs sudo, for every user
 │   ├── vimrc              → /etc/vim/vimrc.local
 │   ├── colors/
 │   │   └── gruvbox.vim    → /usr/share/vim/vimfiles/colors/gruvbox.vim
@@ -378,12 +378,13 @@ elsewhere in this repository with the reasoning that justifies them — dropping
 them onto an arbitrary box without that context is how `StrictHostKeyChecking
 no` ends up somewhere it was never meant to be.
 
-## Optional: vim
+## vim
 
-`vim/` is not deployed by any host's `install.sh` and is not on by default
-anywhere. Vim is optional here; if you want it, run `vim/install.sh` yourself
-— it needs `sudo`, since it sets vim up for every account on the machine, not
-just the one running it:
+Deployed by every host's `install.sh` as part of the standard run, when
+root is configured (the same `y` at the "Configure root user as well?"
+prompt — see [Deploy](#deploy) above) — for every account on the machine,
+not just the one running `install.sh`. Also runnable on its own, at any
+point, the same way:
 
 ```bash
 sudo vim/install.sh
@@ -427,6 +428,10 @@ tmux settings under `su`. The answer is recorded in `/etc/dotfiles-root-configur
 so every later run refreshes `/root` too rather than leaving it on whatever an
 earlier run happened to install. `--root` and `--no-root` answer the question for
 an unattended run; deleting the stamp stops root being managed.
+
+Answering `y` also installs and configures vim, system-wide, for every account
+on the machine — see [vim](#vim) below. Answer `n` and it's skipped, the same
+as the rest of what needs root.
 
 Run it as your own user, never as root. It installs into `$HOME`, so running it
 as root configures `/root` and leaves your account untouched.

@@ -218,6 +218,16 @@ rm -f "$_ssh_py"
 _hdr "misc"
 cp_file "$REPO/hushlogin" "$HOME/.hushlogin"
 
+_hdr "vim"
+# System-wide (every account on the machine, not just this one) — needs the
+# same sudo the rest of this section already asked for. See vim/README.md
+# for what it actually configures.
+if [ "$HAS_SUDO" = true ]; then
+    sudo bash "$REPO/../vim/install.sh"
+else
+    _skip "vim needs sudo — installs and configures it for every user on the machine"
+fi
+
 _hdr "English keyboard on the lock screen"
 mkdir -p "$HOME/.local/bin" "$HOME/.config/systemd/user"
 

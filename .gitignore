@@ -1,5 +1,0 @@
-# amix/vimrc, cloned at the repo root as reference material while picking
-# vim/pack/dist/start plugins — the two actually wanted (NERDTree,
-# lightline) are vendored into vim/ itself; this clone is not part of the
-# project and must never be committed.
-/vimrc/
