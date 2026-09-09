@@ -15,6 +15,10 @@ vim/check.sh          # verifies the install actually took
 sudo vim/uninstall.sh # reverses it
 ```
 
+If an account already has its own `~/.vimrc`, vim uses that instead — a
+personal vimrc always wins over this one, not the other way round.
+`vim/check.sh` warns if the account running it has one.
+
 ## Modes
 
 Vim is *modal* — the same key does different things depending which mode
