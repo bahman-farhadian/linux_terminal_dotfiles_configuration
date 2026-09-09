@@ -416,14 +416,27 @@ used.
 
 `Ctrl-v` is untouched by tmux everywhere except inside `copy-mode` — a
 separate scrollback overlay, not normal pane input, so it never competes with
-vim. Using it as leader costs vim's own default meaning of bare `Ctrl-v` in
-Normal mode, entering Visual Block; `Ctrl-q` now does that instead, chosen
-because vim assigns it no Normal-mode meaning of its own (`:help i_CTRL-Q`'s
-"same as Ctrl-v" note is Insert and command-line mode only, and means
-something unrelated there — inserting the next character literally) and
-tmux does not claim it either, stock or in this project's tmux.conf. Visual
-mode's own `Ctrl-v` — switching a selection already in progress to
-blockwise — is untouched, since only Normal-mode mappings changed.
+vim.
+
+**Correction, since an earlier version of this note overstated the trade:**
+using `Ctrl-v` as leader barely touches vim's own Visual Block. vim only
+defers to a leader mapping when the very next key completes one — here, `e`
+or `f` — so pressing `Ctrl-v` and then any other key, a motion like `j` or a
+count, falls straight through to Visual Block immediately, because vim can
+already see that next key waiting and never has to pause to disambiguate.
+Verified with `feedkeys()` rather than assumed: `Ctrl-v jjy` on three lines
+produced a genuine blockwise yank, `getregtype()` reporting vim's own
+blockwise marker, with these mappings active. The actual cost is narrower —
+pressing `Ctrl-v` and then literally `e` or `f` as the first motion of a
+block selection. `Ctrl-q` exists for that case and for anyone who would
+rather not think about it at all: it enters Visual Block with nothing to
+disambiguate, ever. Chosen because vim assigns it no Normal-mode meaning of
+its own (`:help i_CTRL-Q`'s "same as Ctrl-v" note is Insert and
+command-line mode only, and means something unrelated there — inserting the
+next character literally) and tmux does not claim it either, stock or in
+this project's tmux.conf. Visual mode's own `Ctrl-v` — switching a selection
+already in progress to blockwise — is untouched either way, since only
+Normal-mode mappings changed.
 
 ### Keys
 

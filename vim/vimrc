@@ -16,14 +16,23 @@ set encoding=utf-8
 " point each mapping is defined.
 "
 " Ctrl-v is what vim itself uses, in Normal mode with nothing set, to enter
-" Visual Block. That meaning is not lost, only moved: Ctrl-q now does it,
-" chosen because vim ships no default meaning for it in Normal mode (see
+" Visual Block, and that is barely affected: vim only defers to a leader
+" mapping when the very next key completes one (here, e or f); anything
+" else — j, a digit, whatever a real block selection actually starts with —
+" falls straight through to Visual Block immediately, because vim can
+" already see that next key queued up and does not need to wait it out.
+" Verified with feedkeys(), not assumed: "<C-v>jjy" on three lines produced
+" a genuine blockwise yank (getregtype() came back "\x161", vim's own
+" blockwise marker) with these mappings active. The actual, narrow cost is
+" pressing Ctrl-v and then literally e or f as the first motion of a block
+" selection — Ctrl-q sidesteps even that, with no ambiguity to resolve.
+" Chosen because vim ships no Normal-mode meaning for it at all (see
 " :help i_CTRL-Q — the "same as Ctrl-v" note there is Insert and
 " command-line mode only, a literal-next-character insert, unrelated to
-" Visual Block) and tmux does not claim it either, stock or in this
+" Visual Block), and tmux does not claim it either, stock or in this
 " project's tmux.conf. Visual mode's own Ctrl-v — switching an already-open
-" selection to blockwise — is untouched, since only Normal-mode mappings
-" are changed here.
+" selection to blockwise — is untouched either way, since only Normal-mode
+" mappings are changed here.
 let mapleader = "\<C-v>"
 nnoremap <C-q> <C-v>
 
