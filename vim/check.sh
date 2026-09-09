@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# vim/check.sh — verifies vim/install.sh actually took, and that vim starts
-# clean under it. Reads only, never writes. Run as your own user, not root:
-# it is your ~/.vimrc being checked.
+# vim/check.sh — verifies vim/install.sh actually took, that vim starts clean
+# under it, and that the three plugins it fetches actually loaded. Reads
+# only, never writes. Run as your own user, not root: it is your ~/.vimrc
+# being checked.
 
 if [ "$(id -u)" -eq 0 ]; then
   echo "STOP: run as your normal user, not root. It is your ~/.vimrc and ~/.vim being checked."; exit 1
@@ -73,6 +74,24 @@ ck "Ctrl-q is visual block" "$(printf '%s' "$_map_out" | sed -n 's/^ctrlq=//p')"
 # mapping, since it looks configured and never fires.
 ck "Ctrl-b left unmapped"      "$(printf '%s' "$_map_out" | sed -n 's/^ctrlb=//p')" ""
 ck "Shift-Left left unmapped"  "$(printf '%s' "$_map_out" | sed -n 's/^shiftleft=//p')" ""
+
+printf '\n--- Plugins ---\n'
+# Real functional checks, not just "is the directory there": load vim
+# headless and ask it whether each plugin's own documented command or
+# function actually exists, the same way "Starts clean" above proves the
+# colorscheme rather than assuming a file being present means it worked.
+_plug_out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
+  -c "redir! > /tmp/vimcheck4.$$" \
+  -c "echo 'ctrlp=' . exists(':CtrlP')" \
+  -c "echo 'git=' . exists(':Git')" \
+  -c "echo 'fugitive_fn=' . exists('*FugitiveStatusline')" \
+  -c "echo 'commentary=' . exists(':Commentary')" \
+  -c "redir END" -c "qa!" /dev/null 2>&1; cat "/tmp/vimcheck4.$$" 2>/dev/null; rm -f "/tmp/vimcheck4.$$")
+
+ck "ctrlp.vim loaded"     "$(printf '%s' "$_plug_out" | sed -n 's/^ctrlp=//p')" "2"
+ck "vim-fugitive loaded"  "$(printf '%s' "$_plug_out" | sed -n 's/^git=//p')" "2"
+ck "fugitive statusline"  "$(printf '%s' "$_plug_out" | sed -n 's/^fugitive_fn=//p')" "1"
+ck "vim-commentary loaded" "$(printf '%s' "$_plug_out" | sed -n 's/^commentary=//p')" "2"
 
 if command -v rg &>/dev/null; then
   _rg_out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
