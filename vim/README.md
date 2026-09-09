@@ -239,18 +239,17 @@ pressing `.` repeats it exactly, no selection needed.
 | `:cnext` / `:cprev` | Next / previous match |
 | `gt` / `gT` | Next / previous tab |
 
-Opening a directory instead of a file (`vim .`, or `vim somedir/`) does
-*not* show the tree on its own — press `Ctrl-v e` same as always. Earlier
-this auto-opened, using vim's own built-in netrw; dropped on purpose, since
-it and the leader-e sidebar didn't agree on what "already open" meant and
-would occasionally show two trees at once, right where a duplicate is
-hardest to notice.
+Opening a directory instead of a file (`vim .`, or `vim somedir/`) shows
+this same tree right away, same as pressing `Ctrl-v e` yourself would —
+using the identical, correctly-tracked tree either way, so `Ctrl-v e`
+afterward closes it rather than opening a second one.
 
 The file tree is NERDTree (`pack/dist/start/nerdtree`, vendored from
 [amix/vimrc](https://github.com/amix/vimrc), WTFPL) — the one plugin in
-this setup, replacing vim's own netrw. Once it has focus, these are
-NERDTree's own keys — documented here because nothing else does, not added
-by this config:
+this setup, replacing vim's own netrw (which had exactly this
+already-open-or-not confusion, and would occasionally show two trees at
+once). Once it has focus, these are NERDTree's own keys — documented here
+because nothing else does, not added by this config:
 
 | Keys | Does |
 |---|---|

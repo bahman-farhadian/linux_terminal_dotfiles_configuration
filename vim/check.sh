@@ -157,65 +157,74 @@ ck "Ctrl-q is visual block" "$(printf '%s' "$_map_out" | sed -n 's/^ctrlq=//p')"
 ck "Ctrl-b left unmapped"      "$(printf '%s' "$_map_out" | sed -n 's/^ctrlb=//p')" ""
 ck "Shift-Left left unmapped"  "$(printf '%s' "$_map_out" | sed -n 's/^shiftleft=//p')" ""
 
-printf '\n--- The file tree only ever has one way to open ---\n'
+printf '\n--- The file tree only ever has one tree, however it is opened ---\n'
 # This exact test passed with a single leader-e check the first time NERDTree
 # was wired in, while a second, real bug was still live: NERDTreeHijackNetrw
 # (its own default-on feature) creates a different kind of tree - one that
 # fills the window in place - from the sidebar leader-e creates, and the two
 # don't recognise each other. Reported directly by opening a directory and
 # pressing leader-e, exactly the one path the old version of this check
-# covered - which is why every path that can create a tree is covered here,
-# not just the mapping. Headless equivalents (-es batch mode, :normal,
-# feedkeys()) do not reliably reproduce directory-open or window-splitting
-# behaviour, so this uses a real pty via tmux, same as the original bug was
-# diagnosed with.
+# covered - which is why every path that can create or close a tree is
+# covered here, not just the mapping. Headless equivalents (-es batch mode,
+# :normal, feedkeys()) do not reliably reproduce directory-open or
+# window-splitting behaviour, so this uses a real pty via tmux, same as the
+# original bug was diagnosed with.
 if command -v tmux &>/dev/null; then
   _winnr(){ tmux capture-pane -t "$1" -p | grep -oE '^[0-9]+' | tail -1; } # 1 session
   _dtmp="$(mktemp -d)"; touch "$_dtmp/a.txt"
 
+  # vim . auto-opens the tree itself now, via the same CreateTabTree call
+  # :NERDTreeToggle uses internally - not netrw's or NERDTree's own
+  # directory-hijack mechanisms, both explicitly disabled above, and not a
+  # bare, unwritable buffer named "." either. Confirmed the tree it opens is
+  # the genuine, tracked kind by immediately toggling it both ways.
   tmux kill-session -t vc_dir 2>/dev/null
   tmux new-session -d -s vc_dir -x 200 -y 50 "env HOME=$_home vim $_dtmp" 2>/dev/null
   sleep 1
   tmux send-keys -t vc_dir Escape
-  # A fixed line offset (tail -N | head -1) is fragile: an empty buffer's
-  # own "~" filler lines shift where the echoed value actually lands,
-  # depending on the pane's exact layout, and that's exactly what happened
-  # here - caught by running this on the VM, not this session's own
-  # terminal, where the offset happened to still be right. Wrapping the
-  # value in a fixed prefix/suffix and matching that pattern instead, same
-  # fix already applied once to the window-count extraction above.
-  tmux send-keys -t vc_dir ':echo "ft=[" . &filetype . "]"' Enter; sleep 0.3
-  _ft_on_open="$(tmux capture-pane -t vc_dir -p | sed -n 's/^ft=\[\(.*\)\]$/\1/p' | tail -1)"
-  ck "vim . opens no tree on its own" "$_ft_on_open" ""
+  tmux send-keys -t vc_dir ':echo winnr("$")' Enter; sleep 0.3
+  ck "vim . auto-opens the tree" "$(_winnr vc_dir)" "2"
 
   tmux send-keys -t vc_dir C-v; sleep 0.2
   tmux send-keys -t vc_dir e; sleep 0.3
   tmux send-keys -t vc_dir Escape
   tmux send-keys -t vc_dir ':echo winnr("$")' Enter; sleep 0.3
-  ck "leader-e after vim . opens exactly one" "$(_winnr vc_dir)" "2"
+  ck "leader-e recognises it, closes it" "$(_winnr vc_dir)" "1"
 
   tmux send-keys -t vc_dir C-v; sleep 0.2
   tmux send-keys -t vc_dir e; sleep 0.3
   tmux send-keys -t vc_dir Escape
   tmux send-keys -t vc_dir ':echo winnr("$")' Enter; sleep 0.3
-  ck "leader-e again closes it" "$(_winnr vc_dir)" "1"
+  ck "leader-e reopens it" "$(_winnr vc_dir)" "2"
 
   tmux send-keys -t vc_dir ':qa!' Enter; sleep 0.3
   tmux kill-session -t vc_dir 2>/dev/null
 
-  # Typing the raw command, bypassing our mapping entirely — the actual path
-  # that exposed the NERDTreeHijackNetrw duplicate the first time.
+  # Typing the raw command, bypassing our mapping entirely, right after
+  # vim .'s own auto-open — the actual path that exposed the
+  # NERDTreeHijackNetrw duplicate the first time: it must recognise the
+  # already-open tree and close it, not open a second one.
   tmux new-session -d -s vc_raw -x 200 -y 50 "env HOME=$_home vim $_dtmp" 2>/dev/null
   sleep 1
   tmux send-keys -t vc_raw Escape
   tmux send-keys -t vc_raw ':NERDTreeToggle' Enter; sleep 0.3
   tmux send-keys -t vc_raw ':echo winnr("$")' Enter; sleep 0.3
-  ck ":NERDTreeToggle directly opens exactly one" "$(_winnr vc_raw)" "2"
-  tmux send-keys -t vc_raw ':NERDTreeToggle' Enter; sleep 0.3
-  tmux send-keys -t vc_raw ':echo winnr("$")' Enter; sleep 0.3
-  ck ":NERDTreeToggle again closes it" "$(_winnr vc_raw)" "1"
+  ck ":NERDTreeToggle recognises the auto-opened tree" "$(_winnr vc_raw)" "1"
   tmux send-keys -t vc_raw ':qa!' Enter; sleep 0.3
   tmux kill-session -t vc_raw 2>/dev/null
+
+  # Opening a plain file (no directory argument, nothing auto-opened) still
+  # opens fresh, exactly once, on the first toggle — the case that always
+  # worked, checked again so the fix above didn't quietly break it.
+  tmux new-session -d -s vc_file -x 200 -y 50 "cd $_dtmp && env HOME=$_home vim a.txt" 2>/dev/null
+  sleep 1
+  tmux send-keys -t vc_file C-v; sleep 0.2
+  tmux send-keys -t vc_file e; sleep 0.3
+  tmux send-keys -t vc_file Escape
+  tmux send-keys -t vc_file ':echo winnr("$")' Enter; sleep 0.3
+  ck "leader-e on a plain file opens exactly one" "$(_winnr vc_file)" "2"
+  tmux send-keys -t vc_file ':qa!' Enter; sleep 0.3
+  tmux kill-session -t vc_file 2>/dev/null
 
   # Toggling from inside the sidebar itself, not just from the file window —
   # a different code path in NERDTree, checked separately rather than

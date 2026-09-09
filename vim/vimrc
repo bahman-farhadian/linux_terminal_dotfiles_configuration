@@ -94,15 +94,30 @@ nnoremap <leader>f :Search<Space>
 " competing path; netrw's own directory-auto-browse (a separate mechanism,
 " unaffected by that setting) needs clearing too, deferred to VimEnter
 " since netrw's plugin script — where it registers this — loads after
-" vimrc does, so clearing it any earlier has no effect. Verified after,
-" not assumed: vim . now opens a plain buffer, no tree, and leader-e (or
-" typing :NERDTreeToggle directly, or toggling from inside the sidebar
-" itself) opens and closes exactly one, every time.
+" vimrc does, so clearing it any earlier has no effect.
 let g:NERDTreeHijackNetrw = 0
 autocmd VimEnter * autocmd! FileExplorer
 let g:NERDTreeWinSize = 25
 let g:NERDTreeMinimalUI = 1
 nnoremap <silent> <leader>e :NERDTreeToggle<CR>
+
+" vim . (or vim somedir/) opens the same tree leader-e does, instead of
+" leaving a nonsensical, unwritable buffer named "." sitting in the main
+" window — using :NERDTree, the exact same tree-creating command
+" :NERDTreeToggle itself calls (CreateTabTree), so leader-e afterward
+" correctly recognises it as already open and closes it, rather than
+" creating a second one the way NERDTreeHijackNetrw did above. Verified
+" directly: vim . shows the tree plus an empty buffer, leader-e closes it,
+" leader-e again reopens it, and opening a real file from the tree behaves
+" normally throughout.
+function! s:OpenTreeForDirArg() abort
+    if argc() == 1 && isdirectory(argv(0))
+        let l:dir = fnamemodify(argv(0), ':p')
+        enew
+        execute 'NERDTree' fnameescape(l:dir)
+    endif
+endfunction
+autocmd VimEnter * call s:OpenTreeForDirArg()
 
 " :q and :x close the current *window* — with only one open, that's vim
 " itself, which reads as "vim just quit on me" when what was meant was
