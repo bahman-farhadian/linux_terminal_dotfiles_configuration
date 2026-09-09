@@ -139,7 +139,11 @@ if command -v tmux &>/dev/null; then
   tmux send-keys -t vimcheck_dir e; sleep 0.3
   tmux send-keys -t vimcheck_dir Escape
   tmux send-keys -t vimcheck_dir ':echo winnr("$")' Enter; sleep 0.3
-  _windows="$(tmux capture-pane -t vimcheck_dir -p | grep -E '^[0-9]+$' | tail -1)"
+  # A wide pane puts vim's ruler on the same physical row as the echoed
+  # number ("1                    1,1  All") — anchoring the pattern to the
+  # end of the line, as an earlier version of this check did, never matched
+  # and always reported ERR regardless of the real result.
+  _windows="$(tmux capture-pane -t vimcheck_dir -p | grep -oE '^[0-9]+' | tail -1)"
   tmux send-keys -t vimcheck_dir Escape
   tmux send-keys -t vimcheck_dir ':qa!' Enter; sleep 0.3
   tmux kill-session -t vimcheck_dir 2>/dev/null
