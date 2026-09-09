@@ -1,286 +1,268 @@
 # vim, as configured here
 
-This teaches vim itself, grounded in this specific configuration — not a
-general vim manual, and not only a keybinding table. If you already know vim
-well, the [Keys](#keys) reference near the bottom is probably all you need.
-If you don't, start at the top; each section builds on the one before it.
+Teaches vim itself, grounded in this config — not a full manual, tables
+over paragraphs. Already fluent in vim? [Keys](#keys) at the bottom is
+probably all you need.
 
-Optional, and separate from every host's own `install.sh` on purpose —
-nothing in the rest of this repository depends on it. See the root
-[README.md](../README.md#optional-vim) for the one-paragraph version and how
-this fits into the project as a whole.
+Optional, separate from every host's own `install.sh`. See the root
+[README.md](../README.md#optional-vim) for the file list and how this fits
+the project as a whole.
 
 ```bash
 vim/install.sh      # installs vim if missing, writes ~/.vimrc and the
                      # colour scheme, backs up anything already there
 vim/check.sh        # verifies the install actually took
-vim/uninstall.sh    # reverses it — see the file's own comments for exactly
-                     # what it touches and what it deliberately leaves alone
+vim/uninstall.sh    # reverses it
 ```
 
-## The mental model: modes
+## Modes
 
-Vim is *modal*: the same keys do different things depending on which mode
-you're in, and knowing which mode you're in is the one piece of vim
-literacy everything else rests on.
+Vim is *modal* — the same key does different things depending which mode
+you're in. Knowing which one you're in is the one thing everything else
+rests on.
 
-| Mode | What it's for | How to get there |
+| Mode | For | Enter with |
 |---|---|---|
-| **Normal** | Moving around, and every command that isn't literally typing text. The mode vim starts in, and the one you return to after almost everything. | `Esc`, from anywhere |
-| **Insert** | Typing text, the way every other editor always is. | `i`, `a`, `o`, `O` (below) — from Normal mode |
-| **Visual** | Selecting text, to then act on it. Three variants — see [below](#visual-mode-selecting-text) | `v`, `V`, or `Ctrl-v` — from Normal mode |
-| **Command-line** | One-off commands, prefixed with `:` — search-and-replace, saving, quitting, everything that isn't a single keystroke. | `:`, from Normal mode |
+| **Normal** | Moving around, commands. Vim's start state, and where you land after `Esc`. | `Esc`, from anywhere |
+| **Insert** | Typing text. | `i` — [below](#entering-text) |
+| **Visual** | Selecting text, to act on it. | `v` / `V` / `Ctrl-v` — [below](#visual-mode-selecting-text) |
+| **Command-line** | One-off `:` commands — save, quit, search-replace. | `:` |
 
-The single most common new-to-vim mistake is typing commands while still in
-Insert mode, where they just get typed into the file as text. `Esc` first,
-always, is the habit worth building before any of the rest of this matters.
+The one habit worth building: `Esc` before typing a command. Vim commands
+typed while still in Insert mode just get typed into the file as text.
 
 ## Basic movement
 
-All in Normal mode:
-
 | Keys | Moves |
 |---|---|
-| `h` `j` `k` `l` | Left, down, up, right — one character/line |
+| `h` `j` `k` `l` | Left / down / up / right (arrow keys work too) |
 | `w` / `b` | Forward / back one word |
-| `0` / `$` | Start / end of the current line |
+| `0` / `$` | Start / end of the line |
 | `gg` / `G` | Start / end of the file |
-| `{N}G` or `:{N}` | Line `N` — `42G` or `:42` jump straight to line 42 |
-| `Ctrl-l` | Not movement — clears search highlighting, [below](#search) |
-
-Arrow keys work too; `hjkl` just means never lifting your hands off the
-home row, which is the entire reason vim uses them.
+| `{N}G` or `:{N}` | Line `N` |
 
 ## Entering text
 
-From Normal mode:
-
-| Keys | Enters Insert mode |
-|---|---|
-| `i` | Before the cursor |
-| `a` | After the cursor |
-| `o` | On a new line below |
-| `O` | On a new line above |
-
-Type normally once inside Insert mode. `Esc` returns to Normal mode — that
-return trip, not the typing itself, is what most vim keystrokes are spent
-on.
+`i` — insert before the cursor. That's the one to know. (`a`/`o`/`O` insert
+after the cursor / on a new line below / above, if you ever want them —
+`Esc` returns to Normal mode from any of them.)
 
 ## Undo and redo
 
 | Keys | Does |
 |---|---|
 | `u` | Undo the last change |
-| `Ctrl-r` | Redo — undo the undo |
-
-Verified directly rather than assumed: changed a line, `u` restored the
-original, `Ctrl-r` brought the change back.
+| `Ctrl-r` | Redo |
 
 ## Opening, saving, and closing files
 
 ```bash
-vim somefile.txt      # open a file directly
+vim somefile.txt
 ```
-
-From inside vim:
 
 | Command | Does |
 |---|---|
 | `:e otherfile.txt` | Open another file |
 | `:w` | Save |
 | `:w newname.txt` | Save as |
-| `Ctrl-v e` | Toggle a file tree for browsing the project — [below](#navigating-a-project) |
 
-**Closing is the one place vim's own defaults are worth stopping on.** `:q`
-and `:x` close the current *window* — and with only one window open, which
-is the ordinary case, that closes vim entirely. That's correct vim
-behaviour, not a bug, but it's rarely what "I'm done with this file" means
-to anyone arriving from an editor with persistent tabs.
+**Closing is the one place vim's defaults trip people up.** `:q`/`:x` close
+the current *window* — with only one open, the ordinary case, that closes
+vim too. Correct vim behaviour, not a bug, but rarely what "I'm done with
+this file" means.
 
 | Command | Closes | Vim itself |
 |---|---|---|
-| `:w` \| `Ctrl-v q` | Save, then the buffer | Stays open — switches to another file if one is open, otherwise an empty buffer |
-| `:x` | Save (only if changed), then the window | Exits, if that was the last window |
-| `:q` | The window, refusing if there are unsaved changes | Exits, if that was the last window |
-| `:q!` | The window, discarding any unsaved changes | Exits, if that was the last window |
+| `Ctrl-v q` | The buffer | Stays open — switches to another file, or an empty buffer |
+| `:x` | Save if changed, then the window | Exits, if that was the last window |
+| `:q` | The window (refuses if unsaved) | Exits, if that was the last window |
+| `:q!` | The window, discarding changes | Exits, if that was the last window |
 
-`Ctrl-v q` (mnemonic: Quit — the one that usually means it) is this config's
-own addition, `:Bd` under the hood. Verified directly, both ways it can go:
-with a second file open, closing one switches to the other; closing the
-last one still leaves vim running, on an empty buffer, rather than exiting.
+`Ctrl-v q` is this config's own addition (`:Bd`), and the one to reach for.
+
+## Editing a file you don't own
+
+The classic "forgot sudo" fix — opened `/etc/something` as your own user,
+made the edit, `:w` fails with `E212: Can't open file for writing`:
+
+```vim
+:w !sudo tee % > /dev/null
+```
+
+`%` is the current filename; `:w !cmd` pipes the buffer to that command's
+stdin instead of a file. `sudo tee <filename>` writes it with root
+privileges; `> /dev/null` throws away `tee`'s normal stdout echo so it
+doesn't clutter the screen. Reload afterwards with `:e!` — the file on
+disk changed, but the buffer doesn't know that yet.
 
 ## Search
 
 | Keys | Does |
 |---|---|
-| `/pattern` then `Enter` | Search forward |
-| `?pattern` then `Enter` | Search backward |
-| `n` / `N` | Repeat the last search, forward / backward |
-| `Ctrl-l` | Clear the highlighting from the last search |
+| `/pattern` `Enter` | Search forward |
+| `?pattern` `Enter` | Search backward |
+| `n` / `N` | Repeat, forward / backward |
+| `Ctrl-l` | Clear search highlighting |
 
-Matches highlight as you type (`incsearch`), and searching is
-case-insensitive unless the pattern itself has a capital letter
-(`smartcase`) — `foo` matches `Foo`, `Foo` does not match `foo`.
+Case-insensitive unless the pattern has a capital letter (`foo` matches
+`Foo`; `Foo` does not match `foo`).
 
 ## Search and replace
 
 | Command | Does |
 |---|---|
 | `:%s/old/new/g` | Every match, whole file |
-| `:%s/old/new/gc` | Same, asking before each one — `y`/`n`/`a` (all)/`q` |
+| `:%s/old/new/gc` | Same, confirming each — `y`/`n`/`a`/`q` |
 | `:s/old/new/g` | Just the current line |
-| Select lines in Visual mode, then `:` | Vim fills in `:'<,'>s/old/new/g` on its own, scoped to exactly what was selected |
+| Select in Visual mode, then `:` | Vim fills in `:'<,'>s/old/new/g` — scoped to the selection |
 
 ## Visual mode: selecting text
-
-Three variants, each entered from Normal mode, each ended with `Esc`:
 
 | Keys | Selects |
 |---|---|
 | `v` | Character by character |
 | `V` | Whole lines |
-| `Ctrl-v` (or `Ctrl-q` — [why below](#why-the-leader-is-ctrl-v-not-the-default-backslash)) | A rectangular block — the same column, down several lines |
+| `Ctrl-v` (or `Ctrl-q`) | A rectangular block — same column, down several lines |
 
-Extend the selection with the usual movement keys (`j`, `w`, `$`, `G`, …),
-then act on it — `y` to yank, `d` to delete, `:` for search-and-replace on
-just the selection, or the block-edit trick below.
+Extend with movement keys, then act: `y` to yank, `d` to delete, `:` for a
+scoped substitute, or the block-edit trick below.
 
-### Editing several lines at once — Visual Block
+**Edit several lines at once:**
 
-1. `Ctrl-v` (or `Ctrl-q`), then `j`/`k` to select a block down the left edge
-   of several lines — or `$` first, to select to the end of each line
-   regardless of length.
-2. `I`, type the text, `Esc` — inserted at the start of every selected line.
-   `A` instead of `I` appends at the end of each line instead.
+1. `Ctrl-v`, then `j`/`k` to select a block down the left edge — or `$`
+   first, to reach each line's actual end regardless of length.
+2. `I`, type the text, `Esc` — inserted at the start of every selected
+   line. `A` appends at the end instead.
 
-This is the one place `Ctrl-v` being this config's leader is worth a
-sentence: that combination only behaves differently from plain Visual Block
-if the very next key is `e`, `f`, `q`, `y` or `p` — the five letters this
-config actually maps. Followed by anything else — `j`, `3j`, `$` — it is
-exactly vim's own Visual Block, immediately, with nothing to wait for.
-`Ctrl-q` exists for not having to remember that at all: it enters Visual
-Block with nothing to disambiguate, ever. Verified with a real key
-sequence, not assumed — `Ctrl-v jjy` on three lines produced a genuine
-blockwise yank, and `Ctrl-v jjI- Esc` on three more put `- ` at the start
-of all three.
+(`Ctrl-v` is this config's leader, so that combination only differs from
+plain Visual Block if the very next key is `e`, `f`, `q`, `y` or `p` —
+this config's five mapped letters. Anything else, `Ctrl-v` behaves exactly
+as vim always has. `Ctrl-q` sidesteps the question entirely.)
 
 ## Copy and paste
 
 | Keys | Does |
 |---|---|
-| `y` | Yank (copy) the selection, or `yy` for the current line |
-| `d` / `x` | Delete (cut) the selection, or a line / character |
+| `y` | Yank, or `yy` for the current line |
+| `d` / `x` | Delete a selection / a line / a character |
 | `p` / `P` | Paste after / before the cursor |
 
-These are vim's own registers, unaffected by anything in this config, and
-work across every buffer and tab in the same session — yank in one file,
-paste in another, no special step needed.
+Vim's own registers — work across every buffer and tab in the session.
 
 **To or from outside vim** — another tmux pane, another application:
 
 | Keys | Does |
 |---|---|
 | `Ctrl-v y` (Visual mode) | Yank the selection to the system clipboard |
-| `Ctrl-v p` (Normal mode) | Paste the system clipboard below the cursor |
+| `Ctrl-v p` | Paste the system clipboard below the cursor |
 
-Only defined where `xclip` and a display exist — this vim package ships
-without `+clipboard` (confirmed with `vim --version`; true on every host
-here), so vim's own `"+` register does nothing regardless of display.
-Piped through `xclip` instead, the same tool this project's own `cpy` bash
-function already uses, and silently absent the same way on the headless
-hosts: no display, no mapping, nothing to fail. Verified with a real
-`xclip` round trip — yanked two of three lines from a selection, only
-those two arrived on the clipboard; pasted a marker back, it landed on
-exactly the expected line.
+Present only where `xclip` and a display exist (this vim package has no
+`+clipboard`, so `"+y`/`"+p` do nothing regardless) — silently absent on
+the headless hosts.
+
+## Comparing two files
+
+```bash
+vim -d fileA fileB          # side by side, differences highlighted
+```
+
+or from inside vim, `:vsplit otherfile` then `:diffthis` in both windows.
+`Ctrl-w` + `h`/`l`/`j`/`k` moves between the windows.
+
+| Command | Does |
+|---|---|
+| `]c` / `[c` | Jump to the next / previous difference |
+| `:diffget` | Pull the other window's version of this hunk into the current one |
+| `:diffput` | Push this hunk's version to the other window |
+| `:diffoff` | Turn diff mode off |
+
+## Filtering text through a shell command
+
+Sends a range of lines to an external command and replaces them with its
+output — for reformatting, sorting, or reshaping data without leaving vim:
+
+| Command | Does |
+|---|---|
+| `:%!sort` | Sort the whole file |
+| `:%!jq .` | Reformat the whole file as pretty-printed JSON |
+| Select lines, then `:!column -t` | Same idea, scoped to a selection |
+| `!!command` | Filter just the current line |
+
+## Repeating and automating edits
+
+| Keys | Does |
+|---|---|
+| `.` | Repeat the last change |
+| `qa` ... `q` | Record keystrokes into register `a` |
+| `@a` | Play back register `a` |
+| `@@` | Repeat the last macro played |
+
+`.` is worth reaching for constantly — after any single edit, moving to a
+similar spot and pressing `.` repeats it exactly. Macros are the same idea
+for a sequence of edits: record one pass on the first line, then `@a` (or
+`5@a` for five more) repeats it down the rest of the file.
 
 ## Navigating a project
 
 | Keys | Does |
 |---|---|
-| `Ctrl-v e` | Toggle a left-hand file tree (mnemonic: Explorer) |
-| `Ctrl-v f` then a pattern, `Enter` | Search the whole project; results land in the quickfix list (mnemonic: Find) |
+| `Ctrl-v e` | Toggle a file tree (mnemonic: Explorer) |
+| `Ctrl-v f` then a pattern, `Enter` | Search the whole project — results in the quickfix list |
 | `:copen` / `:cclose` | Show / hide that list |
-| `:cnext` / `:cprev` | Jump to the next / previous match |
-| `gt` / `gT` | Next / previous tab — vim's own default, not a mapping this config adds |
+| `:cnext` / `:cprev` | Next / previous match |
+| `gt` / `gT` | Next / previous tab |
 
-The file tree is netrw, which ships with vim — no plugin. Once it has
-focus, these are netrw's own keys, documented here because nothing else
-does, not because this config added them:
+The file tree is netrw, which ships with vim. Once it has focus, these are
+netrw's own keys — documented here because nothing else does, not added by
+this config:
 
 | Keys | Does |
 |---|---|
-| `Enter` | Open the file under the cursor, or enter the directory |
+| `Enter` | Open the file, or enter the directory |
 | `-` | Go up one directory |
 | `o` / `v` / `t` | Open in a horizontal split / vertical split / new tab |
 | `gh` | Toggle hidden (dot) files |
-| `i` | Cycle listing style — thin, long, wide, tree |
-| `qf` | Show information about the file under the cursor |
 
-The full list is netrw's own `:help netrw-quickhelp`, once the tree has
-focus.
-
-Project-wide search falls back to vim's own (slower) internal grep when
-`ripgrep` isn't installed, rather than erroring — either way the results
-land in the same quickfix list.
-
-## Why the leader is Ctrl-v, not the default backslash
-
-Every binding in this file has to work inside tmux, since that is where
-vim runs here essentially all the time — `.bashrc` starts a tmux session
-for every login. Two keys an earlier version of this config used turned
-out to be dead on arrival inside one: `Ctrl-b` is this project's tmux
-prefix, so tmux consumes it before vim ever sees it, on every host;
-`Shift-Left` and `Shift-Right` are bound at tmux's root key table with no
-prefix needed, which claims them the same way, unconditionally. Both
-mappings looked configured and neither ever fired in the one place this
-config is actually used.
-
-`Ctrl-v` is untouched by tmux everywhere except inside `copy-mode` — a
-separate scrollback overlay, not normal pane input, so it never competes
-with vim.
-
-Using it as leader barely touches vim's own Visual Block. Vim only defers
-to a leader mapping when the very next key completes one — `e`, `f`, `q`,
-`y` or `p` here — so pressing `Ctrl-v` and then any other key, a motion
-like `j` or a count, falls straight through to Visual Block immediately,
-because vim can already see that next key waiting and never has to pause
-to disambiguate. Verified with `feedkeys()` rather than assumed: `Ctrl-v
-jjy` on three lines produced a genuine blockwise yank, `getregtype()`
-reporting vim's own blockwise marker, with these mappings active. The
-actual cost is narrower — pressing `Ctrl-v` and then literally one of
-those five letters as the first motion of a block selection. `Ctrl-q`
-exists for that case and for anyone who would rather not think about it
-at all: it enters Visual Block with nothing to disambiguate, ever. Chosen
-because vim assigns it no Normal-mode meaning of its own (`:help
-i_CTRL-Q`'s "same as Ctrl-v" note is Insert and command-line mode only,
-and means something unrelated there — inserting the next character
-literally) and tmux does not claim it either, stock or in this project's
-tmux.conf. Visual mode's own `Ctrl-v` — switching a selection already in
-progress to blockwise — is untouched either way, since only Normal-mode
-mappings changed.
+Full list: `:help netrw-quickhelp`, once the tree has focus. Project search
+falls back to vim's own (slower) grep when `ripgrep` isn't installed.
 
 ## Keys
 
-Every binding this config adds, in one table:
+Everything this config adds:
 
 | Keys | Action |
 |---|---|
 | `Ctrl-v e` | Toggle the file tree |
-| `Ctrl-v f` then a pattern, `Enter` | Search the project |
+| `Ctrl-v f` | Search the project |
 | `Ctrl-v q` | Close this buffer, not vim |
-| `Ctrl-v y` (Visual mode) | Yank the selection to the system clipboard |
-| `Ctrl-v p` | Paste the system clipboard below the cursor |
-| `Ctrl-q` | Enter Visual Block — where bare `Ctrl-v` would, if it were not the leader |
+| `Ctrl-v y` / `Ctrl-v p` | Yank / paste via the system clipboard |
+| `Ctrl-q` | Enter Visual Block (unambiguously, even as `e`/`f`/`q`/`y`/`p`) |
 | `Ctrl-l` | Clear search highlighting |
 
-Everything else on this page — modes, movement, undo, `gt`/`gT`, the
-netrw keys inside the tree — is vim's own, or netrw's own, unchanged.
-Nothing here needed a plugin.
+Vim's own defaults, worth knowing, unchanged by this config:
+
+| Keys | Does |
+|---|---|
+| `.` | Repeat the last change |
+| `%` | Jump to the matching bracket / paren / brace |
+| `qa` ... `q`, `@a`, `@@` | Record / play back / repeat a macro |
+| `Ctrl-w` + `h`/`j`/`k`/`l` | Move between split windows |
+| `>>` / `<<`, or select then `>`/`<` | Indent / outdent |
+| `gt` / `gT` | Next / previous tab |
+
+## Why the leader is Ctrl-v
+
+Every binding here has to survive tmux, since vim runs inside it almost
+always — `.bashrc` starts a tmux session per login. `Ctrl-b` (this
+project's tmux prefix) and `Shift-Left`/`Shift-Right` (bound at tmux's
+root key table) both looked configured in an earlier version of this file
+and never fired inside one. `Ctrl-v` is unclaimed by tmux everywhere except
+`copy-mode`, a separate scrollback overlay — so it's the leader instead.
+What that costs Visual Block, and why it's small, is covered where it's
+actually used: [Visual mode](#visual-mode-selecting-text) above.
 
 ## The colour scheme
 
-`colors/gruvbox.vim` is hand-written to the exact hex values the tmux
-status bar and bash prompt elsewhere in this project already use, not
-vendored from upstream Gruvbox — a file in this repository, not a `git
-clone` of someone else's. Needs a true-colour terminal, the same
-requirement the bash prompt already has.
+`colors/gruvbox.vim` — the exact hex values the tmux bar and bash prompt
+already use, hand-written rather than vendored from upstream Gruvbox.
+Needs a true-colour terminal, same as the bash prompt.
