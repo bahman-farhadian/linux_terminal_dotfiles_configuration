@@ -239,11 +239,6 @@ pressing `.` repeats it exactly, no selection needed.
 | `:cnext` / `:cprev` | Next / previous match |
 | `gt` / `gT` | Next / previous tab |
 
-Opening a directory instead of a file (`vim .`, or `vim somedir/`) shows
-this same tree right away, same as pressing `Ctrl-v e` yourself would —
-using the identical, correctly-tracked tree either way, so `Ctrl-v e`
-afterward closes it rather than opening a second one.
-
 The file tree is NERDTree (`pack/dist/start/nerdtree`, vendored from
 [amix/vimrc](https://github.com/amix/vimrc), WTFPL), replacing vim's own
 netrw (which had exactly this already-open-or-not confusion, and would
