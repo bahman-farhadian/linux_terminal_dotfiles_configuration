@@ -46,6 +46,31 @@ ck "vim installed" "$(command -v vim >/dev/null && echo yes || echo no)" "yes"
 same "vimrc"    vimrc              "/etc/vim/vimrc.local"
 same "gruvbox"  colors/gruvbox.vim "/usr/share/vim/vimfiles/colors/gruvbox.vim"
 
+printf '\n--- Your own account does not have a personal vimrc shadowing this ---\n'
+# Every check below runs with a throwaway, empty $HOME, on purpose — it is
+# the fair way to test "every user gets this," including one with no config
+# of their own. But it means those checks cannot see this: vim always
+# sources a personal vimrc, if this account happens to have one, AFTER the
+# system one just installed — so it silently wins, overriding anything
+# installed here. That is not hypothetical: a leftover ~/.vimrc from testing
+# this project's own earlier, per-user design, dated before a real bugfix
+# even existed, did exactly this — every check here passed while the actual
+# bug it was fixing was still fully reproducible in a real terminal, because
+# nothing here was checking the one account actually being used interactively.
+_shadow=""
+for f in "$HOME/.vimrc" "$HOME/.vim/vimrc"; do
+  [ -e "$f" ] && _shadow="$_shadow $f"
+done
+[ -n "${VIMINIT:-}" ] && _shadow="$_shadow \$VIMINIT"
+if [ -n "$_shadow" ]; then
+  printf '  FAIL  %-28s found:%s\n' "no shadowing vimrc" "$_shadow"
+  fail=$((fail+1))
+  _note "no shadowing vimrc: found$_shadow — sourced after /etc/vim/vimrc.local, so it wins; move it aside if this account should actually get the system-wide config"
+else
+  printf '  PASS  %-28s none found\n' "no shadowing vimrc"
+  pass=$((pass+1))
+fi
+
 printf '\n--- Starts clean, for a user with no vimrc of their own ---\n'
 # A real smoke test, not a guess: start vim exactly as a fresh account would,
 # ask it what settings actually took, and check its own message log for
