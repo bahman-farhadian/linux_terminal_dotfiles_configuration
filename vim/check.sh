@@ -35,19 +35,28 @@ printf '\n--- Starts clean ---\n'
 # A real smoke test, not a guess: start vim against the deployed vimrc with no
 # terminal, ask it what settings actually took, and check its own message log
 # for anything vim itself considers an error.
+# Merged into one -c with | rather than one -c per echo: vim refuses more
+# than about ten -c/--cmd arguments total ("Too many -c command... arguments")
+# and this file already hit that limit once, silently — every value in this
+# block came back empty, not just the two just-added ones, because vim
+# never even started once the count was over.
 _out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
   -c "redir! > /tmp/vimcheck.$$" \
-  -c "echo 'colors_name=' . get(g:, 'colors_name', 'UNSET')" \
-  -c "echo 'background=' . &background" \
-  -c "echo 'tabstop=' . &tabstop" \
-  -c "echo 'expandtab=' . &expandtab" \
-  -c "echo 'hlsearch=' . &hlsearch" \
+  -c "echo 'colors_name=' . get(g:, 'colors_name', 'UNSET') | echo 'background=' . &background | echo 'tabstop=' . &tabstop | echo 'expandtab=' . &expandtab | echo 'hlsearch=' . &hlsearch | echo 'normal_bg=' . (has_key(hlget('Normal')[0], 'guibg') ? 'set' : 'inherits') | echo 'signcol_bg=' . (has_key(hlget('SignColumn')[0], 'guibg') ? 'set' : 'inherits')" \
   -c "redir END" -c "messages" -c "qa!" /dev/null 2>&1; cat "/tmp/vimcheck.$$" 2>/dev/null; rm -f "/tmp/vimcheck.$$")
 
 ck "no startup errors" "$(printf '%s' "$_out" | grep -Ec '^E[0-9]+:')" "0"
 ck "colorscheme loaded" "$(printf '%s' "$_out" | sed -n 's/^colors_name=//p')" "gruvbox"
 ck "background dark"    "$(printf '%s' "$_out" | sed -n 's/^background=//p')" "dark"
 ck "tabstop 4"           "$(printf '%s' "$_out" | sed -n 's/^tabstop=//p')" "4"
+# Normal and SignColumn must inherit the terminal's own background, not force
+# a fixed hex — the same bg=default approach this project's tmux.conf already
+# uses. hi clear restores vim's own compiled-in defaults for some groups
+# rather than blanking them (SignColumn among them), which silently defeated
+# an earlier version of this check's own intent; asserted directly against
+# hlget() rather than assumed from the colorscheme source reading correctly.
+ck "vim background inherits terminal" "$(printf '%s' "$_out" | sed -n 's/^normal_bg=//p')" "inherits"
+ck "sign column inherits terminal"    "$(printf '%s' "$_out" | sed -n 's/^signcol_bg=//p')" "inherits"
 ck "expandtab on"        "$(printf '%s' "$_out" | sed -n 's/^expandtab=//p')" "1"
 ck "hlsearch on"         "$(printf '%s' "$_out" | sed -n 's/^hlsearch=//p')" "1"
 

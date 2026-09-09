@@ -127,12 +127,24 @@ Case-insensitive unless the pattern has a capital letter (`foo` matches
 Extend with movement keys, then act: `y` to yank, `d` to delete, `:` for a
 scoped substitute, or the block-edit trick below.
 
-**Edit several lines at once:**
+**Edit several lines at once — the everyday case is commenting out a block
+of a config file:**
 
-1. `Ctrl-v`, then `j`/`k` to select a block down the left edge — or `$`
-   first, to reach each line's actual end regardless of length.
-2. `I`, type the text, `Esc` — inserted at the start of every selected
-   line. `A` appends at the end instead.
+```
+listen 80;                    listen 80;
+server_name example.com;  →   # server_name example.com;
+root /var/www;                # root /var/www;
+```
+
+1. Put the cursor on `server_name`'s line, `Ctrl-v`, then `j` to extend the
+   block down to `root`'s line too.
+2. `I`, type `# `, `Esc` — inserted at the start of both selected lines at
+   once. Verified directly: ran exactly this on three lines and all three
+   came back commented.
+
+`A` instead of `I` appends at the end of each line rather than the start —
+same idea, useful for adding a trailing `;` to several lines instead of a
+leading `#`.
 
 (`Ctrl-v` is this config's leader, so that combination only differs from
 plain Visual Block if the very next key is `e`, `f`, `q`, `y` or `p` —
@@ -188,19 +200,26 @@ output — for reformatting, sorting, or reshaping data without leaving vim:
 | Select lines, then `:!column -t` | Same idea, scoped to a selection |
 | `!!command` | Filter just the current line |
 
-## Repeating and automating edits
+## Everyday config-file edits
 
-| Keys | Does |
+The things that come up constantly editing `/etc` and its relatives —
+mostly the same tools as above, applied to the specific shape these edits
+usually take.
+
+| Task | Keys |
 |---|---|
-| `.` | Repeat the last change |
-| `qa` ... `q` | Record keystrokes into register `a` |
-| `@a` | Play back register `a` |
-| `@@` | Repeat the last macro played |
+| Comment out one line | `0i# ` `Esc` |
+| Comment out several lines | Block Visual — [above](#visual-mode-selecting-text) |
+| Uncomment several lines | `0`, `Ctrl-v`, extend down and across the `# `, then `d` — deletes it from every selected line at once |
+| Delete a line entirely | `dd` |
+| Duplicate a line (to edit the copy) | `yy` then `p` |
+| Repeat the last edit at a similar spot | `.` |
 
-`.` is worth reaching for constantly — after any single edit, moving to a
-similar spot and pressing `.` repeats it exactly. Macros are the same idea
-for a sequence of edits: record one pass on the first line, then `@a` (or
-`5@a` for five more) repeats it down the rest of the file.
+Verified directly, not assumed: block-selecting `# ` on three commented
+lines and pressing `d` removed it from all three in one motion — the exact
+reverse of the block-comment above. `.` is worth reaching for on its own,
+constantly — after any single change, moving to a similar spot and
+pressing `.` repeats it exactly, no selection needed.
 
 ## Navigating a project
 
@@ -266,3 +285,13 @@ actually used: [Visual mode](#visual-mode-selecting-text) above.
 `colors/gruvbox.vim` — the exact hex values the tmux bar and bash prompt
 already use, hand-written rather than vendored from upstream Gruvbox.
 Needs a true-colour terminal, same as the bash prompt.
+
+The editing area sets no background colour at all — the same `bg=default`
+approach this project's own `tmux.conf` already uses for its status bar,
+rather than forcing a fixed dark tone that only matches a terminal profile
+set to this exact palette. Vim inherits whatever the terminal's own
+background is, transparency included, so it matches whatever terminal
+you're actually running rather than a specific hex this file would
+otherwise have to guess at. Only the things meant to visibly stand out —
+the cursor line, a selection, the status line, tabs — keep a fixed colour,
+the same way `tmux.conf`'s window tabs do beside its own `bg=default` bar.

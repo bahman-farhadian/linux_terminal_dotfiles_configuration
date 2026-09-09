@@ -8,9 +8,12 @@
 " takes effect where the terminal honours it; elsewhere colours fall back to
 " whatever the terminal's own palette maps nearest, same as the prompt does.
 
-if exists('g:colors_name')
-  hi clear
-endif
+" Unconditional, not only when a prior colorscheme was named: vim's own
+" factory defaults set explicit colours on some groups (SignColumn among
+" them) before any colorscheme ever runs, and hi link only fills in what
+" a group does not already have set — so skipping this on a fresh session
+" left SignColumn's default grey background showing through underneath.
+hi clear
 if has('termguicolors')
   set termguicolors
 endif
@@ -39,23 +42,43 @@ let s:purple = '#d3869b'
 let s:aqua   = '#8ec07c'
 let s:orange = '#fe8019'
 
+" Always sets guifg/guibg/gui/cterm explicitly, using the literal NONE vim
+" recognises as "clear this" — never by omitting the flag. Omitting it was
+" the original design here, and it silently left vim's own factory default
+" for that one attribute in place: SignColumn kept its built-in grey
+" background, Visual its built-in black text, TabLineFill, StatusLineNC and
+" VertSplit their built-in reverse-video, none of it ever asked for, none
+" of it visible until checked with hlget() against what hi clear actually
+" leaves behind (vim's compiled-in defaults, not blank, for groups like
+" these). NONE closes all of it in one place rather than auditing each
+" group by hand. ctermfg/ctermbg are deliberately untouched — this project
+" already states it needs a true-colour terminal, and clearing those would
+" erase whatever sensible fallback colour a 256-colour terminal already
+" had, which is worse than leaving it alone.
 function! s:hi(group, fg, bg, attr) abort
-  let l:cmd = 'hi ' . a:group
-  if a:fg   !=# '' | let l:cmd .= ' guifg=' . a:fg | endif
-  if a:bg   !=# '' | let l:cmd .= ' guibg=' . a:bg | endif
-  if a:attr !=# '' | let l:cmd .= ' gui=' . a:attr . ' cterm=' . a:attr | endif
-  execute l:cmd
+  let l:fg   = a:fg   !=# '' ? a:fg   : 'NONE'
+  let l:bg   = a:bg   !=# '' ? a:bg   : 'NONE'
+  let l:attr = a:attr !=# '' ? a:attr : 'NONE'
+  execute 'hi ' . a:group . ' guifg=' . l:fg . ' guibg=' . l:bg
+        \ . ' gui=' . l:attr . ' cterm=' . l:attr
 endfunction
 
-" Editing surface
-call s:hi('Normal',       s:fg1,  s:bg0, '')
+" Editing surface — Normal, the gutter, and the sign column set no
+" background at all, the same way this project's tmux status bar uses
+" bg=default: they recede into whatever the terminal's own background is,
+" including any transparency, rather than forcing a fixed dark tone that
+" only matches a terminal profile set to this exact palette. Only the
+" things meant to visibly stand out as a block — CursorLine, Visual, the
+" status line, tabs, search — keep an absolute colour, exactly the way
+" tmux.conf's own window tabs do beside its bg=default status bar.
+call s:hi('Normal',       s:fg1,  '',    '')
 call s:hi('NonText',      s:bg3,  '',    '')
-call s:hi('LineNr',       s:bg3,  s:bg0, '')
+call s:hi('LineNr',       s:bg3,  '',    '')
 call s:hi('CursorLineNr', s:yellow, s:bg1, 'bold')
 call s:hi('CursorLine',   '',     s:bg1, '')
 call s:hi('Visual',       '',     s:bg2, '')
 call s:hi('MatchParen',   s:bg0,  s:blue, 'bold')
-call s:hi('SignColumn',   '',     s:bg0, '')
+call s:hi('SignColumn',   '',     '',    '')
 call s:hi('ColorColumn',  '',     s:bg1, '')
 call s:hi('Directory',    s:blue, '',    'bold')
 
