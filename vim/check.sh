@@ -42,7 +42,7 @@ printf '\n--- Starts clean ---\n'
 # never even started once the count was over.
 _out=$(vim -Nu "$HOME/.vimrc" -es --not-a-term \
   -c "redir! > /tmp/vimcheck.$$" \
-  -c "echo 'colors_name=' . get(g:, 'colors_name', 'UNSET') | echo 'background=' . &background | echo 'tabstop=' . &tabstop | echo 'expandtab=' . &expandtab | echo 'hlsearch=' . &hlsearch | echo 'normal_bg=' . (has_key(hlget('Normal')[0], 'guibg') ? 'set' : 'inherits') | echo 'signcol_bg=' . (has_key(hlget('SignColumn')[0], 'guibg') ? 'set' : 'inherits')" \
+  -c "echo 'colors_name=' . get(g:, 'colors_name', 'UNSET') | echo 'background=' . &background | echo 'tabstop=' . &tabstop | echo 'expandtab=' . &expandtab | echo 'hlsearch=' . &hlsearch | echo 'normal_bg=' . (has_key(hlget('Normal')[0], 'guibg') ? 'set' : 'inherits') | echo 'signcol_bg=' . (has_key(hlget('SignColumn')[0], 'guibg') ? 'set' : 'inherits') | echo 'shortmess_I=' . (&shortmess =~# 'I' ? 'yes' : 'no') | echo 'vimenter_autocmd=' . exists('#VimEnter')" \
   -c "redir END" -c "messages" -c "qa!" /dev/null 2>&1; cat "/tmp/vimcheck.$$" 2>/dev/null; rm -f "/tmp/vimcheck.$$")
 
 ck "no startup errors" "$(printf '%s' "$_out" | grep -Ec '^E[0-9]+:')" "0"
@@ -59,6 +59,14 @@ ck "vim background inherits terminal" "$(printf '%s' "$_out" | sed -n 's/^normal
 ck "sign column inherits terminal"    "$(printf '%s' "$_out" | sed -n 's/^signcol_bg=//p')" "inherits"
 ck "expandtab on"        "$(printf '%s' "$_out" | sed -n 's/^expandtab=//p')" "1"
 ck "hlsearch on"         "$(printf '%s' "$_out" | sed -n 's/^hlsearch=//p')" "1"
+ck "no splash screen"    "$(printf '%s' "$_out" | sed -n 's/^shortmess_I=//p')" "yes"
+# Confirms the autocmd is registered, not that startinsert actually landed in
+# Insert mode — :help :startinsert states plainly that it only takes effect
+# once the calling script has finished, so nothing running inside this
+# script's own -c chain can observe that transition happening. Checked the
+# opposite way first, got exactly the documented behaviour, and trusted the
+# documentation over trying to force a synchronous answer out of it.
+ck "auto-insert on empty start registered" "$(printf '%s' "$_out" | sed -n 's/^vimenter_autocmd=//p')" "1"
 
 printf '\n--- Keys that must not collide with tmux ---\n'
 # 22 is Ctrl-V's character code. Asserted by value, not by re-simulating a

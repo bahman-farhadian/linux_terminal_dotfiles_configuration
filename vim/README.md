@@ -60,6 +60,11 @@ after the cursor / on a new line below / above, if you ever want them —
 vim somefile.txt
 ```
 
+Typing bare `vim`, with no file, lands directly in Insert mode — no splash
+screen, cursor ready, since opening it with nothing to open means "I want
+to start typing," not "browse a file." `vim somefile.txt` still opens in
+Normal mode as always, since there's a real file to look at first.
+
 | Command | Does |
 |---|---|
 | `:e otherfile.txt` | Open another file |

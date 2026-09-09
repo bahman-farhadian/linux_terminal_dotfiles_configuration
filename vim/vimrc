@@ -15,6 +15,23 @@ filetype plugin indent on
 syntax on
 set encoding=utf-8
 
+" No splash screen ("VIM - Vi IMproved", the Uganda notice, :help pointers)
+" on an empty start — it is not a dialog to dismiss, it clears on the first
+" keystroke either way, but skipping it means the very first thing on
+" screen is the file, not a wall of text about how to quit.
+set shortmess+=I
+
+" Opening vim with nothing to open lands in Insert mode immediately — typing
+" bare `vim` means "I want to start typing", the way opening a blank
+" document in any other editor does, not "browse a file". Only for that one
+" case: `vim somefile.txt` still opens in Normal mode, as always, since
+" there is a real file to look at first. :help :startinsert is explicit
+" that it only takes effect once the script that calls it has finished —
+" true here too, verified by testing it the wrong way first and finding
+" that documented line, not by assuming a script-context test would show it
+" synchronously.
+autocmd VimEnter * if argc() == 0 && line('$') == 1 && getline(1) ==# '' | startinsert | endif
+
 " Leader — Ctrl-v, not the default backslash, and not any of the handful of
 " keys this project's tmux.conf claims for itself. Has to be set before any
 " mapping below uses <leader>, since the substitution happens once, at the
