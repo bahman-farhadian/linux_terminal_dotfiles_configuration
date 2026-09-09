@@ -30,27 +30,9 @@ _take() { # 1 path being removed, 2 label
 _take "$HOME/.vimrc" "$_here/vimrc"
 _take "$HOME/.vim/colors/gruvbox.vim" "$_here/colors/gruvbox.vim"
 
-# The three plugins install.sh clones live under their own pack name,
-# "minimal", chosen for exactly this: it is safe to remove that one
-# subdirectory outright, because nothing but this project's install.sh ever
-# writes there, while ~/.vim/pack itself is left alone — a different pack
-# name a user or another tool created is not this script's business, and
-# never touched.
-#
-# Not backed up like the two files above: this is an unmodified upstream git
-# clone with nothing of the user's in it, re-created by running install.sh
-# again if it is ever wanted back, network permitting.
-if [ -d "$HOME/.vim/pack/minimal" ]; then
-    echo "==> removing $HOME/.vim/pack/minimal (the three plugins install.sh fetched)"
-    rm -rf "$HOME/.vim/pack/minimal"
-    _did_something=true
-fi
-
-# Only clears directories this project creates, and only if nothing else is
-# left in them — never rm -rf beyond the one directory above, since a plugin
-# manager under a different pack name, or the user's own files, could live
-# anywhere else under ~/.vim.
-rmdir "$HOME/.vim/pack" 2>/dev/null || true
+# Only clears the one directory this project creates, and only if nothing
+# else is left in it — never rm -rf, since a plugin manager or the user's own
+# files could live one level up in ~/.vim.
 rmdir "$HOME/.vim/colors" 2>/dev/null || true
 rmdir "$HOME/.vim" 2>/dev/null || true
 

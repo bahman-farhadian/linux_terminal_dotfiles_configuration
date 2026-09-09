@@ -1,11 +1,9 @@
-" ~/.vimrc — minimal, Gruvbox dark, three plugins.
+" ~/.vimrc — minimal, Gruvbox dark, zero plugins.
 "
 " Deliberately narrow: tabs, the same colour scheme as the rest of this
-" project, search, a file tree for navigating a project the way an editor
-" with a sidebar does, and the three plugins further down that cover what
-" none of that does on its own. Nothing here traces to anything else, on
-" purpose — this file is optional and lives apart from every host's own
-" install.sh.
+" project, search, and a file tree for navigating a project the way an editor
+" with a sidebar does. Nothing here traces to anything else, on purpose —
+" this file is optional and lives apart from every host's own install.sh.
 
 set nocompatible
 filetype plugin indent on
@@ -105,28 +103,6 @@ let g:netrw_winsize = 25
 let g:netrw_browse_split = 4
 let g:netrw_altv = 1
 nnoremap <silent> <leader>e :Lexplore<CR>
-
-" Three plugins, not zero — curated from amix/vimrc's own "awesome" list
-" (github.com/amix/vimrc) rather than its full bundle, for the three gaps
-" netrw and vim's own builtins genuinely do not cover: a fuzzy file finder,
-" git integration, and comment toggling. vim/install.sh fetches them into
-" ~/.vim/pack/minimal/start/, which vim 8's own package loading picks up
-" with no plugin manager and no lines needed here to load them.
-"
-" ctrlp.vim — fuzzy find, on its own default Ctrl-p. Confirmed unclaimed by
-" tmux, stock and in this project's tmux.conf, the same way Ctrl-v was.
-" Loses vim's own Ctrl-p, "same as k" (move up a line) — k, and the up
-" arrow, still do that.
-"
-" vim-commentary — gcc toggles a comment on the current line, gc plus a
-" motion comments its target. No configuration; it reads 'commentstring',
-" which filetype detection already sets correctly per file.
-"
-" vim-fugitive — :Git for anything git, run from inside the file being
-" edited. FugitiveStatusline() below is the plugin's own documented
-" statusline hook, returning the current branch or nothing outside a repo.
-set laststatus=2
-set statusline=%<%f\ %h%m%r%{FugitiveStatusline()}%=%-14.(%l,%c%V%)\ %P
 
 " Clicking a file in that tree, or anywhere else, should do what it looks
 " like it does.

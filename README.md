@@ -378,28 +378,20 @@ vim/install.sh
 It installs vim if it is missing, backs up any `~/.vimrc` or
 `~/.vim/colors/gruvbox.vim` already there, timestamped, then writes
 `vim/vimrc` to `~/.vimrc` and `vim/colors/gruvbox.vim` to
-`~/.vim/colors/gruvbox.vim`. It then fetches three plugins — see
-[Plugins](#plugins) below — into `~/.vim/pack/minimal/start/`, which is vim
-8's own package directory and needs no plugin manager to load them.
-`vim/check.sh` verifies the result the same way every host's `check.sh`
-verifies its own build: byte-for-byte against the repository for the two
-files, a real headless run of vim checked for startup errors, and — for the
-plugins, since a directory existing proves nothing about whether it loaded —
-a check that each one's own documented command or function is actually
-present after that run.
+`~/.vim/colors/gruvbox.vim`. `vim/check.sh` verifies the result the same way
+every host's `check.sh` verifies its own build — byte-for-byte against the
+repository, plus a real headless run of vim checked for startup errors.
 
-`vim/uninstall.sh` reverses it: backs up whatever is currently at `~/.vimrc`
-and `~/.vim/colors/gruvbox.vim` — timestamped, into its own directory so it
-never collides with a backup `install.sh` made earlier — then removes both,
-along with `~/.vim/pack/minimal` outright, unbacked-up, since that one is an
-unmodified upstream clone with nothing of the user's in it. Nothing wider
-than that. `~/.vim/pack` itself, and `~/.vim`, are removed only if genuinely
-empty afterward; a plugin manager under a different pack name, or anything
-else a user has put under `~/.vim`, survives untouched, since none of it is
-this project's to delete. Vim the package is left installed too — the rest
-of this project's dotfiles set `EDITOR=vim` regardless of whether this
-config is in use, so removing the binary is out of scope for undoing *this*
-config.
+`vim/uninstall.sh` reverses it: backs up whatever is currently at those two
+paths — timestamped, into its own directory so it never collides with a
+backup `install.sh` made earlier — and removes them. It only ever touches
+those two files. `~/.vim` itself is left alone even when it is now empty of
+everything *this* project put there, and removed only if genuinely nothing
+else remains in it; a plugin manager or anything else living under `~/.vim`
+survives untouched, since none of it is this project's to delete. Vim the
+package is left installed too — the rest of this project's dotfiles set
+`EDITOR=vim` regardless of whether this config is in use, so removing the
+binary is out of scope for undoing *this* config.
 
 Deliberately narrow, matching what was actually asked for:
 
@@ -409,58 +401,6 @@ Deliberately narrow, matching what was actually asked for:
 | Tabs | 4-space, `expandtab`, a persistent tab line, `gt`/`gT` to switch — vim's own defaults, needing no mapping. |
 | Search | Incremental, case-insensitive unless the pattern itself is not, `Ctrl-l` clears stale highlighting. Project-wide search through the quickfix list, ripgrep-backed when ripgrep is present and vim's own (slower) grep otherwise. |
 | Navigate like an editor with a sidebar | `Ctrl-v e` toggles a left-hand file tree — netrw, which ships with vim, toggled with its own built-in `:Lexplore` command. No plugin. |
-| Plugins | Three, not zero — see [Plugins](#plugins) below for which, and why those three specifically. |
-
-### Plugins
-
-Three, curated from [amix/vimrc](https://github.com/amix/vimrc)'s own
-"awesome" list rather than adopted wholesale. That project actually ships
-two tiers — "basic" (`basic.vim`, no plugins at all) and "awesome" (nine,
-via pathogen) — with nothing in between; asking "why not a minimal version
-of this" meant building the minimal tier that repository does not have,
-rather than picking one that was already there. The nine are `ack.vim`,
-`bufexplorer.zip`, `ctrlp.vim`, `goyo.vim` (with `vim-zenroom2`),
-`lightline.vim`, NERDTree, `ale`, `vim-commentary`, and `vim-fugitive`. Three
-were kept:
-
-| Plugin | Why this one | Why not the other six |
-|---|---|---|
-| [ctrlp.vim](https://github.com/ctrlpvim/ctrlp.vim) | Fuzzy file finder — pure Vimscript, no external binary, the actual gap netrw's tree leaves: browsing is fine, jumping straight to a file by typing part of its name is not what a tree is for. | `bufexplorer.zip` overlaps `gt`/`gT`, already free. |
-| [vim-fugitive](https://github.com/tpope/vim-fugitive) | Git from inside the file being edited, and the branch in the statusline — a real gap, since this project's own aliases (`gs`, `gd`, `gl`, …) only run from a shell. | `ack.vim` overlaps the `Ctrl-v f`/ripgrep search already built in. |
-| [vim-commentary](https://github.com/tpope/vim-commentary) | Comment toggling — small, and genuinely reached for constantly. | NERDTree duplicates netrw, which was already built, tested, and documented. `goyo.vim`/`vim-zenroom2` are a distraction-free writing mode, not an editing gap. `lightline.vim` is a statusline plugin for what `'statusline'` plus `FugitiveStatusline()` already does in four lines, no plugin needed. `ale` is a linter framework — real value, but real configuration per language, which is the opposite of what "minimal" asked for. |
-
-Installed the way vim 8 was designed for: no plugin manager, not even
-pathogen. `vim/install.sh` clones each one, shallow, into
-`~/.vim/pack/minimal/start/<name>/`; vim loads anything under
-`~/.vim/pack/*/start/*/` on its own at startup, which is the whole
-mechanism. Re-running `install.sh` pulls each plugin's latest commit rather
-than re-cloning.
-
-This is the one network dependency anywhere in `vim/`, and it fails the same
-way the tmux completion fetch elsewhere in this project does: no network
-reaches GitHub, no plugin, vim still starts clean without it, and the
-failure is reported rather than silent.
-
-Every command below was checked against each plugin's own README before
-being written down, and against a real headless vim load with all three
-present — `:CtrlP`, `:Git`, `FugitiveStatusline()` and `:Commentary` were
-each confirmed to exist, not assumed to.
-
-| Keys / command | Action |
-|---|---|
-| `Ctrl-p` | Fuzzy-find a file by name, anywhere under the project root |
-| `Ctrl-v`, `Ctrl-x`, `Ctrl-t` inside that finder | Open the match in a vertical split / horizontal split / new tab |
-| `:Git` | Git status, staged and operated on from the same window |
-| the statusline | Shows the current branch when inside a repository, nothing when not |
-| `gcc` | Comment or uncomment the current line |
-| `gc` + a motion (`gcap` for a paragraph) | Comment or uncomment its target |
-| `gc` in Visual mode | Comment or uncomment the selection |
-
-`Ctrl-p` is unclaimed by tmux the same way `Ctrl-v` is — confirmed against
-this project's `tmux.conf` and stock tmux's own defaults, not assumed
-because it looked unlikely to collide. It does cost vim's own default
-meaning of bare `Ctrl-p` in Normal mode, "same as `k`" — move up a line —
-which `k` and the up arrow still do.
 
 ### Why the leader is Ctrl-v, not the default backslash
 
@@ -527,17 +467,10 @@ because nothing else does, not because this config added them:
 
 The full list is netrw's own `:help netrw-quickhelp`, once the tree has focus.
 
-Zero plugin *manager*, still — vim 8's own package loading needs none, so
-adding three plugins added no framework underneath them. The colour scheme
-stays a file in this repository rather than a `git clone` of someone else's;
-the three plugins are the deliberate exception to that, kept upstream and
-fetched rather than vendored, since unlike a hundred-line colorscheme,
-staying current with someone else's actively maintained plugin is exactly
-the kind of thing worth *not* taking over the maintenance of. Three plugins,
-each tied to a specific gap netrw and vim's own builtins left, not a
-starting shopping list to grow from — the same discipline "minimal" asked
-for from the start, applied to which three rather than to whether the count
-should be zero.
+Zero plugins, zero plugin manager, zero network fetches at install time — the
+colour scheme is a file in this repository, not a `git clone` of someone
+else's. That was a deliberate choice for a config the project treats as worth
+testing before it is trusted anywhere, not an accident of it being small.
 
 ## Prerequisites
 
