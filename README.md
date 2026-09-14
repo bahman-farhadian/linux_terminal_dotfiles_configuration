@@ -366,7 +366,14 @@ scp portable-bash-tmux-setup.sh you@some-debian-13-box:
 ssh you@some-debian-13-box ./portable-bash-tmux-setup.sh
 ```
 
-or paste its contents directly into a root shell on a box you're already in.
+or, on a box you're already logged into, fetch and run it directly, no local
+copy needed:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/bahman-farhadian/linux_terminal_dotfiles_configuration/main/portable-bash-tmux-setup.sh | bash
+```
+
+or paste its contents directly into a root shell.
 It installs `bash-completion`, `tmux`, `git`, `vim`, `curl`, `jq`, `tree`,
 `openssl`, and `btop` (falling back to `htop`); backs up any `.bashrc`,
 `.bash_aliases`, `.bash_profile`, `.tmux.conf` or `.hushlogin` already there,
