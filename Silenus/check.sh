@@ -92,9 +92,9 @@ miss=""
 for p in vim mokutil dmidecode efibootmgr \
   libpcre2-16-0 libdouble-conversion3 qt6-wayland qgnomeplatform-qt6 qtwayland5 qgnomeplatform-qt5 \
   fwupd fwupd-amd64-signed \
-  bash-completion bridge-utils btop curl default-jre duf ethtool ffmpeg filezilla foliate fonts-jetbrains-mono git \
+  bash-completion bridge-utils btop chatty curl default-jre duf ethtool ffmpeg filezilla foliate fonts-jetbrains-mono git \
   gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc \
-  iperf3 jq keepassxc lshw make nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio \
+  iperf3 jq keepassxc libmbim-utils lshw make mmsd-tng modemmanager nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio \
   openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv remmina remmina-plugin-rdp rsync sshuttle \
   sudo tmux traceroute tree unrar virt-top vlc wget xclip yt-dlp \
   flatpak gnome-software-plugin-flatpak  \
@@ -262,6 +262,20 @@ ck "guest-net-access active"  "$(systemctl is-active guest-net-access.service 2>
 hf "guest-net-access script"  /usr/local/sbin/guest-net-access
 hf "guest-net-access unit"    /etc/systemd/system/guest-net-access.service
 ck "unit follows libvirtd"    "$(systemctl show -p PartOf --value guest-net-access.service 2>/dev/null|grep -c libvirtd)" "1"
+
+printf '\n--- Step 15: WWAN ---\n'
+ck "fcc-unlock EM05-G" "$(readlink -f /etc/ModemManager/fcc-unlock.d/2c7c:0313 2>/dev/null)" "/usr/share/ModemManager/fcc-unlock.available.d/2c7c"
+ck "thinkpad wwan"     "$(cat /sys/devices/platform/thinkpad_acpi/wwan_enable 2>/dev/null)" "1"
+ck "nm wwan radio"     "$(nmcli radio wwan 2>/dev/null)" "enabled"
+ck "wwan modem"        "$(mmcli -L 2>/dev/null | grep -o 'Quectel EM05-G')" "Quectel EM05-G"
+ck "primary sim slot"  "$(mmcli -m any -K 2>/dev/null | awk -F': ' '/modem.generic.primary-sim-slot/{print $2; exit}' | tr -d '[:space:]')" "1"
+ck "mci type"          "$(nmcli -g connection.type connection show MCI 2>/dev/null)" "gsm"
+ck "mci apn"           "$(nmcli -g gsm.apn connection show MCI 2>/dev/null)" "mcinet"
+ck "mci autoconnect"   "$(nmcli -g connection.autoconnect connection show MCI 2>/dev/null)" "no"
+ck "mci home-only"     "$(nmcli -g gsm.home-only connection show MCI 2>/dev/null)" "yes"
+ck "mci v4 metric"     "$(nmcli -g ipv4.route-metric connection show MCI 2>/dev/null)" "1050"
+ck "chats desktop"     "$(grep -c '^Name=Chats$' /usr/share/applications/sm.puri.Chatty.desktop 2>/dev/null)" "1"
+ck "mmsd-tng user unit" "$(systemctl --user is-enabled mmsd-tng.service 2>/dev/null)" "enabled"
 
 printf '\n--- Step 7/10: keyboard and lid ---\n'
 ck "lock service" "$(systemctl --user is-active lock-keyboard-en.service)" "active"

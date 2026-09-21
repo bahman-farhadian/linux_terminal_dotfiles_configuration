@@ -465,7 +465,7 @@ sudo -i
 #### 2. Install the packages
 
 ```bash
-apt install -y bash-completion bridge-utils btop curl default-jre duf ethtool ffmpeg filezilla foliate fonts-jetbrains-mono git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc lshw make nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv remmina remmina-plugin-rdp rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip yt-dlp
+apt install -y bash-completion bridge-utils btop chatty curl default-jre duf ethtool ffmpeg filezilla foliate fonts-jetbrains-mono git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc libmbim-utils lshw make mmsd-tng modemmanager nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv remmina remmina-plugin-rdp rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip yt-dlp
 ```
 
 #### 3. Install flatpak
@@ -572,6 +572,8 @@ The `Installed:` line must show a version, not `(none)`.
 - `default-jre` runs `.jar` files with `java -jar`. It pulls OpenJDK 21. The headless variant is not used because a jar that opens a window fails at runtime under it rather than at install time.
 - `net-tools` provides `netstat`, `ifconfig` and `route`. They are superseded by `ss` and `ip` from `iproute2`, which is already installed, but the old names are still what most documentation uses.
 - `virt-top` reads from libvirt. Until libvirt is installed and running it shows nothing.
+- `libmbim-utils` provides `mbimcli`. ModemManager does not depend on it, and the FCC unlock script in Step 15 calls it. Without this package the unlock symlink is a no-op and enable still fails with `Invalid transition`.
+- `modemmanager` is the daemon `mmcli` talks to. GNOME's NetworkManager install pulls it in; it is named here so a machine without that task still gets it. `chatty` is the desktop application **Chats** (`sm.puri.Chatty.desktop`): SMS and MMS through that daemon. `mmsd-tng` is a Recommends of `chatty` and would normally arrive with it; it is named so MMS still works when `APT::Install-Recommends` is false. SMS itself is ModemManager, not `mmsd-tng`.
 -  comes from 's own repository, not Debian's. The key is fetched separately and `Signed-By` limits it to that one repository.
 - `gpg --show-keys` prints the key before apt is told to trust it. Compare the fingerprint with the one  publishes.
 - Run `` as your own user, not root. Its settings and login live in your home directory, so as root they land in `/root`.
@@ -1531,7 +1533,280 @@ the rule does anything.
 - `172.16.0.0/12` includes `172.17.0.0/16`, which is `docker0`, so containers can reach guests too. Drop that range if you would rather they could not.
 - This is the same service, by the same name, that Dionysus.md Step 11 and Hephaestus.md Step 10 install. Only the guest subnet and the outward interface differ.
 
-### Step 15 — Check the whole setup
+### Step 15 — WWAN (Quectel EM05-G)
+
+This ThinkPad has a Quectel EM05-G on USB `2c7c:0313`, in MBIM mode. It
+exposes two SIM slots: the nano-SIM tray is slot 1, and the eSIM is slot 2.
+Two things have to be true before NetworkManager can use the tray card.
+Debian ships the FCC unlock script for this USB ID and leaves it disabled, so
+the modem stays in low power with the software radio off. Independently, the
+module boots with slot 2 active, so a physical SIM in the tray is present and
+ignored.
+
+ModemManager and NetworkManager are already running from the GNOME install.
+`libmbim-utils`, `modemmanager`, `chatty` and `mmsd-tng` were installed in
+Step 6.
+
+Modem and SIM D-Bus indices change every time the module resets (`Modem/0`
+becomes `Modem/2`, `SIM/0` becomes `SIM/2`). Address them with `-m any` and
+`-i any`, never a number from an earlier command.
+
+#### 1. Confirm the module and the two SIMs
+
+```bash
+lsusb -d 2c7c:0313
+```
+
+```bash
+cat /sys/devices/platform/thinkpad_acpi/wwan_enable
+```
+
+```bash
+nmcli radio wwan
+```
+
+```bash
+mmcli -L
+```
+
+```bash
+mmcli -m any
+```
+
+`2c7c:0313` is this module. `wwan_enable` must be `1` and `nmcli radio wwan`
+must be `enabled`. If `wwan_enable` is `0`, Wireless WAN is off in the BIOS.
+
+`mmcli -m any` prints `sim slot paths`. Slot 1 is the tray, slot 2 is the
+eSIM. Inspect the object that is currently active:
+
+```bash
+mmcli -i any
+```
+
+A tray card has an ICCID. An eSIM with no downloaded profile has an EID and
+no ICCID. Before this step the modem is `disabled` / `low` power and slot 2
+is the active one.
+
+Read the identifiers when you need them. They are not stored in this file.
+
+```bash
+mmcli -i any -K | awk -F': ' '/sim.properties.iccid/{print $2}'
+```
+
+```bash
+mmcli -i any -K | awk -F': ' '/sim.properties.imsi/{print $2}'
+```
+
+```bash
+mmcli -i any -K | awk -F': ' '/sim.properties.eid/{print $2}'
+```
+
+```bash
+mmcli -m any -K | awk -F': ' '/modem.generic.primary-sim-slot/{print $2}'
+```
+
+A slot that is not active still has a path under `sim slot paths`. Inspect it
+by that path:
+
+```bash
+mmcli -i /org/freedesktop/ModemManager1/SIM/N
+```
+
+Replace `N` with the number from `mmcli -m any`.
+
+#### 2. Become root
+
+```bash
+sudo -i
+```
+
+#### 3. Enable the FCC unlock for this USB ID
+
+```bash
+ln -sft /etc/ModemManager/fcc-unlock.d /usr/share/ModemManager/fcc-unlock.available.d/2c7c:0313
+```
+
+```bash
+readlink -f /etc/ModemManager/fcc-unlock.d/2c7c:0313
+```
+
+Expect `/usr/share/ModemManager/fcc-unlock.available.d/2c7c`.
+
+#### 4. Restart ModemManager and wait for the modem
+
+```bash
+systemctl restart ModemManager
+```
+
+Leave the root shell. The rest of this step is run as your own user, with
+`sudo` only where the D-Bus policy requires it.
+
+```bash
+exit
+```
+
+```bash
+until mmcli -L 2>/dev/null | grep -q 'Quectel EM05-G'; do sleep 1; done
+mmcli -L
+```
+
+`--set-primary-sim-slot` before this wait returns `couldn't find modem`.
+
+#### 5. Enable the modem
+
+Enabling is what runs the FCC unlock script. It is allowed to an ordinary
+session.
+
+```bash
+mmcli -m any --enable
+```
+
+`Status state` becomes `enabled` and `power state` becomes `on`.
+`Invalid transition` here still means the unlock symlink is missing or
+`mbimcli` is not installed. Slot 2 is still the active slot at this point;
+registration stays `idle` until the next sub-step.
+
+#### 6. Switch the primary SIM to the tray
+
+```bash
+sudo mmcli -m any --set-primary-sim-slot=1
+```
+
+The module resets. The command itself can return `couldn't find modem`
+because the D-Bus object vanished before the reply; that is the reset, not a
+failed switch. Wait until the modem is back, then enable again:
+
+```bash
+until mmcli -L 2>/dev/null | grep -q 'Quectel EM05-G'; do sleep 1; done
+mmcli -m any --enable
+```
+
+```bash
+mmcli -m any
+```
+
+```bash
+mmcli -i any
+```
+
+`sim slot paths` must show slot 1 as `(active)`. `mmcli -i any` must show
+`active: yes` and an ICCID. `Status lock: sim-pin2` with
+`enabled locks: fixed-dialing` is PIN2 / FDN on the card; it does not block
+packet data. `unlock-required: sim-pin` (PIN1) does, and is a different
+prompt.
+
+#### 7. Create the MCI profile
+
+```bash
+nmcli connection show MCI
+```
+
+If the profile is missing, create it:
+
+```bash
+nmcli connection add type gsm ifname '*' con-name MCI apn mcinet
+```
+
+Then, whether it was new or already there:
+
+```bash
+nmcli connection modify MCI gsm.apn mcinet gsm.home-only yes ipv4.method auto ipv4.route-metric 1050 ipv4.dns-priority 120 ipv6.method auto connection.autoconnect no
+```
+
+The APN is MCI's `mcinet`. Metric 1050 and dns-priority 120 keep WiFi and
+Ethernet as the default route. Autoconnect stays off. The primary slot from
+sub-step 6 is what selects the card; leave `gsm.sim-id` unset.
+
+To pin the profile to this card later, read the ICCID and write it yourself:
+
+```bash
+iccid=$(mmcli -i any -K | awk -F': ' '/sim.properties.iccid/{print $2}' | tr -d '[:space:]')
+nmcli connection modify MCI gsm.sim-id "$iccid"
+```
+
+#### 8. Bring the packet connection up
+
+```bash
+nmcli connection up MCI
+```
+
+```bash
+nmcli device status
+```
+
+```bash
+mmcli -m any
+```
+
+`cdc-wdm0` should show `connected` and `MCI`. `mmcli` should show `state:
+connected`, `access tech: lte`, `registration: home`. A 90-second timeout
+means slot 2 is still primary (the eSIM has no subscriber). Redo sub-step 6.
+
+SMS does not need this connection. Chatty talks to ModemManager; packet data
+is for internet and for MMS.
+
+#### 9. SMS in Chats
+
+`chatty` is the application GNOME shows as **Chats**. There is no SMS
+account to add and no preference that turns SMS on. **Add New Account**
+is Matrix and XMPP. Once the tray SIM is primary and the modem is
+enabled, **+ → New SMS/MMS Message** sends and receives. The left list
+stays empty until the first thread exists.
+
+If that menu says `No modem found`, the login daemon started before the
+modem was enabled:
+
+```bash
+killall chatty; sleep 1; killall chatty; chatty
+```
+
+```bash
+mmcli -m any --messaging-list-sms
+```
+
+lists what the module currently holds.
+
+MMS is a separate path: `mmsd-tng` (user unit, enabled by the package
+preset) plus the MMSC/APN under **Protocol → SMS/MMS**. SMS does not
+use those fields.
+
+```bash
+systemctl --user status mmsd-tng.service
+```
+
+It must be `active`. `IMSI is NULL` in its log means the eSIM is still
+the primary slot.
+
+#### 10. Leave the packet connection down when you do not need it
+
+```bash
+nmcli connection down MCI
+```
+
+Leave the modem enabled if you still want SMS. Disable it only when the radio
+should be off:
+
+```bash
+mmcli -m any --disable
+```
+
+**Notes**
+
+- `Invalid transition` on enable is the FCC lock. `thinkpad_acpi` already reports `wwan_enable=1`, the WWAN rfkill is unblocked, and NetworkManager reports `WWAN-HW enabled`. Debian's `/usr/share/doc/modemmanager/README.Debian` names this error and this fix. From ModemManager 1.18.4 the unlock is off unless a symlink exists in `/etc/ModemManager/fcc-unlock.d`.
+- The script for `2c7c:0313` sends `mbimcli --device-open-proxy --quectel-set-radio-state=on`. That is the software-radio-on command. Hardware radio on and software radio off is the locked state. Link only this USB ID.
+- Slot 2 is the eSIM. An EID without an ICCID means the chip is present and no profile is downloaded onto it. The tray SIM is slot 1. The module selects slot 2 at boot.
+- `SetPrimarySimSlot` needs `org.freedesktop.ModemManager1.Control`, which an ordinary session is denied. `Enable` is allowed. That is why the slot command is `sudo` and enable is not.
+- Restarting ModemManager, and switching slots, both drop the D-Bus objects. Wait until `mmcli -L` lists the modem. The slot-switch command can print `couldn't find modem` and still have succeeded; check `primary-sim-slot` afterwards. `mmcli -i 0` fails after a reset because that object is gone; use `-i any` or the path from `mmcli -m any`.
+- `nmcli connection up MCI` times out at 90 seconds while slot 2 is still primary. The FCC unlock can succeed and this still fail.
+- Talking to `/dev/cdc-wdm0` with `mbimcli` or `qmicli` while ModemManager owns the port times out. Use `mmcli`, or pass `--device-open-proxy`.
+- Chats is `chatty`. SMS needs no extra setting: the tray SIM as primary slot and an enabled modem are enough. **+ → New SMS/MMS Message** is the inbox. The login daemon is `/etc/xdg/autostart/sm.puri.Chatty-daemon.desktop`; `killall chatty` twice then `chatty` only if the menu still says `No modem found`. XMPP and Matrix in the same application are unused here.
+- Firmware `EM05GFAR07A07M1G` is what LVFS currently has for this module. `fwupdmgr get-updates` lists the EM05-G under devices with no available updates. A BIOS update can clear `Wireless WAN` in firmware; if `wwan_enable` is then `0`, turn it back on in the BIOS rather than repeating this step.
+- `sim-pin2` / `fixed-dialing` is PIN2. Packet data comes up with it still set. `sim-pin` is PIN1; if that is required, `mmcli -m any` shows `unlock-required: sim-pin`. Set it on the profile with `nmcli connection modify MCI gsm.pin`. The PIN stays out of this file.
+- `gsm.home-only yes` keeps the modem on the home operator.
+- Autoconnect stays off. Cellular data is metered; WiFi and Ethernet are the defaults. Bring the profile up by hand when you need it.
+- This host only. Dionysus and Hephaestus have no WWAN module.
+
+### Step 16 — Check the whole setup
 
 `check.sh` in this repository runs every check the steps above describe and
 prints `PASS` or `FAIL` for each one.
