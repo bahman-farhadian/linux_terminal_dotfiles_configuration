@@ -496,7 +496,7 @@ error.
 flatpak install -y flathub org.telegram.desktop com.belmoussaoui.Obfuscate md.obsidian.Obsidian io.gitlab.adhami3310.Impression
 ```
 
-#### 6. Install what the  repository needs
+#### 6. Install what the Lens repository needs
 
 ```bash
 apt install -y curl gnupg
@@ -508,59 +508,7 @@ apt install -y curl gnupg
 install -m 0755 -d /etc/apt/keyrings
 ```
 
-#### 8. Fetch the  signing key
-
-```bash
-curl -fsSL  -o 
-```
-
-```bash
-chmod a+r 
-```
-
-Read the key before trusting it:
-
-```bash
-gpg --show-keys 
-```
-
-#### 9. Add the repository
-
-```bash
-vim 
-```
-
-Put this in it:
-
-```
-Types: deb
-URIs: 
-Suites: stable
-Components: main
-Signed-By: 
-```
-
-```bash
-apt update
-```
-
-#### 10. Install 
-
-```bash
-apt install -y 
-```
-
-#### 11. Check it
-
-```bash
-apt policy 
-```
-
-The `Installed:` line must show a version, not `(none)`.
-
-#### 12. Fetch the Lens signing key
-
-The keyring directory is already there from sub-step 7.
+#### 8. Fetch the Lens signing key
 
 ```bash
 curl -fsSL https://downloads.k8slens.dev/keys/gpg -o /etc/apt/keyrings/lens-archive-keyring.asc
@@ -576,7 +524,7 @@ gpg --show-keys /etc/apt/keyrings/lens-archive-keyring.asc
 
 The fingerprint is `958F 4ED7 52DE 9C0F E68C  177A 666A 7D88 2011 D3CE` (Mirantis, Inc.).
 
-#### 13. Add the repository
+#### 9. Add the repository
 
 ```bash
 vim /etc/apt/sources.list.d/lens.sources
@@ -597,13 +545,13 @@ Signed-By: /etc/apt/keyrings/lens-archive-keyring.asc
 apt update
 ```
 
-#### 14. Install Lens
+#### 10. Install Lens
 
 ```bash
 apt install -y lens
 ```
 
-#### 15. Check it
+#### 11. Check it
 
 ```bash
 apt policy lens
@@ -627,10 +575,9 @@ The `Installed:` line must show a version, not `(none)`.
 - `virt-top` reads from libvirt. Until libvirt is installed and running it shows nothing.
 - `libmbim-utils` provides `mbimcli`. ModemManager does not depend on it, and the FCC unlock script in Step 15 calls it. Without this package the unlock symlink is a no-op and enable still fails with `Invalid transition`.
 - `modemmanager` is the daemon `mmcli` talks to. GNOME's NetworkManager install pulls it in; it is named here so a machine without that task still gets it. `chatty` is the desktop application **Chats** (`sm.puri.Chatty.desktop`): SMS and MMS through that daemon. `mmsd-tng` is a Recommends of `chatty` and would normally arrive with it; it is named so MMS still works when `APT::Install-Recommends` is false. SMS itself is ModemManager, not `mmsd-tng`.
--  comes from 's own repository, not Debian's. The key is fetched separately and `Signed-By` limits it to that one repository.
-- Lens is the same pattern: Mirantis's repository, one package, `Signed-By` limited to that file. The key is kept as the ASCII armour they publish; `gpg --dearmor` is not needed. The keyring directory is already there from the  sub-steps.
-- `gpg --show-keys` prints the key before apt is told to trust it. Compare the fingerprint with the one  publishes. For Lens, compare with `958F 4ED7 52DE 9C0F E68C  177A 666A 7D88 2011 D3CE`.
-- Run `` as your own user, not root. Its settings and login live in your home directory, so as root they land in `/root`. Lens is the same: launch it as your own user.
+- Lens comes from Mirantis's own repository, not Debian's. One package, key fetched separately, `Signed-By` limited to that file. The key is kept as the ASCII armour they publish; `gpg --dearmor` is not needed.
+- `gpg --show-keys` prints the key before apt is told to trust it. Compare the fingerprint with `958F 4ED7 52DE 9C0F E68C  177A 666A 7D88 2011 D3CE`.
+- Run Lens as your own user, not root. Its settings live in your home directory, so as root they land in `/root`.
 - The keyring directory and the key fetch are done again in Step 9 for Docker. Both are safe to repeat: the directory is left alone if it exists, and the key file is overwritten with the same content.
 
 ### Step 7 — Bash, tmux, and SSH configuration
@@ -1148,7 +1095,7 @@ code --version
 #### 2. Install the extensions
 
 ```bash
-code --install-extension  --install-extension inferrinizzard.prettier-sql-vscode --install-extension mechatroner.rainbow-csv --install-extension mongodb.mongodb-vscode --install-extension ms-azuretools.vscode-containers --install-extension ms-azuretools.vscode-docker --install-extension ms-kubernetes-tools.vscode-kubernetes-tools --install-extension ms-python.autopep8 --install-extension ms-python.debugpy --install-extension ms-python.flake8 --install-extension ms-python.pylint --install-extension ms-python.python --install-extension ms-python.vscode-pylance --install-extension ms-python.vscode-python-envs --install-extension ms-toolsai.datawrangler --install-extension ms-toolsai.jupyter --install-extension ms-toolsai.jupyter-keymap --install-extension ms-toolsai.jupyter-renderers --install-extension ms-toolsai.vscode-jupyter-cell-tags --install-extension ms-toolsai.vscode-jupyter-slideshow --install-extension ms-vscode-remote.remote-containers --install-extension ms-vscode-remote.remote-ssh --install-extension ms-vscode-remote.remote-ssh-edit --install-extension ms-vscode.makefile-tools --install-extension ms-vscode.remote-explorer --install-extension openai.chatgpt --install-extension redhat.vscode-xml --install-extension redhat.vscode-yaml
+code --install-extension inferrinizzard.prettier-sql-vscode --install-extension mechatroner.rainbow-csv --install-extension mongodb.mongodb-vscode --install-extension ms-azuretools.vscode-containers --install-extension ms-azuretools.vscode-docker --install-extension ms-kubernetes-tools.vscode-kubernetes-tools --install-extension ms-python.autopep8 --install-extension ms-python.debugpy --install-extension ms-python.flake8 --install-extension ms-python.pylint --install-extension ms-python.python --install-extension ms-python.vscode-pylance --install-extension ms-python.vscode-python-envs --install-extension ms-toolsai.datawrangler --install-extension ms-toolsai.jupyter --install-extension ms-toolsai.jupyter-keymap --install-extension ms-toolsai.jupyter-renderers --install-extension ms-toolsai.vscode-jupyter-cell-tags --install-extension ms-toolsai.vscode-jupyter-slideshow --install-extension ms-vscode-remote.remote-containers --install-extension ms-vscode-remote.remote-ssh --install-extension ms-vscode-remote.remote-ssh-edit --install-extension ms-vscode.makefile-tools --install-extension ms-vscode.remote-explorer --install-extension openai.chatgpt --install-extension redhat.vscode-xml --install-extension redhat.vscode-yaml
 ```
 
 #### 3. Check what is installed
@@ -2063,5 +2010,4 @@ ip netns del g24; ip link del v24h 2>/dev/null || true
 - It only reads. Nothing on the machine is changed, so it is safe to run at any time.
 - It exits `0` when everything passes and `1` otherwise.
 - `nested conf` reports `not needed` when the kernel already has nested virtualisation on. That is a pass, not a gap.
-- The  key check is pinned to the fingerprint published for the release key. If  rotates it, this fails on purpose and the new key needs checking by hand.
 - **Step 11 is the one step this does not check.** Visual Studio Code is not in the Debian archive and this guide does not install it, so the extension list is a suggestion rather than part of the build. `code --list-extensions` is the check, if you want one. Every other step in this document has at least one assertion here.

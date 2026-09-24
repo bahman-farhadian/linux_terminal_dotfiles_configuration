@@ -537,7 +537,6 @@ Expect a number above 0. This machine is AMD, so the flag is `svm`.
 **Notes**
 
 - This is Silenus's package list with everything desktop-only removed: no GNOME, no flatpak, no fonts, no media applications, none of which has anything to talk to on a headless host.
--  is not installed here either, though Silenus has it. It is a developer tool for the machine you work at; a server has no use for it, and its repository and signing key are two more things to keep trusted for no return. Reach this host over SSH from Silenus instead.
 - `bash-completion`, `python3` and `openssl` are here because `install.sh` in Step 6 checks for them and warns if they are missing.
 - `network-manager` is here because a headless Debian install does not have it. It arrives on a desktop machine as a dependency of `gnome-core`, which is why Silenus has it without ever asking; no task a base install selects pulls it in. Step 10 needs `nmcli`, so it is installed with everything else rather than in the middle of reconfiguring the network.
 - Installing it here changes nothing on its own. Debian ships NetworkManager with `[ifupdown] managed=false`, so it will not touch `enp4s0` while the installer's stanza is still in `/etc/network/interfaces`. Handing that interface over is a deliberate act in Step 10. `tmux`, `vim`, `git`, `curl`, `jq` and `tree` are on the same list and already above.
@@ -1768,6 +1767,6 @@ expected, so it points at the step to redo.
 - It needs network. It pulls the `busybox` and `hello-world` images to prove the Docker storage quota is really enforced.
 - It only reads. Nothing on the machine is changed, so it is safe to run at any time.
 - It exits `0` when everything passes and `1` otherwise.
-- This is `Dionysus/check.sh`, not Silenus's. It asserts this host's disk sizes, both interfaces including the `p2plink0` rename, `static_network_32` and `isolated_network_32`, the GPU binding, and that no desktop and no  are installed. Silenus's would fail on almost all of it, and vice versa.
+- This is `Dionysus/check.sh`, not Silenus's. It asserts this host's disk sizes, both interfaces including the `p2plink0` rename, `static_network_32` and `isolated_network_32`, the GPU binding, and that no desktop is installed. Silenus's would fail on almost all of it, and vice versa.
 - The GPU checks fail until Step 9 has been through the reboot in Step 12. That is the expected order, not a fault.
 - Every step from 1 to 11 has at least one assertion here, under a heading naming it. Steps 12 and 13 have none by design: Step 12 is itself a verification pass, and Step 13 is this script.

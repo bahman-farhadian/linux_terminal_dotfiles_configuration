@@ -102,7 +102,6 @@ for p in bash-completion bridge-utils btop curl git iptables iputils-ping jq lsh
 done
 ck "all packages present" "${miss:-none missing}" "none missing"
 ck "editor is vim" "$(readlink -f /etc/alternatives/editor|grep -c vim)" "1"
-ck "no "  "$(dpkg -l  2>/dev/null|grep -c '^ii')" "0"
 ck "no desktop"    "$(dpkg -l 2>/dev/null|grep -cE '^ii +(gnome-shell|xserver-xorg-core) ')" "0"
 
 printf '\n--- Step 6: dotfiles ---\n'

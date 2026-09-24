@@ -463,7 +463,6 @@ Expect a number above 0.
 **Notes**
 
 - This is Silenus's package list with everything desktop-only removed: no GNOME, no flatpak, no fonts, no media applications, none of which has anything to talk to on a headless host. It is identical to Dionysus's.
--  is not installed here, though Silenus has it. It is a developer tool for the machine you work at; a server has no use for it, and its repository and signing key are two more things to keep trusted for no return.
 - `bash-completion`, `python3` and `openssl` are here because `install.sh` in Step 6 checks for them and warns if they are missing.
 - `network-manager` is here because a headless Debian install does not have it. It arrives on a desktop machine as a dependency of `gnome-core`; no task a base install selects pulls it in. Step 9 needs `nmcli`, so it is installed with everything else rather than in the middle of reconfiguring the network.
 - `iptables` makes libvirt's choice deterministic. `/etc/libvirt/network.conf` documents the default as the first available of `[iptables, nftables]`, and `libvirt-daemon-system` depends on neither, so the backend would otherwise be decided by whatever else happened to pull one in. Step 10 reads libvirt's `LIBVIRT_FWI` chain with `iptables`; under the nftables backend that chain does not exist.
@@ -1435,6 +1434,6 @@ what the machine returned and what was wanted.
 - It needs network. It pulls the `busybox` and `hello-world` images to prove the Docker storage quota is really enforced.
 - It only reads. Nothing on the machine is changed, so it is safe to run at any time.
 - It exits `0` when everything passes and `1` otherwise.
-- This is `Hephaestus/check.sh`, not Dionysus's. It asserts this host's disk sizes, both interfaces including the WiFi `wan` profile, `static_network_40` and `isolated_network_40`, and that no desktop and no  are installed. It carries no GPU section, because there is no card here. Dionysus's would fail on the disks, the network and the passthrough checks, and vice versa.
+- This is `Hephaestus/check.sh`, not Dionysus's. It asserts this host's disk sizes, both interfaces including the WiFi `wan` profile, `static_network_40` and `isolated_network_40`, and that no desktop is installed. It carries no GPU section, because there is no card here. Dionysus's would fail on the disks, the network and the passthrough checks, and vice versa.
 - Every step from 1 to 10 has at least one assertion here, under a heading naming it. Steps 11 and 12 have none by design: Step 11 is itself a verification pass, and Step 12 is this script.
 - The `eno1` checks assert the profile and its address, not that the link is up. The cable is only connected when Silenus is on site, and a check that failed whenever it was unplugged would be noise rather than signal.
