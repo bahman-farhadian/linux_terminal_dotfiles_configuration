@@ -1,0 +1,48 @@
+<!--
+  Network Name: isolated_network_24
+
+  This network uses a Class A private subnet 10.24.0.0/24, inside 10.0.0.0/8:
+    - 10.24.0.0      -> The "network address" used to identify the entire subnet. NetID.
+                        It cannot be assigned to any host or device.
+    - 10.24.0.1      -> Assigned to the libvirt bridge 'virbr2' on the host.
+                        Guests reach this host here; they do not use it as a
+                        default gateway, because this network has no way out.
+    - 10.24.0.2
+      through
+      10.24.0.254    -> Usable range for VM static IPs (no DHCP configured).
+    - 10.24.0.255    -> The "broadcast address" for this subnet. Also not assignable to any host.
+
+  Mode: isolated
+    - There is no <forward> element. Guests on this bridge reach each other
+      and this host, and nothing else: not the internet, not the NAT guests
+      on virbr1, and not the isolated networks on the other two hosts.
+    - The same host numbers as the NAT networks (24, 32, 40) are reused in
+      10.0.0.0/8 so an address still names the machine it belongs to.
+
+  No DHCP:
+    - No <dhcp> section is defined, so each VM must be manually configured with a static IP
+      (e.g., 10.24.0.10, netmask=255.255.255.0, no default gateway).
+
+  Typical VM static configuration might look like:
+    IP Address: 10.24.0.10
+    Netmask:    255.255.255.0
+    Gateway:    (none)
+    DNS:        (none)
+
+  Dual-homed guests keep their default gateway on static_network_24
+  (192.168.24.1) and put 10.24.0.0/24 on a second NIC attached here.
+
+  The NAT network on this host is static_network_24. libvirt's own 'default'
+  network is removed in Step 8 rather than left stopped.
+
+    virsh -c qemu:///system net-define    kvm/isolated_network_24.xml
+    virsh -c qemu:///system net-start     isolated_network_24
+    virsh -c qemu:///system net-autostart isolated_network_24
+-->
+
+<network>
+  <name>isolated_network_24</name>
+  <bridge name="virbr2" stp="on" delay="0"/>
+  <ip address="10.24.0.1" netmask="255.255.255.0">
+  </ip>
+</network>

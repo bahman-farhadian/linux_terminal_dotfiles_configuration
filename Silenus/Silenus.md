@@ -809,8 +809,8 @@ Expect `libvirt` and `kvm` in the list.
 #### 10. Remove the default network
 
 `libvirtd` defines a `default` NAT network on `192.168.122.0/24`, with its own
-DHCP server, when the package is installed. This host uses one network only, so
-`default` is removed rather than left stopped.
+DHCP server, when the package is installed. This host uses two networks of its
+own, so `default` is removed rather than left stopped.
 
 ```bash
 virsh -c qemu:///system net-destroy default
@@ -820,7 +820,7 @@ virsh -c qemu:///system net-destroy default
 virsh -c qemu:///system net-undefine default
 ```
 
-#### 11. Define the one network this host uses
+#### 11. Define the NAT network
 
 `static_network_24` — NAT on `192.168.24.0/24`, no DHCP, guests configured
 statically. The definition is `kvm/static_network_24.xml` in this repository,
@@ -838,7 +838,28 @@ virsh -c qemu:///system net-start static_network_24
 virsh -c qemu:///system net-autostart static_network_24
 ```
 
-#### 12. Verify as your own user
+#### 12. Define the isolated network
+
+`isolated_network_24` — isolated on `10.24.0.0/24`, no DHCP, no `<forward>`.
+Guests on this bridge reach each other and this host, and nothing else. The
+definition is `kvm/isolated_network_24.xml` in this repository, and its
+comment block carries the address plan. The same host numbers as the NAT
+networks — 24, 32, 40 — are reused in `10.0.0.0/8`, so an address still names
+the machine.
+
+```bash
+virsh -c qemu:///system net-define kvm/isolated_network_24.xml
+```
+
+```bash
+virsh -c qemu:///system net-start isolated_network_24
+```
+
+```bash
+virsh -c qemu:///system net-autostart isolated_network_24
+```
+
+#### 13. Verify as your own user
 
 ```bash
 virsh -c qemu:///system list --all
@@ -848,14 +869,20 @@ virsh -c qemu:///system list --all
 virsh -c qemu:///system net-list --all
 ```
 
-Both must run without a permission error. `static_network_24` must show
-`active` with `Autostart yes`, and `default` must not be listed at all.
+Both must run without a permission error. `static_network_24` and
+`isolated_network_24` must show `active` with `Autostart yes`, and `default`
+must not be listed at all.
 
 ```bash
 ip -br addr show virbr1
 ```
 
-Expect `192.168.24.1/24`. `virbr0` belonged to `default` and should be gone.
+```bash
+ip -br addr show virbr2
+```
+
+Expect `192.168.24.1/24` and `10.24.0.1/24`. `virbr0` belonged to `default`
+and should be gone.
 
 **Notes**
 
@@ -873,10 +900,11 @@ Expect `192.168.24.1/24`. `virbr0` belonged to `default` and should be gone.
 - `/etc/security/limits.d` applies to login sessions, not to systemd services. If libvirtd itself needs a higher limit, add a `LimitNOFILE` drop-in under `/etc/systemd/system/libvirtd.service.d/`.
 - libvirt raises `net.ipv4.ip_forward` itself for its NAT network, but setting it here makes it explicit and survives for bridged or routed setups.
 - Run `net-define` from the repository directory, or give the file an absolute path. libvirt reads the file at define time and stores a copy of its own, so the repository file is not consulted again afterwards; editing it later means running `net-define` again.
-- Guests get no address by themselves. With no `<dhcp>` section there is nothing handing them one, so each guest is configured by hand: address in `192.168.24.2`–`192.168.24.254`, netmask `255.255.255.0`, gateway `192.168.24.1`, DNS of your choosing. A guest left on DHCP simply comes up with no address.
+- Guests get no address by themselves. With no `<dhcp>` section there is nothing handing them one, so each guest is configured by hand. On the NAT network: address in `192.168.24.2`–`192.168.24.254`, netmask `255.255.255.0`, gateway `192.168.24.1`, DNS of your choosing. On the isolated network: address in `10.24.0.2`–`10.24.0.254`, netmask `255.255.255.0`, no default gateway. A guest left on DHCP simply comes up with no address.
 - Sub-step 10 is the one part of this step that errors on a second run: `net-destroy` reports the network is not active and `net-undefine` that it does not exist. Both are harmless and mean the work is already done. `net-define` is safe to repeat — it replaces the stored definition — and `net-start` errors the same harmless way once the network is running.
-- The bridge is `virbr1`, not `virbr0`. `virbr0` was `default`'s and disappears with it. Nothing else on this host claims `virbr1`, and the name is fixed in the XML rather than left to libvirt so it stays predictable across rebuilds.
+- The NAT bridge is `virbr1`, the isolated bridge is `virbr2`, and neither is `virbr0`. `virbr0` was `default`'s and disappears with it. Nothing else on this host claims those names, and they are fixed in the XML rather than left to libvirt so they stay predictable across rebuilds.
 - NAT means guests reach the outside and the outside cannot reach them. Exposing a guest service needs an explicit port forward on the host.
+- Isolated means there is no `<forward>` element. Guests on `virbr2` reach each other and this host at `10.24.0.1`, and they do not reach the internet, the NAT guests, or the isolated networks on Dionysus and Hephaestus. No route for `10.24.0.0/24`, `10.32.0.0/24` or `10.40.0.0/24` is written on any host: isolation is per-host by design. Dual-homed guests keep `192.168.24.1` as the default gateway and put `10.24.0.0/24` on a second NIC.
 
 ### Step 9 — Docker
 
@@ -1222,7 +1250,10 @@ graph TB
         SP["enp0s31f6 &middot; onboard RJ45<br/>Dionysus 192.168.124.2/30<br/>Hephaestus 192.168.124.6/30"]
         SB["virbr1 &middot; static_network_24<br/>192.168.24.1/24 &middot; NAT"]
         SG["guests 192.168.24.2 &ndash; .254"]
+        SI["virbr2 &middot; isolated_network_24<br/>10.24.0.1/24 &middot; isolated"]
+        SIG["guests 10.24.0.2 &ndash; .254"]
         SB --- SG
+        SI --- SIG
     end
 
     subgraph DIO ["Dionysus &middot; Ryzen 9 3900X &middot; home"]
@@ -1230,7 +1261,10 @@ graph TB
         DP["p2plink0 &middot; external USB NIC<br/>192.168.124.1/30"]
         DB["virbr1 &middot; static_network_32<br/>192.168.32.1/24 &middot; NAT"]
         DG["guests 192.168.32.2 &ndash; .254"]
+        DI["virbr2 &middot; isolated_network_32<br/>10.32.0.1/24 &middot; isolated"]
+        DIG["guests 10.32.0.2 &ndash; .254"]
         DB --- DG
+        DI --- DIG
     end
 
     subgraph HEP ["Hephaestus &middot; work"]
@@ -1238,7 +1272,10 @@ graph TB
         HE["eno1 &middot; onboard ethernet<br/>192.168.124.5/30"]
         HB["virbr1 &middot; static_network_40<br/>192.168.40.1/24 &middot; NAT"]
         HG["guests 192.168.40.2 &ndash; .254"]
+        HI["virbr2 &middot; isolated_network_40<br/>10.40.0.1/24 &middot; isolated"]
+        HIG["guests 10.40.0.2 &ndash; .254"]
         HB --- HG
+        HI --- HIG
     end
 
     R -.-|WiFi| SW
@@ -1250,24 +1287,27 @@ graph TB
     classDef wan fill:#1f6feb,stroke:#0b4fc0,color:#ffffff
     classDef p2p fill:#8957e5,stroke:#6a3fbf,color:#ffffff
     classDef guest fill:#2da44e,stroke:#1a7f37,color:#ffffff
+    classDef isolated fill:#9a6700,stroke:#7d4e00,color:#ffffff
     classDef infra fill:#57606a,stroke:#424a53,color:#ffffff
     class SW,DW,HW wan
     class SP,DP,HE p2p
     class SB,SG,DB,DG,HB,HG guest
+    class SI,SIG,DI,DIG,HI,HIG isolated
     class R,AP,INET infra
 ```
 
-Blue is each host's way out, purple the point-to-point links, green the guest
-networks each host NATs behind itself. Dotted lines are wireless or a cable that
-is only connected at one site; solid ones are permanent cable.
+Blue is each host's way out, purple the point-to-point links, green the NAT
+guest networks each host NATs behind itself, amber the isolated guest networks
+that stay on that host. Dotted lines are wireless or a cable that is only
+connected at one site; solid ones are permanent cable.
 
 Silenus has one spare ethernet port and two peers, so it carries a profile for
 each and only one is up at a time. Neither autoconnects: the one for the site
 you are at is brought up by hand.
 
-Three guest subnets, three point-to-point `/30`s out of one `/29`, and no two
-overlap: the hosts can reach one another, so an address has to say which machine
-it belongs to.
+Three NAT guest subnets, three isolated guest subnets in `10.0.0.0/8`, three
+point-to-point `/30`s out of one `/29`, and no two overlap: the hosts can reach
+one another, so an address has to say which machine it belongs to.
 
 ```mermaid
 flowchart LR
@@ -1911,6 +1951,7 @@ asks the opposite, and reproducing a host depends on the answer:
 ```
   PASS  no network namespaces              none
   PASS  virbr1 carries only guest taps     none
+  PASS  virbr2 carries only guest taps     none
   PASS  no extra sysctl drop-ins           none
   PASS  no extra sshd drop-ins             none
   PASS  no undocumented next hops          none
@@ -1923,10 +1964,11 @@ debugging, a drop-in written once and forgotten — and residue nothing looks fo
 survives into the next rebuild as a difference nobody can explain.
 
 The section is deliberately narrow, covering only what this build owns:
-namespaces, what is attached to `virbr1`, the two drop-in directories, and any
-next hop for a guest or point-to-point subnet that no step here writes. It
-cannot police a whole machine, and it is not meant to. It polices the parts that
-would otherwise make two supposedly identical hosts behave differently.
+namespaces, what is attached to `virbr1` and `virbr2`, the two drop-in
+directories, and any next hop for a guest or point-to-point subnet that no
+step here writes. It cannot police a whole machine, and it is not meant to.
+It polices the parts that would otherwise make two supposedly identical hosts
+behave differently.
 
 The residue it was written for was real. A namespace from sub-step 6 was still
 up, with its veth attached to `virbr1`, through a run reporting 133 `PASS` and

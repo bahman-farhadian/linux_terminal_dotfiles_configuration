@@ -576,8 +576,8 @@ cd ~/dotfiles/Dionysus
 ```
 
 Keep it. `install.sh` needs the directory to re-run, and Step 7 reads
-`kvm/static_network_32.xml` from it — by way of your home directory, which is
-why it has to be cloned there.
+`kvm/static_network_32.xml` and `kvm/isolated_network_32.xml` from it — by way
+of your home directory, which is why it has to be cloned there.
 
 #### 3. Run the installer
 
@@ -732,8 +732,8 @@ Expect `sssd-pool` and `lssd-pool` both active, with autostart `yes`.
 #### 7. Remove the default NAT network
 
 `libvirtd` creates a `default` NAT network on install, typically
-`192.168.122.0/24`, with its own DHCP server. This host uses one network only,
-so it is removed rather than left stopped:
+`192.168.122.0/24`, with its own DHCP server. This host uses two networks of
+its own, so it is removed rather than left stopped:
 
 ```bash
 virsh net-destroy default
@@ -754,14 +754,20 @@ virsh pool-list --all
 
 Expect `sssd-pool` and `lssd-pool`, alongside whatever `default` libvirt keeps.
 
-#### 8. Define the one network this host uses
+#### 8. Define the two networks this host uses
 
 `static_network_32` — NAT on `192.168.32.0/24`, no DHCP, guests configured
 statically. The definition is `kvm/static_network_32.xml` in this repository,
 and its comment block carries the address plan.
 
+`isolated_network_32` — isolated on `10.32.0.0/24`, no DHCP, no `<forward>`.
+Guests on this bridge reach each other and this host, and nothing else. The
+definition is `kvm/isolated_network_32.xml`. The same host numbers as the NAT
+networks — 24, 32, 40 — are reused in `10.0.0.0/8`, so an address still names
+the machine.
+
 `sudo -i` in sub-step 1 left you in `/root`, so go back to the host directory
-first — this path is relative to it:
+first — these paths are relative to it:
 
 ```bash
 cd ~<your-user>/dotfiles/Dionysus
@@ -780,17 +786,34 @@ virsh net-autostart static_network_32
 ```
 
 ```bash
+virsh net-define kvm/isolated_network_32.xml
+```
+
+```bash
+virsh net-start isolated_network_32
+```
+
+```bash
+virsh net-autostart isolated_network_32
+```
+
+```bash
 virsh net-list --all
 ```
 
-Expect `static_network_32` active with `Autostart yes`, and no `default`.
+Expect `static_network_32` and `isolated_network_32` active with `Autostart
+yes`, and no `default`.
 
 ```bash
 ip -br addr show virbr1
 ```
 
-Expect `192.168.32.1/24`. libvirt creates and owns this bridge, which is why
-Step 10 builds no bridge of its own.
+```bash
+ip -br addr show virbr2
+```
+
+Expect `192.168.32.1/24` and `10.32.0.1/24`. libvirt creates and owns both
+bridges, which is why Step 10 builds no bridge of its own.
 
 #### 9. Leave the root shell
 
@@ -831,6 +854,7 @@ Expect `libvirt` and `kvm` in the list.
 - The default pool is not removed, because `virt-manager` recreates it whenever it next connects to this host. Deleting it is a chore repeated forever rather than a fix; knowing where it points is the durable answer.
 - `net-define` reads the file at define time and stores a copy of its own, so the repository file is not consulted again afterwards. Editing it later means running `net-define` again.
 - The path is relative to the host directory. Give it an absolute path instead if you would rather not change directory, but do not leave it relative while sitting in `/root`, where the file does not exist.
+- Isolated means there is no `<forward>` element. Guests on `virbr2` reach each other and this host at `10.32.0.1`, and they do not reach the internet, the NAT guests, or the isolated networks on Silenus and Hephaestus. No route for `10.24.0.0/24`, `10.32.0.0/24` or `10.40.0.0/24` is written on any host. Dual-homed guests keep `192.168.32.1` as the default gateway and put `10.32.0.0/24` on a second NIC.
 - IP forwarding is set in Step 10 alongside the bridges, since that is what needs it.
 
 ### Step 8 — Docker
@@ -1096,7 +1120,7 @@ Expect `4`, not `8`. Eight means the append ran twice.
 ### Step 10 — Networking
 
 Two interfaces, doing different jobs. Guests are on neither: they live on the
-libvirt network defined in Step 7, and libvirt owns that bridge.
+two libvirt networks defined in Step 7, and libvirt owns those bridges.
 
 | Interface | Kind | Address | Purpose |
 |---|---|---|---|
@@ -1122,7 +1146,10 @@ graph TB
         SP["enp0s31f6 &middot; onboard RJ45<br/>Dionysus 192.168.124.2/30<br/>Hephaestus 192.168.124.6/30"]
         SB["virbr1 &middot; static_network_24<br/>192.168.24.1/24 &middot; NAT"]
         SG["guests 192.168.24.2 &ndash; .254"]
+        SI["virbr2 &middot; isolated_network_24<br/>10.24.0.1/24 &middot; isolated"]
+        SIG["guests 10.24.0.2 &ndash; .254"]
         SB --- SG
+        SI --- SIG
     end
 
     subgraph DIO ["Dionysus &middot; Ryzen 9 3900X &middot; home"]
@@ -1130,7 +1157,10 @@ graph TB
         DP["p2plink0 &middot; external USB NIC<br/>192.168.124.1/30"]
         DB["virbr1 &middot; static_network_32<br/>192.168.32.1/24 &middot; NAT"]
         DG["guests 192.168.32.2 &ndash; .254"]
+        DI["virbr2 &middot; isolated_network_32<br/>10.32.0.1/24 &middot; isolated"]
+        DIG["guests 10.32.0.2 &ndash; .254"]
         DB --- DG
+        DI --- DIG
     end
 
     subgraph HEP ["Hephaestus &middot; work"]
@@ -1138,7 +1168,10 @@ graph TB
         HE["eno1 &middot; onboard ethernet<br/>192.168.124.5/30"]
         HB["virbr1 &middot; static_network_40<br/>192.168.40.1/24 &middot; NAT"]
         HG["guests 192.168.40.2 &ndash; .254"]
+        HI["virbr2 &middot; isolated_network_40<br/>10.40.0.1/24 &middot; isolated"]
+        HIG["guests 10.40.0.2 &ndash; .254"]
         HB --- HG
+        HI --- HIG
     end
 
     R -.-|WiFi| SW
@@ -1150,16 +1183,19 @@ graph TB
     classDef wan fill:#1f6feb,stroke:#0b4fc0,color:#ffffff
     classDef p2p fill:#8957e5,stroke:#6a3fbf,color:#ffffff
     classDef guest fill:#2da44e,stroke:#1a7f37,color:#ffffff
+    classDef isolated fill:#9a6700,stroke:#7d4e00,color:#ffffff
     classDef infra fill:#57606a,stroke:#424a53,color:#ffffff
     class SW,DW,HW wan
     class SP,DP,HE p2p
     class SB,SG,DB,DG,HB,HG guest
+    class SI,SIG,DI,DIG,HI,HIG isolated
     class R,AP,INET infra
 ```
 
-Blue is each host's way out, purple the point-to-point links, green the guest
-networks each host NATs behind itself. Dotted lines are wireless or a cable that
-is only connected at one site; solid ones are permanent cable.
+Blue is each host's way out, purple the point-to-point links, green the NAT
+guest networks each host NATs behind itself, amber the isolated guest networks
+that stay on that host. Dotted lines are wireless or a cable that is only
+connected at one site; solid ones are permanent cable.
 
 Silenus has one spare ethernet port and two peers, so it carries a profile for
 each and only one is up at a time. Neither autoconnects: the one for the site
@@ -1337,7 +1373,7 @@ Expect `net.ipv4.ip_forward = 1`.
 
 **Notes**
 
-- There is no `br-kvm` here and no bridge built by hand. The draft this document grew from built one, because it also hand-maintained the NAT rules. Defining the guest network in libvirt instead — the same choice Silenus made — means libvirt creates and owns `virbr1`, so a second hand-built bridge would only duplicate it.
+- There is no `br-kvm` here and no bridge built by hand. The draft this document grew from built one, because it also hand-maintained the NAT rules. Defining the guest networks in libvirt instead — the same choice Silenus made — means libvirt creates and owns `virbr1` and `virbr2`, so a hand-built bridge would only duplicate them.
 - The rename binds to the MAC address, so it follows that one adapter. A replacement adapter needs its own MAC written into the `.link` file, or it comes up under its own `enx` name with no profile attached.
 - `p2plink0` is chosen to be a name nothing else generates. The kernel produces `en*`, `wl*` and `ww*`; `wpa_supplicant` produces `p2p0` and `p2p-dev-*` for Wi-Fi Direct. A rename that collides with an automatically assigned name can race with it, which is why both `eth0` and `p2p0` are avoided.
 - The file must sort before `99-default.link`, where the default naming policy lives. `10-` does.
@@ -1591,13 +1627,18 @@ The second needs Silenus up on the other end of the cable.
 virsh -c qemu:///system net-list --all
 ```
 
-Expect `static_network_32` active with `Autostart yes`, and no `default`.
+Expect `static_network_32` and `isolated_network_32` active with `Autostart
+yes`, and no `default`.
 
 ```bash
 ip -br addr show virbr1
 ```
 
-Expect `192.168.32.1/24`.
+```bash
+ip -br addr show virbr2
+```
+
+Expect `192.168.32.1/24` and `10.32.0.1/24`.
 
 ```bash
 sudo iptables -t nat -L LIBVIRT_PRT -n -v
@@ -1655,7 +1696,7 @@ virsh -c qemu:///system vol-create-as sssd-pool <vm-name>.qcow2 20G --format qco
 ```
 
 ```bash
-virt-install --connect qemu:///system --name <vm-name> --memory 4096 --vcpus 2 --disk vol=sssd-pool/<vm-name>.qcow2 --network network=static_network_32 --os-variant debian13 --cdrom /data-root/isos/debian-13-netinst.iso
+virt-install --connect qemu:///system --name <vm-name> --memory 4096 --vcpus 2 --disk vol=sssd-pool/<vm-name>.qcow2 --network network=static_network_32 --network network=isolated_network_32 --os-variant debian13 --cdrom /data-root/isos/debian-13-netinst.iso
 ```
 
 Docker quota enforcement:
@@ -1727,6 +1768,6 @@ expected, so it points at the step to redo.
 - It needs network. It pulls the `busybox` and `hello-world` images to prove the Docker storage quota is really enforced.
 - It only reads. Nothing on the machine is changed, so it is safe to run at any time.
 - It exits `0` when everything passes and `1` otherwise.
-- This is `Dionysus/check.sh`, not Silenus's. It asserts this host's disk sizes, both interfaces including the `p2plink0` rename, `static_network_32`, the GPU binding, and that no desktop and no  are installed. Silenus's would fail on almost all of it, and vice versa.
+- This is `Dionysus/check.sh`, not Silenus's. It asserts this host's disk sizes, both interfaces including the `p2plink0` rename, `static_network_32` and `isolated_network_32`, the GPU binding, and that no desktop and no  are installed. Silenus's would fail on almost all of it, and vice versa.
 - The GPU checks fail until Step 9 has been through the reboot in Step 12. That is the expected order, not a fault.
 - Every step from 1 to 11 has at least one assertion here, under a heading naming it. Steps 12 and 13 have none by design: Step 12 is itself a verification pass, and Step 13 is this script.

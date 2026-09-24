@@ -144,6 +144,10 @@ ck "no default net"  "$(virsh -c qemu:///system net-list --all --name 2>/dev/nul
 ck "static_network_24" "$(virsh -c qemu:///system net-list --name 2>/dev/null|grep -cx static_network_24)" "1"
 ck "net autostart"   "$(virsh -c qemu:///system net-info static_network_24 2>/dev/null|awk '/^Autostart/{print $2}')" "yes"
 ck "virbr1 address"  "$(ip -4 -br addr show virbr1 2>/dev/null|awk '{print $3}')" "192.168.24.1/24"
+ck "isolated_network_24" "$(virsh -c qemu:///system net-list --name 2>/dev/null|grep -cx isolated_network_24)" "1"
+ck "isolated autostart" "$(virsh -c qemu:///system net-info isolated_network_24 2>/dev/null|awk '/^Autostart/{print $2}')" "yes"
+ck "isolated no forward" "$(virsh -c qemu:///system net-dumpxml isolated_network_24 2>/dev/null|grep -c '<forward')" "0"
+ck "virbr2 address"  "$(ip -4 -br addr show virbr2 2>/dev/null|awk '{print $3}')" "10.24.0.1/24"
 
 printf '\n--- Step 9: Docker ---\n'
 ck "docker active"   "$(systemctl is-active docker)" "active"
@@ -404,12 +408,14 @@ _ns=$(ip netns list 2>/dev/null | awk '{print $1}' | sort | tr '\n' ' ')
 ck "no network namespaces" "${_ns:-none}" "none"
 _brif=$(ls /sys/class/net/virbr1/brif 2>/dev/null | grep -v '^vnet' | sort | tr '\n' ' ')
 ck "virbr1 carries only guest taps" "${_brif:-none}" "none"
+_brif2=$(ls /sys/class/net/virbr2/brif 2>/dev/null | grep -v '^vnet' | sort | tr '\n' ' ')
+ck "virbr2 carries only guest taps" "${_brif2:-none}" "none"
 _sy=$(ls /etc/sysctl.d/ 2>/dev/null | grep -vxE '99-kvm\.conf|README\.sysctl' | sort | tr '\n' ' ')
 ck "no extra sysctl drop-ins" "${_sy:-none}" "none"
 _sd=$(ls /etc/ssh/sshd_config.d/ 2>/dev/null | grep -vx '99-local\.conf' | sort | tr '\n' ' ')
 ck "no extra sshd drop-ins" "${_sd:-none}" "none"
 # Any next hop for a subnet this build owns that the documents do not name.
-_badr=$(for s in 192.168.24.0/24 192.168.32.0/24 192.168.40.0/24 192.168.124.0/24; do ip -4 route show "$s" 2>/dev/null; done \
+_badr=$(for s in 192.168.24.0/24 192.168.32.0/24 192.168.40.0/24 192.168.124.0/24 10.24.0.0/24 10.32.0.0/24 10.40.0.0/24; do ip -4 route show "$s" 2>/dev/null; done \
         | sed -n 's/.*via \([0-9.]*\).*/\1/p' | grep -vxE '192.168.124.1|192.168.8.3|192.168.124.5|192.168.88.212' | sort -u | tr '\n' ' ')
 ck "no undocumented next hops" "${_badr:-none}" "none"
 

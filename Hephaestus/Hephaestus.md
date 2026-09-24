@@ -492,7 +492,7 @@ cd ~/dotfiles/Hephaestus
 ```
 
 Keep it. `install.sh` needs the directory to re-run, and Step 7 reads
-`kvm/static_network_40.xml` from it.
+`kvm/static_network_40.xml` and `kvm/isolated_network_40.xml` from it.
 
 #### 3. Run the installer
 
@@ -624,8 +624,8 @@ Expect `lssd-pool` active with autostart `yes`.
 #### 7. Remove the default NAT network
 
 `libvirtd` creates a `default` NAT network on install, typically
-`192.168.122.0/24`, with its own DHCP server. This host uses one network only,
-so it is removed rather than left stopped:
+`192.168.122.0/24`, with its own DHCP server. This host uses two networks of
+its own, so it is removed rather than left stopped:
 
 ```bash
 virsh net-destroy default
@@ -635,10 +635,20 @@ virsh net-destroy default
 virsh net-undefine default
 ```
 
-#### 8. Define the one network this host uses
+#### 8. Define the two networks this host uses
+
+`static_network_40` — NAT on `192.168.40.0/24`, no DHCP, guests configured
+statically. The definition is `kvm/static_network_40.xml` in this repository,
+and its comment block carries the address plan.
+
+`isolated_network_40` — isolated on `10.40.0.0/24`, no DHCP, no `<forward>`.
+Guests on this bridge reach each other and this host, and nothing else. The
+definition is `kvm/isolated_network_40.xml`. The same host numbers as the NAT
+networks — 24, 32, 40 — are reused in `10.0.0.0/8`, so an address still names
+the machine.
 
 `sudo -i` in sub-step 1 left you in `/root`, so go back to the host directory
-first — this path is relative to it:
+first — these paths are relative to it:
 
 ```bash
 cd ~<your-user>/dotfiles/Hephaestus
@@ -657,16 +667,33 @@ virsh net-autostart static_network_40
 ```
 
 ```bash
+virsh net-define kvm/isolated_network_40.xml
+```
+
+```bash
+virsh net-start isolated_network_40
+```
+
+```bash
+virsh net-autostart isolated_network_40
+```
+
+```bash
 virsh net-list --all
 ```
 
-Expect `static_network_40` active with `Autostart yes`, and no `default`.
+Expect `static_network_40` and `isolated_network_40` active with `Autostart
+yes`, and no `default`.
 
 ```bash
 ip -br addr show virbr1
 ```
 
-Expect `192.168.40.1/24`.
+```bash
+ip -br addr show virbr2
+```
+
+Expect `192.168.40.1/24` and `10.40.0.1/24`.
 
 #### 9. Leave the root shell
 
@@ -699,6 +726,7 @@ groups
 - `modprobe -r` fails if a virtual machine is running. Shut them down first.
 - The packaged `osinfo-db` is the maintained source, refreshed by `apt upgrade`. Do not use `osinfo-db-import --latest`: it fetches from a third-party host libosinfo's own maintainers have flagged as unreliable.
 - `net-define` reads the file at define time and stores a copy of its own, so editing the repository file later means running `net-define` again.
+- Isolated means there is no `<forward>` element. Guests on `virbr2` reach each other and this host at `10.40.0.1`, and they do not reach the internet, the NAT guests, or the isolated networks on Silenus and Dionysus. No route for `10.24.0.0/24`, `10.32.0.0/24` or `10.40.0.0/24` is written on any host. Dual-homed guests keep `192.168.40.1` as the default gateway and put `10.40.0.0/24` on a second NIC.
 
 ### Step 8 — Docker
 
@@ -865,8 +893,8 @@ docker run --rm hello-world
 
 ### Step 9 — Networking
 
-Two interfaces. Guests are on neither: they live on the libvirt network defined
-in Step 7, and libvirt owns that bridge.
+Two interfaces. Guests are on neither: they live on the two libvirt networks
+defined in Step 7, and libvirt owns those bridges.
 
 | Interface | Kind | Address | Purpose |
 |---|---|---|---|
@@ -887,7 +915,10 @@ graph TB
         HE["eno1 &middot; onboard ethernet<br/>connection: Hephaestus<br/>192.168.124.5/30"]
         HB["virbr1 &middot; static_network_40<br/>192.168.40.1/24 &middot; NAT"]
         HG["guests<br/>192.168.40.2 &ndash; .254<br/>static, no DHCP"]
+        HI["virbr2 &middot; isolated_network_40<br/>10.40.0.1/24 &middot; isolated"]
+        HIG["guests<br/>10.40.0.2 &ndash; .254<br/>static, no DHCP"]
         HB --- HG
+        HI --- HIG
     end
 
     SIL["Silenus<br/>192.168.124.6/30"]
@@ -897,22 +928,27 @@ graph TB
     classDef wan fill:#1f6feb,stroke:#0b4fc0,color:#ffffff
     classDef p2p fill:#8957e5,stroke:#6a3fbf,color:#ffffff
     classDef guest fill:#2da44e,stroke:#1a7f37,color:#ffffff
+    classDef isolated fill:#9a6700,stroke:#7d4e00,color:#ffffff
     classDef infra fill:#57606a,stroke:#424a53,color:#ffffff
     class HW wan
     class HE p2p
     class HB,HG guest
+    class HI,HIG isolated
     class AP,INET infra
     class SIL p2p
 ```
 
 Blue is this host's way out, purple the point-to-point link to Silenus, green
-the guest network it NATs behind itself. The dotted line is wireless; the solid
-one is the cable, which is only connected when Silenus is on site.
+the NAT guest network it NATs behind itself, amber the isolated guest network
+that stays on this host. The dotted line is wireless; the solid one is the
+cable, which is only connected when Silenus is on site.
 
-The guest subnet is `192.168.40.0/24` here, against `192.168.24.0/24` on Silenus
-and `192.168.32.0/24` on Dionysus. All three differ on purpose: the hosts can
-reach one another, so overlapping guest ranges would make a guest on one
-indistinguishable from a guest on another.
+The NAT guest subnet is `192.168.40.0/24` here, against `192.168.24.0/24` on
+Silenus and `192.168.32.0/24` on Dionysus. The isolated subnet is
+`10.40.0.0/24`, against `10.24.0.0/24` and `10.32.0.0/24`. All six differ on
+purpose: the hosts can reach one another, so overlapping guest ranges would
+make a guest on one indistinguishable from a guest on another. Isolated
+guests are not routed between hosts in any case.
 
 
 #### 1. Become root
@@ -1130,7 +1166,7 @@ Expect `net.ipv4.ip_forward = 1`.
 
 **Notes**
 
-- There is no bridge built by hand for guests. Defining the guest network in libvirt — the same choice the other two hosts made — means libvirt creates and owns `virbr1`.
+- There is no bridge built by hand for guests. Defining the guest networks in libvirt — the same choice the other two hosts made — means libvirt creates and owns `virbr1` and `virbr2`.
 - Nothing is renamed on this host. Both interfaces have stable hardware-derived names already, which is exactly why Dionysus renames its USB adapter and this machine renames nothing.
 - **A WiFi install always leaves ifupdown holding the adapter**, and sub-step 4 is how it is taken back. This is not the handover Dionysus needed. There the ethernet stanza only made the interface unmanaged, and `[ifupdown] managed=false` settled it. Here the stanza carries `wpa-ssid` and `wpa-psk`, so it starts a second supplicant, and the symptom is not `unmanaged` but `unavailable` alongside `NM-MANAGED: yes` — a combination that reads like a driver or firmware fault and is neither.
 - The failure names the wrong device, which is the confusing part. `No suitable device found for this connection (device docker0 not available because profile is not compatible with device (mismatching interface name))` is NetworkManager reporting the last device it happened to check. `wlp2s0` is missing from that message precisely because it was never a candidate to begin with.
@@ -1285,7 +1321,7 @@ Expect no output.
 #### 3. Both interfaces and the guest bridge
 
 ```bash
-ip -br addr show | grep -E 'wlp2s0|eno1|virbr1'
+ip -br addr show | grep -E 'wlp2s0|eno1|virbr1|virbr2'
 ```
 
 ```bash
@@ -1300,7 +1336,8 @@ Exactly one default route, on `wlp2s0`.
 virsh -c qemu:///system net-list --all
 ```
 
-Expect `static_network_40` active with `Autostart yes`, and no `default`.
+Expect `static_network_40` and `isolated_network_40` active with `Autostart
+yes`, and no `default`.
 
 #### 5. The firewall order survived
 
@@ -1367,7 +1404,7 @@ proper — run it next.
 - **Confirm the machine actually rebooted before trusting anything below.** `systemctl reboot` refuses while another user — typically a `root` shell left open from an earlier step — holds a session, and it says so rather than failing silently. Every check here then runs against the old boot and passes for the wrong reason. `uptime -p` after logging back in is the cheap way to be sure.
 - Verification is gathered here because the changes in Steps 9 and 10 only take effect on this boot. Checking them earlier reports the state before the change, which reads as a pass and is not one.
 - **No guest is built here.** Nothing in this document creates an install ISO or a directory to keep one in, so a `virt-install` line naming one could not be run by anyone following this guide. A guest left behind by a verification step is also debris on a machine that is otherwise reproducible end to end. The volume test proves what this step can honestly prove: the pool is active, libvirt allocates on it, and the space comes back.
-- When you do build the first guest, give it a static address on `192.168.40.0/24` with gateway `192.168.40.1` — nothing hands one out. Reachability is then tested outward with `ping -c3 192.168.88.212` from inside the guest, and inward with `ping -c3 <guest-address>` from a machine holding a route to that subnet. `virt-install --cdrom` expects a console this host does not have, so add `--noautoconsole` and attach afterwards with `virsh console <vm-name>`. Name the pool explicitly — `--disk vol=lssd-pool/<name>.qcow2` — or libvirt puts the disk in the `default` pool on the 32 GiB root filesystem.
+- When you do build the first guest, give it a static address on `192.168.40.0/24` with gateway `192.168.40.1` — nothing hands one out. An isolated NIC, if you attach one, takes an address on `10.40.0.0/24` with no default gateway. Reachability on the NAT side is then tested outward with `ping -c3 192.168.88.212` from inside the guest, and inward with `ping -c3 <guest-address>` from a machine holding a route to that subnet. `virt-install --cdrom` expects a console this host does not have, so add `--noautoconsole` and attach afterwards with `virsh console <vm-name>`. Name the pool explicitly — `--disk vol=lssd-pool/<name>.qcow2` — or libvirt puts the disk in the `default` pool on the 32 GiB root filesystem. A second `--network network=isolated_network_40` attaches the isolated NIC.
 - **Reaching a guest from off-site is a login to this host, not a route.** Silenus routes `192.168.40.0/24` across the cable when it is here, and across the work LAN when it is on that WiFi. From anywhere else: `ssh <you>@192.168.88.212`, then `ssh <guest-address>` from the shell it gives you. That works from home because the office VPN carries `192.168.88.0/24` and this host answers on that address. Not `ssh -J` — `ProxyJump` forwards only the connection, so the guest would authenticate the laptop's key rather than this host's, and this host's is the one a guest it built already trusts.
 - **A route over the VPN is deliberately not configured, and only one direction of it would even work.** This host can reach Silenus's VPN address through the office router, so `192.168.24.0/24` via that address would resolve. The reverse does not: a packet Silenus sends for `192.168.40.0/24` arrives at the VPN server, which routes by destination and has no route for this guest network. Configuring the half that works leaves traffic going out one path and replies coming back another, which breaks anything stateful and reads as packet loss rather than as a misconfiguration. Joining the two sites properly means a tunnel between them, which is a larger thing than the SSH hop it would replace.
 
@@ -1398,6 +1435,6 @@ what the machine returned and what was wanted.
 - It needs network. It pulls the `busybox` and `hello-world` images to prove the Docker storage quota is really enforced.
 - It only reads. Nothing on the machine is changed, so it is safe to run at any time.
 - It exits `0` when everything passes and `1` otherwise.
-- This is `Hephaestus/check.sh`, not Dionysus's. It asserts this host's disk sizes, both interfaces including the WiFi `wan` profile, `static_network_40`, and that no desktop and no  are installed. It carries no GPU section, because there is no card here. Dionysus's would fail on the disks, the network and the passthrough checks, and vice versa.
+- This is `Hephaestus/check.sh`, not Dionysus's. It asserts this host's disk sizes, both interfaces including the WiFi `wan` profile, `static_network_40` and `isolated_network_40`, and that no desktop and no  are installed. It carries no GPU section, because there is no card here. Dionysus's would fail on the disks, the network and the passthrough checks, and vice versa.
 - Every step from 1 to 10 has at least one assertion here, under a heading naming it. Steps 11 and 12 have none by design: Step 11 is itself a verification pass, and Step 12 is this script.
 - The `eno1` checks assert the profile and its address, not that the link is up. The cable is only connected when Silenus is on site, and a check that failed whenever it was unplugged would be noise rather than signal.

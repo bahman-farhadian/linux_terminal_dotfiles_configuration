@@ -102,7 +102,10 @@ graph TB
         SP["enp0s31f6 &middot; onboard RJ45<br/>Dionysus 192.168.124.2/30<br/>Hephaestus 192.168.124.6/30"]
         SB["virbr1 &middot; static_network_24<br/>192.168.24.1/24 &middot; NAT"]
         SG["guests 192.168.24.2 &ndash; .254"]
+        SI["virbr2 &middot; isolated_network_24<br/>10.24.0.1/24 &middot; isolated"]
+        SIG["guests 10.24.0.2 &ndash; .254"]
         SB --- SG
+        SI --- SIG
     end
 
     subgraph DIO ["Dionysus &middot; Ryzen 9 3900X &middot; home"]
@@ -110,7 +113,10 @@ graph TB
         DP["p2plink0 &middot; external USB NIC<br/>192.168.124.1/30"]
         DB["virbr1 &middot; static_network_32<br/>192.168.32.1/24 &middot; NAT"]
         DG["guests 192.168.32.2 &ndash; .254"]
+        DI["virbr2 &middot; isolated_network_32<br/>10.32.0.1/24 &middot; isolated"]
+        DIG["guests 10.32.0.2 &ndash; .254"]
         DB --- DG
+        DI --- DIG
     end
 
     subgraph HEP ["Hephaestus &middot; work"]
@@ -118,7 +124,10 @@ graph TB
         HE["eno1 &middot; onboard ethernet<br/>192.168.124.5/30"]
         HB["virbr1 &middot; static_network_40<br/>192.168.40.1/24 &middot; NAT"]
         HG["guests 192.168.40.2 &ndash; .254"]
+        HI["virbr2 &middot; isolated_network_40<br/>10.40.0.1/24 &middot; isolated"]
+        HIG["guests 10.40.0.2 &ndash; .254"]
         HB --- HG
+        HI --- HIG
     end
 
     R -.-|WiFi| SW
@@ -130,30 +139,46 @@ graph TB
     classDef wan fill:#1f6feb,stroke:#0b4fc0,color:#ffffff
     classDef p2p fill:#8957e5,stroke:#6a3fbf,color:#ffffff
     classDef guest fill:#2da44e,stroke:#1a7f37,color:#ffffff
+    classDef isolated fill:#9a6700,stroke:#7d4e00,color:#ffffff
     classDef infra fill:#57606a,stroke:#424a53,color:#ffffff
     class SW,DW,HW wan
     class SP,DP,HE p2p
     class SB,SG,DB,DG,HB,HG guest
+    class SI,SIG,DI,DIG,HI,HIG isolated
     class R,AP,INET infra
 ```
 
-Blue is each host's way out, purple the point-to-point links, green the guest
-networks each host NATs behind itself. Dotted lines are wireless or a cable that
-is only connected at one site; solid ones are permanent cable.
+Blue is each host's way out, purple the point-to-point links, green the NAT
+guest networks each host NATs behind itself, amber the isolated guest networks
+that stay on that host. Dotted lines are wireless or a cable that is only
+connected at one site; solid ones are permanent cable.
 
 Silenus has one spare ethernet port and two peers, so it carries a profile for
 each and only one is up at a time. Neither autoconnects: the one for the site
 you are at is brought up by hand.
 
-Three guest subnets, three point-to-point `/30`s out of one `/29`, and no two
-overlap: the hosts can reach one another, so an address has to say which machine
-it belongs to.
+Three NAT guest subnets, three isolated guest subnets in `10.0.0.0/8`, three
+point-to-point `/30`s out of one `/29`, and no two overlap: the hosts can reach
+one another, so an address has to say which machine it belongs to.
 
 ## The guest networks
 
 Each host NATs its own guests behind itself, and Silenus is the hub: it holds a
 route to the guest network of whichever peer its cable is currently in, forwards
 for its own guests, and each peer holds a route back to `192.168.24.0/24`.
+
+Each host also keeps an isolated libvirt network in `10.0.0.0/8`, no DHCP, no
+forwarding, using the same host numbers as the NAT subnets:
+
+| Host | NAT (`virbr1`) | Isolated (`virbr2`) |
+|---|---|---|
+| Silenus | `192.168.24.0/24` | `10.24.0.0/24` |
+| Dionysus | `192.168.32.0/24` | `10.32.0.0/24` |
+| Hephaestus | `192.168.40.0/24` | `10.40.0.0/24` |
+
+Guests on an isolated bridge reach each other and their own host. They are not
+routed between machines. Dual-homed guests keep the NAT address as the default
+gateway and put the `10.x.0.0/24` address on a second NIC.
 
 ```mermaid
 graph LR
@@ -320,7 +345,8 @@ one of the two, the path works one way and reads as a routing fault.
 │   │   ├── check.sh
 │   │   └── README.md      how to use it — vim's own modes up, not just keys
 │   ├── kvm/
-│   │   └── static_network_24.xml   the one libvirt network on this host
+│   │   ├── static_network_24.xml     NAT, 192.168.24.0/24
+│   │   └── isolated_network_24.xml   isolated, 10.24.0.0/24
 │   ├── install.sh         bash, tmux, ssh, vim, and the GNOME parts
 │   ├── check.sh
 │   ├── gnome-app-folders.py
@@ -332,14 +358,16 @@ one of the two, the path works one way and reads as a routing fault.
 │   ├── hushlogin
 │   ├── vim/               identical to Silenus/vim/
 │   ├── kvm/
-│   │   └── static_network_32.xml   guest network, 192.168.32.0/24
+│   │   ├── static_network_32.xml     NAT, 192.168.32.0/24
+│   │   └── isolated_network_32.xml   isolated, 10.32.0.0/24
 │   ├── install.sh         bash, tmux, ssh, vim — no GNOME
 │   ├── check.sh
 │   └── Dionysus.md
 └── Hephaestus/            second headless KVM host, no GPU
     ├── bash/  tmux/  ssh/  hushlogin  vim/
     ├── kvm/
-    │   └── static_network_40.xml   guest network, 192.168.40.0/24
+    │   ├── static_network_40.xml     NAT, 192.168.40.0/24
+    │   └── isolated_network_40.xml   isolated, 10.40.0.0/24
     ├── install.sh         identical to Dionysus/install.sh
     ├── check.sh
     └── Hephaestus.md

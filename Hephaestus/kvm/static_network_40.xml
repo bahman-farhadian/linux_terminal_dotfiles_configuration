@@ -26,7 +26,8 @@
     Gateway:    192.168.40.1
     DNS:        8.8.8.8, 1.1.1.1
 
-  This is the only libvirt network on this host. libvirt's own 'default' network is
+  This is the NAT network on this host. The isolated network is
+  isolated_network_40 on 10.40.0.0/24. libvirt's own 'default' network is
   removed in Step 7 rather than left stopped, so nothing else claims a subnet or runs
   a DHCP server for guests that are meant to be static.
 
