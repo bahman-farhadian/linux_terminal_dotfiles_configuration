@@ -77,12 +77,17 @@ for s in "trixie" "trixie-security" "trixie-updates"; do
 done
 hf "docker.sources"      /etc/apt/sources.list.d/docker.sources
 hf "" 
+hf "lens.sources"        /etc/apt/sources.list.d/lens.sources
 ck "no " "$([ -e  ] && echo present || echo absent)" "absent"
+ck "no lens.list"        "$([ -e /etc/apt/sources.list.d/lens.list ] && echo present || echo absent)" "absent"
 hf "docker key"      /etc/apt/keyrings/docker.asc
 hf " key" 
+hf "lens key"        /etc/apt/keyrings/lens-archive-keyring.asc
 ck " key valid" "$(gpg --show-keys  2>/dev/null|grep -c 31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE)" "1"
+ck "lens key valid"   "$(gpg --show-keys /etc/apt/keyrings/lens-archive-keyring.asc 2>/dev/null|tr -d ' '|grep -c 958F4ED752DE9C0FE68C177A666A7D882011D3CE)" "1"
 ck "docker suite"  "$(grep -c '^Suites: trixie$' /etc/apt/sources.list.d/docker.sources)" "1"
 ck " signed-by" "$(grep -c '^Signed-By: $' )" "1"
+ck "lens signed-by"   "$(grep -c '^Signed-By: /etc/apt/keyrings/lens-archive-keyring.asc$' /etc/apt/sources.list.d/lens.sources)" "1"
 u=$(sudo apt update 2>&1)
 ck "apt update errors"    "$(printf '%s' "$u"|grep -c '^Err:')" "0"
 ck "apt duplicate warns"  "$(printf '%s' "$u"|grep -ci 'configured multiple times')" "0"
@@ -97,7 +102,7 @@ for p in vim mokutil dmidecode efibootmgr \
   iperf3 jq keepassxc libmbim-utils lshw make mmsd-tng modemmanager nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio \
   openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv remmina remmina-plugin-rdp rsync sshuttle \
   sudo tmux traceroute tree unrar virt-top vlc wget xclip yt-dlp \
-  flatpak gnome-software-plugin-flatpak  \
+  flatpak gnome-software-plugin-flatpak  lens \
   qemu-system-x86 qemu-utils ovmf virtinst virt-manager libvirt-daemon-system libvirt-clients \
   libosinfo-bin osinfo-db osinfo-db-tools libguestfs-tools cloud-image-utils acl util-linux \
   ca-certificates docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; do

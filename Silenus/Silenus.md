@@ -558,6 +558,59 @@ apt policy
 
 The `Installed:` line must show a version, not `(none)`.
 
+#### 12. Fetch the Lens signing key
+
+The keyring directory is already there from sub-step 7.
+
+```bash
+curl -fsSL https://downloads.k8slens.dev/keys/gpg -o /etc/apt/keyrings/lens-archive-keyring.asc
+```
+
+```bash
+chmod a+r /etc/apt/keyrings/lens-archive-keyring.asc
+```
+
+```bash
+gpg --show-keys /etc/apt/keyrings/lens-archive-keyring.asc
+```
+
+The fingerprint is `958F 4ED7 52DE 9C0F E68C  177A 666A 7D88 2011 D3CE` (Mirantis, Inc.).
+
+#### 13. Add the repository
+
+```bash
+vim /etc/apt/sources.list.d/lens.sources
+```
+
+Put this in it:
+
+```
+Types: deb
+URIs: https://downloads.k8slens.dev/apt/debian
+Suites: stable
+Components: main
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/lens-archive-keyring.asc
+```
+
+```bash
+apt update
+```
+
+#### 14. Install Lens
+
+```bash
+apt install -y lens
+```
+
+#### 15. Check it
+
+```bash
+apt policy lens
+```
+
+The `Installed:` line must show a version, not `(none)`.
+
 **Notes**
 
 - `remmina` is the remote-desktop client, from Debian's own repository rather than a flatpak. The protocols live in separate plugin packages, so `remmina` on its own gives you the application with no way to open an RDP session. `remmina-plugin-rdp` is a Recommends of `remmina` and would normally arrive with it, but it is named here so the install does not depend on recommends being enabled — a machine configured with `APT::Install-Recommends "false"` would otherwise get a client that cannot speak the one protocol it was installed for.
@@ -575,8 +628,9 @@ The `Installed:` line must show a version, not `(none)`.
 - `libmbim-utils` provides `mbimcli`. ModemManager does not depend on it, and the FCC unlock script in Step 15 calls it. Without this package the unlock symlink is a no-op and enable still fails with `Invalid transition`.
 - `modemmanager` is the daemon `mmcli` talks to. GNOME's NetworkManager install pulls it in; it is named here so a machine without that task still gets it. `chatty` is the desktop application **Chats** (`sm.puri.Chatty.desktop`): SMS and MMS through that daemon. `mmsd-tng` is a Recommends of `chatty` and would normally arrive with it; it is named so MMS still works when `APT::Install-Recommends` is false. SMS itself is ModemManager, not `mmsd-tng`.
 -  comes from 's own repository, not Debian's. The key is fetched separately and `Signed-By` limits it to that one repository.
-- `gpg --show-keys` prints the key before apt is told to trust it. Compare the fingerprint with the one  publishes.
-- Run `` as your own user, not root. Its settings and login live in your home directory, so as root they land in `/root`.
+- Lens is the same pattern: Mirantis's repository, one package, `Signed-By` limited to that file. The key is kept as the ASCII armour they publish; `gpg --dearmor` is not needed. The keyring directory is already there from the  sub-steps.
+- `gpg --show-keys` prints the key before apt is told to trust it. Compare the fingerprint with the one  publishes. For Lens, compare with `958F 4ED7 52DE 9C0F E68C  177A 666A 7D88 2011 D3CE`.
+- Run `` as your own user, not root. Its settings and login live in your home directory, so as root they land in `/root`. Lens is the same: launch it as your own user.
 - The keyring directory and the key fetch are done again in Step 9 for Docker. Both are safe to repeat: the directory is left alone if it exists, and the key file is overwritten with the same content.
 
 ### Step 7 — Bash, tmux, and SSH configuration
