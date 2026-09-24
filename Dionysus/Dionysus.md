@@ -759,8 +759,10 @@ Expect `sssd-pool` and `lssd-pool`, alongside whatever `default` libvirt keeps.
 statically. The definition is `kvm/static_network_32.xml` in this repository,
 and its comment block carries the address plan.
 
-`isolated_network_32` — isolated on `10.32.0.0/24`, no DHCP, no `<forward>`.
-Guests on this bridge reach each other and this host, and nothing else. The
+`isolated_network_32` — isolated on `10.32.0.0/24`, no DHCP, no `<forward>`,
+no masquerade. Guests on this bridge have no path to the public internet.
+Silenus routes this prefix the same way as `192.168.32.0/24`, and
+`guest-net-access` (Step 11) lets private networks into `virbr2`. The
 definition is `kvm/isolated_network_32.xml`. The same host numbers as the NAT
 networks — 24, 32, 40 — are reused in `10.0.0.0/8`, so an address still names
 the machine.
@@ -853,7 +855,7 @@ Expect `libvirt` and `kvm` in the list.
 - The default pool is not removed, because `virt-manager` recreates it whenever it next connects to this host. Deleting it is a chore repeated forever rather than a fix; knowing where it points is the durable answer.
 - `net-define` reads the file at define time and stores a copy of its own, so the repository file is not consulted again afterwards. Editing it later means running `net-define` again.
 - The path is relative to the host directory. Give it an absolute path instead if you would rather not change directory, but do not leave it relative while sitting in `/root`, where the file does not exist.
-- Isolated means there is no `<forward>` element. Guests on `virbr2` reach each other and this host at `10.32.0.1`, and they do not reach the internet, the NAT guests, or the isolated networks on Silenus and Hephaestus. No route for `10.24.0.0/24`, `10.32.0.0/24` or `10.40.0.0/24` is written on any host. Dual-homed guests keep `192.168.32.1` as the default gateway and put `10.32.0.0/24` on a second NIC.
+- Isolated means there is no `<forward>` element and no masquerade, so guests have no path to the public internet. Silenus is the hub: it holds a route to `10.32.0.0/24`, this host holds a route back to `10.24.0.0/24` (Step 10), and Step 11 lets private networks into `virbr2`. Isolated-only guests use `10.32.0.1` as their default gateway so they can reply. Dual-homed guests keep `192.168.32.1` as the default gateway and put `10.32.0.0/24` on a second NIC.
 - IP forwarding is set in Step 10 alongside the bridges, since that is what needs it.
 
 ### Step 8 — Docker
@@ -1193,8 +1195,8 @@ graph TB
 
 Blue is each host's way out, purple the point-to-point links, green the NAT
 guest networks each host NATs behind itself, amber the isolated guest networks
-that stay on that host. Dotted lines are wireless or a cable that is only
-connected at one site; solid ones are permanent cable.
+(no internet; Silenus routes them like NAT). Dotted lines are wireless or a
+cable that is only connected at one site; solid ones are permanent cable.
 
 Silenus has one spare ethernet port and two peers, so it carries a profile for
 each and only one is up at a time. Neither autoconnects: the one for the site
@@ -1308,7 +1310,9 @@ nmcli con add type ethernet ifname p2plink0 con-name Dionysus ipv4.method manual
 nmcli con mod wan connection.autoconnect yes
 nmcli con mod Dionysus connection.autoconnect yes
 nmcli con mod Dionysus +ipv4.routes "192.168.24.0/24 192.168.124.2 100"
+nmcli con mod Dionysus +ipv4.routes "10.24.0.0/24 192.168.124.2 100"
 nmcli con mod wan +ipv4.routes "192.168.24.0/24 192.168.8.2 200"
+nmcli con mod wan +ipv4.routes "10.24.0.0/24 192.168.8.2 200"
 printf 'source /etc/network/interfaces.d/*\n\nauto lo\niface lo inet loopback\n' > /etc/network/interfaces
 grep -rl enp4s0 /etc/network/interfaces.d/ 2>/dev/null | xargs -r rm -f
 systemctl restart NetworkManager
@@ -1393,14 +1397,16 @@ Expect `net.ipv4.ip_forward = 1`.
 - The block brings `Dionysus` up before `wan`, so a machine whose `enp4s0` refuses to come back is still reachable on `192.168.124.1` from Silenus. That ordering is deliberate, not alphabetical.
 - `ip addr show` takes one device, not a list. `ip -br addr show enp4s0 p2plink0` fails with `either "dev" is duplicate, or "p2plink0" is garbage`; filtering the full listing is the way to see both at once.
 - IPv6 is disabled on both profiles. Nothing in this build uses it, and leaving it on means a second address family to reason about in the firewall.
-- Reaching a guest on `192.168.32.0/24` from Silenus needs routes on Silenus — Silenus.md Step 13 sub-step 3 — forwarding on this host, which sub-step 7 enables, and the rules in Step 11. All three, or a guest stays unreachable.
+- Reaching a guest on `192.168.32.0/24` or `10.32.0.0/24` from Silenus needs routes on Silenus — Silenus.md Step 13 sub-step 3 — forwarding on this host, which sub-step 7 enables, and the rules in Step 11. All three, or a guest stays unreachable. Isolated-only guests also need `10.32.0.1` as their default gateway so the reply can leave.
 
 ### Step 11 — Firewall
 
 `libvirt` writes the rules for `static_network_32` itself when the network
-starts. This step does not repeat any of them. It adds the one thing libvirt
-deliberately does not do: letting a machine outside the guest network open a
-connection into it.
+starts. Isolated `isolated_network_32` has no `<forward>`, so libvirt rejects
+forwarding in and out of `virbr2`. This step does not repeat libvirt's NAT
+rules. It adds the one thing libvirt deliberately does not do: letting a
+machine outside the guest networks open a
+connection into them.
 
 #### 1. Read what libvirt installed
 
@@ -1432,7 +1438,9 @@ falls to the `REJECT`. That is the gap this step closes.
 
 | # | Rule | Required | Why |
 |---|------|----------|-----|
-| 1 | `FORWARD` accept, private ranges → `192.168.32.0/24` | **yes** | without it nothing on your network can reach a guest at all |
+| 1 | `FORWARD` accept, private ranges → `192.168.32.0/24` out `virbr1` | **yes** | without it nothing on your network can reach a NAT guest at all |
+| 2 | `FORWARD` accept, private ranges → `10.32.0.0/24` out `virbr2` | **yes** | isolated has no `<forward>`, so inbound is rejected the same way |
+| 3 | `FORWARD` accept, `10.32.0.0/24` in `virbr2` | **yes** | isolated also rejects outbound; replies from isolated guests need this. NAT already allows outbound itself |
 
 #### 3. Add the required rules, as a service
 
@@ -1450,19 +1458,25 @@ So they are re-applied by a unit ordered after both daemons instead:
 ```bash
 sudo tee /usr/local/sbin/guest-net-access >/dev/null <<'EOF'
 #!/bin/sh
-# Let private networks open connections into the libvirt guest network.
+# Let private networks open connections into the libvirt guest networks.
 #
 # These must precede the jump to LIBVIRT_FWI, whose final rule rejects anything
-# inbound to virbr1 that conntrack does not already know. libvirtd re-inserts
-# its own jumps at the head of FORWARD on every start, so this deletes and
+# inbound to virbr1 that conntrack does not already know. Isolated virbr2 has
+# no <forward>, so libvirt rejects both inbound and outbound; replies from
+# isolated guests need the outbound ACCEPT as well. libvirtd re-inserts its
+# own jumps at the head of FORWARD on every start, so this deletes and
 # re-inserts rather than assuming a position it once had.
 set -e
 for net in 192.168.0.0/16 172.16.0.0/12 10.0.0.0/8; do
     iptables -D FORWARD -s "$net" -d 192.168.32.0/24 -o virbr1 -j ACCEPT 2>/dev/null || true
+    iptables -D FORWARD -s "$net" -d 10.32.0.0/24 -o virbr2 -j ACCEPT 2>/dev/null || true
 done
+iptables -D FORWARD -s 10.32.0.0/24 -i virbr2 -j ACCEPT 2>/dev/null || true
 for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
     iptables -I FORWARD 1 -s "$net" -d 192.168.32.0/24 -o virbr1 -j ACCEPT
+    iptables -I FORWARD 1 -s "$net" -d 10.32.0.0/24 -o virbr2 -j ACCEPT
 done
+iptables -I FORWARD 1 -s 10.32.0.0/24 -i virbr2 -j ACCEPT
 EOF
 sudo chmod +x /usr/local/sbin/guest-net-access
 sudo tee /etc/systemd/system/guest-net-access.service >/dev/null <<'EOF'
@@ -1494,7 +1508,7 @@ The three `ACCEPT` rules must come out **before** `-j LIBVIRT_FWI`. Read it, the
 have the shell decide:
 
 ```bash
-ours=$(sudo iptables -S FORWARD | grep -n 'd 192.168.32.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1); libv=$(sudo iptables -S FORWARD | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1); if [ -n "$ours" ] && [ -n "$libv" ] && [ "$ours" -lt "$libv" ]; then echo "  PASS  rules precede LIBVIRT_FWI ($ours < $libv)"; else echo "  FAIL  ours=$ours libvirt=$libv"; fi
+ours=$(sudo iptables -S FORWARD | grep -n 'd 192.168.32.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1); iso=$(sudo iptables -S FORWARD | grep -n 'd 10.32.0.0/24 -o virbr2 -j ACCEPT' | tail -1 | cut -d: -f1); libv=$(sudo iptables -S FORWARD | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1); if [ -n "$ours" ] && [ -n "$iso" ] && [ -n "$libv" ] && [ "$ours" -lt "$libv" ] && [ "$iso" -lt "$libv" ]; then echo "  PASS  rules precede LIBVIRT_FWI ($ours $iso < $libv)"; else echo "  FAIL  ours=$ours iso=$iso libvirt=$libv"; fi
 ```
 
 ```bash
@@ -1653,7 +1667,7 @@ sudo systemctl is-active guest-net-access.service
 ```
 
 ```bash
-ours=$(sudo iptables -S FORWARD | grep -n 'd 192.168.32.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1); libv=$(sudo iptables -S FORWARD | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1); if [ -n "$ours" ] && [ -n "$libv" ] && [ "$ours" -lt "$libv" ]; then echo "  PASS  rules precede LIBVIRT_FWI ($ours < $libv)"; else echo "  FAIL  ours=$ours libvirt=$libv"; fi
+ours=$(sudo iptables -S FORWARD | grep -n 'd 192.168.32.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1); iso=$(sudo iptables -S FORWARD | grep -n 'd 10.32.0.0/24 -o virbr2 -j ACCEPT' | tail -1 | cut -d: -f1); libv=$(sudo iptables -S FORWARD | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1); if [ -n "$ours" ] && [ -n "$iso" ] && [ -n "$libv" ] && [ "$ours" -lt "$libv" ] && [ "$iso" -lt "$libv" ]; then echo "  PASS  rules precede LIBVIRT_FWI ($ours $iso < $libv)"; else echo "  FAIL  ours=$ours iso=$iso libvirt=$libv"; fi
 ```
 
 This boot is the only thing that proves the ordering holds. `libvirtd` inserts

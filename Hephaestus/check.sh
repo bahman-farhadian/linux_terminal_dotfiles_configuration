@@ -207,11 +207,13 @@ ck "p2p autoconnect" "$(nmcli -g connection.autoconnect connection show Hephaest
 # Half of a pair: this route lets a guest here answer one on Silenus, and
 # Silenus.md Step 14 lets a connection started here in past libvirt's REJECT.
 ck "route to silenus guests" "$(nmcli -g ipv4.routes connection show Hephaestus 2>/dev/null|grep -c '192.168.24.0/24 192.168.124.6 100')" "1"
+ck "route to silenus isolated" "$(nmcli -g ipv4.routes connection show Hephaestus 2>/dev/null|grep -c '10.24.0.0/24 192.168.124.6 100')" "1"
 # Written against whatever Silenus holds on the work WiFi, which is a lease
 # rather than a reservation. Absent, it is unconfigured rather than wrong.
 # Gatewayless, so there is no leased address to go stale and this is a fact
 # about our own configuration rather than about Silenus's current lease.
 ck "silenus guests fallback" "$(nmcli -g ipv4.routes connection show wan 2>/dev/null|grep -c '192.168.24.0/24')" "1"
+ck "silenus isolated fallback" "$(nmcli -g ipv4.routes connection show wan 2>/dev/null|grep -c '10.24.0.0/24')" "1"
 if [ "$(cat /sys/class/net/eno1/carrier 2>/dev/null)" = "1" ]; then
   ck "p2p link up" "$(ip -4 -br addr show eno1 2>/dev/null|awk '{print $3}')" "192.168.124.5/30"
 else
@@ -227,12 +229,16 @@ ck "default gw reachable" "$(ip -4 route show default|awk '{print $3}'|head -1|x
 printf '\n--- Step 10: firewall ---\n' 
 for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
   ck "guests reachable from $net" "$(sudo iptables -C FORWARD -s "$net" -d 192.168.40.0/24 -o virbr1 -j ACCEPT 2>/dev/null && echo yes || echo no)" "yes"
+  ck "isolated reachable from $net" "$(sudo iptables -C FORWARD -s "$net" -d 10.40.0.0/24 -o virbr2 -j ACCEPT 2>/dev/null && echo yes || echo no)" "yes"
 done
+ck "isolated replies outbound" "$(sudo iptables -C FORWARD -s 10.40.0.0/24 -i virbr2 -j ACCEPT 2>/dev/null && echo yes || echo no)" "yes"
 # Existence is not enough: a rule below the jump to LIBVIRT_FWI, whose last rule
 # rejects anything inbound to virbr1, is never reached and still passes -C.
 _ours=$(sudo iptables -S FORWARD 2>/dev/null | grep -n 'd 192.168.40.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1)
+_iso=$(sudo iptables -S FORWARD 2>/dev/null | grep -n 'd 10.40.0.0/24 -o virbr2 -j ACCEPT' | tail -1 | cut -d: -f1)
 _libv=$(sudo iptables -S FORWARD 2>/dev/null | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1)
 ck "rules precede LIBVIRT_FWI" "$([ -n "$_ours" ] && [ -n "$_libv" ] && [ "$_ours" -lt "$_libv" ] && echo yes || echo no)" "yes"
+ck "isolated rules precede LIBVIRT_FWI" "$([ -n "$_iso" ] && [ -n "$_libv" ] && [ "$_iso" -lt "$_libv" ] && echo yes || echo no)" "yes"
 ck "guest-net-access enabled" "$(systemctl is-enabled guest-net-access.service 2>/dev/null)" "enabled"
 ck "guest-net-access active"  "$(systemctl is-active guest-net-access.service 2>/dev/null)" "active"
 hf "guest-net-access script"  /usr/local/sbin/guest-net-access
@@ -267,6 +273,9 @@ printf '  %-17s %-9s %-9s %-27s %s\n' "-----------------" "--------" "--------" 
 printf '  %-17s %-9s %-9s %-27s %s\n' "192.168.24.0/24" \
   "$(_cfg '192.168.24.0/24 192.168.124.6 100')" $(nmcli -g ipv4.routes connection show wan 2>/dev/null|grep -q '192.168.24.0/24' && echo yes || echo NO) \
   "$(_live 192.168.24.0/24)" "$(_ans 192.168.24.1)"
+printf '  %-17s %-9s %-9s %-27s %s\n' "10.24.0.0/24" \
+  "$(_cfg '10.24.0.0/24 192.168.124.6 100')" $(nmcli -g ipv4.routes connection show wan 2>/dev/null|grep -q '10.24.0.0/24' && echo yes || echo NO) \
+  "$(_live 10.24.0.0/24)" "$(_ans 10.24.0.1)"
 printf '\n  %-17s %-18s %s\n' "peer host" "address" "answers"
 printf '  %-17s %-18s %s\n' "-----------------" "------------------" "-------"
 printf '  %-17s %-18s %s\n' "Silenus" "192.168.124.6" "$(_ans 192.168.124.6)"
@@ -281,6 +290,7 @@ _routed(){ # 1 subnet -> yes/no. A route for this exact prefix, or none.
   [ -n "$(ip -4 route show "$1" 2>/dev/null)" ] && echo yes || echo no
 }
 ck "Silenus guests routed" "$(_routed 192.168.24.0/24)" "yes"
+ck "Silenus isolated routed" "$(_routed 10.24.0.0/24)" "yes"
 _peer=""
 for a in 192.168.124.6; do
   ping -c1 -W2 "$a" >/dev/null 2>&1 && { _peer=$a; break; }
@@ -296,6 +306,11 @@ if [ -n "$_peer" ]; then
     # the cable to an address Silenus has not brought up: its point-to-point
     # profiles do not autoconnect, so a plugged cable is not a configured one.
     ck "Silenus guests reachable" "no" "yes"
+  fi
+  if ping -c1 -W2 10.24.0.1 >/dev/null 2>&1; then
+    ck "Silenus isolated reachable" "yes" "yes"
+  else
+    ck "Silenus isolated reachable" "no" "yes"
   fi
 else
   na "Silenus guests reachable" "Silenus is not answering on 192.168.124.6, the far end of the cable, so it is at the other site or switched off"

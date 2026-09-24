@@ -150,8 +150,8 @@ graph TB
 
 Blue is each host's way out, purple the point-to-point links, green the NAT
 guest networks each host NATs behind itself, amber the isolated guest networks
-that stay on that host. Dotted lines are wireless or a cable that is only
-connected at one site; solid ones are permanent cable.
+(no internet; Silenus routes them like NAT). Dotted lines are wireless or a
+cable that is only connected at one site; solid ones are permanent cable.
 
 Silenus has one spare ethernet port and two peers, so it carries a profile for
 each and only one is up at a time. Neither autoconnects: the one for the site
@@ -164,11 +164,12 @@ one another, so an address has to say which machine it belongs to.
 ## The guest networks
 
 Each host NATs its own guests behind itself, and Silenus is the hub: it holds a
-route to the guest network of whichever peer its cable is currently in, forwards
-for its own guests, and each peer holds a route back to `192.168.24.0/24`.
+route to the guest networks of whichever peer its cable is currently in, forwards
+for its own guests, and each peer holds a route back to `192.168.24.0/24` and
+`10.24.0.0/24`.
 
 Each host also keeps an isolated libvirt network in `10.0.0.0/8`, no DHCP, no
-forwarding, using the same host numbers as the NAT subnets:
+masquerade, using the same host numbers as the NAT subnets:
 
 | Host | NAT (`virbr1`) | Isolated (`virbr2`) |
 |---|---|---|
@@ -176,9 +177,11 @@ forwarding, using the same host numbers as the NAT subnets:
 | Dionysus | `192.168.32.0/24` | `10.32.0.0/24` |
 | Hephaestus | `192.168.40.0/24` | `10.40.0.0/24` |
 
-Guests on an isolated bridge reach each other and their own host. They are not
-routed between machines. Dual-homed guests keep the NAT address as the default
-gateway and put the `10.x.0.0/24` address on a second NIC.
+Silenus routes `10.32.0.0/24` and `10.40.0.0/24` with the same cable / LAN
+fallbacks as the NAT guest nets. Isolated-only guests use the host `.1` as
+default gateway so they can reply; they still have no path to the public
+internet. Dual-homed guests keep the NAT address as the default gateway and
+put the `10.x.0.0/24` address on a second NIC.
 
 ```mermaid
 graph LR
@@ -217,8 +220,8 @@ local network at a higher metric, and the kernel falls back on its own.
 
 | From | To | Routed |
 |---|---|---|
-| Silenus guests | Dionysus guests | at home — cable, else the home LAN |
-| Silenus guests | Hephaestus guests | at work — cable, else the work WiFi |
+| Silenus guests (NAT and isolated) | Dionysus guests (NAT and isolated) | at home — cable, else the home LAN |
+| Silenus guests (NAT and isolated) | Hephaestus guests (NAT and isolated) | at work — cable, else the work WiFi |
 | Dionysus guests | Hephaestus guests | **no** |
 
 **Guest subnets are routed within a site, never between them.** That last row is
@@ -280,11 +283,11 @@ its own guests, because it *is* their gateway:
 
 | You are | The guest is on | How |
 |---|---|---|
-| at home | Dionysus | direct — `192.168.32.0/24` is routed |
-| at home | Silenus | direct — `192.168.24.0/24` is routed |
+| at home | Dionysus | direct — `192.168.32.0/24` and `10.32.0.0/24` are routed |
+| at home | Silenus | direct — `192.168.24.0/24` and `10.24.0.0/24` are on-link |
 | at home, on the office VPN | Hephaestus | `ssh <you>@192.168.88.212`, then `ssh <guest>` |
-| at work | Hephaestus | direct — `192.168.40.0/24` is routed |
-| at work | Silenus | direct — `192.168.24.0/24` is routed |
+| at work | Hephaestus | direct — `192.168.40.0/24` and `10.40.0.0/24` are routed |
+| at work | Silenus | direct — `192.168.24.0/24` and `10.24.0.0/24` are on-link |
 | at work | Dionysus | `ssh <you>@192.168.8.3`, then `ssh <guest>`, if home is reachable |
 
 Two logins rather than `ssh -J`. `ProxyJump` only forwards the TCP connection,
@@ -311,8 +314,9 @@ over a bridge it owns.
 
 Each direction needs both halves. A route tells the far host how to send a
 packet; the `guest-net-access` service on the receiving host is what lets a
-connection *started* elsewhere past libvirt's `REJECT` on `virbr1`. With only
-one of the two, the path works one way and reads as a routing fault.
+connection *started* elsewhere past libvirt's `REJECT` on `virbr1` and
+`virbr2`. With only one of the two, the path works one way and reads as a
+routing fault.
 
 ## Layout
 

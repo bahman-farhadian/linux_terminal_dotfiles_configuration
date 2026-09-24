@@ -640,8 +640,10 @@ virsh net-undefine default
 statically. The definition is `kvm/static_network_40.xml` in this repository,
 and its comment block carries the address plan.
 
-`isolated_network_40` — isolated on `10.40.0.0/24`, no DHCP, no `<forward>`.
-Guests on this bridge reach each other and this host, and nothing else. The
+`isolated_network_40` — isolated on `10.40.0.0/24`, no DHCP, no `<forward>`,
+no masquerade. Guests on this bridge have no path to the public internet.
+Silenus routes this prefix the same way as `192.168.40.0/24`, and
+`guest-net-access` (Step 10) lets private networks into `virbr2`. The
 definition is `kvm/isolated_network_40.xml`. The same host numbers as the NAT
 networks — 24, 32, 40 — are reused in `10.0.0.0/8`, so an address still names
 the machine.
@@ -725,7 +727,7 @@ groups
 - `modprobe -r` fails if a virtual machine is running. Shut them down first.
 - The packaged `osinfo-db` is the maintained source, refreshed by `apt upgrade`. Do not use `osinfo-db-import --latest`: it fetches from a third-party host libosinfo's own maintainers have flagged as unreliable.
 - `net-define` reads the file at define time and stores a copy of its own, so editing the repository file later means running `net-define` again.
-- Isolated means there is no `<forward>` element. Guests on `virbr2` reach each other and this host at `10.40.0.1`, and they do not reach the internet, the NAT guests, or the isolated networks on Silenus and Dionysus. No route for `10.24.0.0/24`, `10.32.0.0/24` or `10.40.0.0/24` is written on any host. Dual-homed guests keep `192.168.40.1` as the default gateway and put `10.40.0.0/24` on a second NIC.
+- Isolated means there is no `<forward>` element and no masquerade, so guests have no path to the public internet. Silenus is the hub: it holds a route to `10.40.0.0/24`, this host holds a route back to `10.24.0.0/24` (Step 9), and Step 10 lets private networks into `virbr2`. Isolated-only guests use `10.40.0.1` as their default gateway so they can reply. Dual-homed guests keep `192.168.40.1` as the default gateway and put `10.40.0.0/24` on a second NIC.
 
 ### Step 8 — Docker
 
@@ -939,15 +941,15 @@ graph TB
 
 Blue is this host's way out, purple the point-to-point link to Silenus, green
 the NAT guest network it NATs behind itself, amber the isolated guest network
-that stays on this host. The dotted line is wireless; the solid one is the
-cable, which is only connected when Silenus is on site.
+(no internet; Silenus routes it like NAT). The dotted line is wireless; the
+solid one is the cable, which is only connected when Silenus is on site.
 
 The NAT guest subnet is `192.168.40.0/24` here, against `192.168.24.0/24` on
 Silenus and `192.168.32.0/24` on Dionysus. The isolated subnet is
 `10.40.0.0/24`, against `10.24.0.0/24` and `10.32.0.0/24`. All six differ on
 purpose: the hosts can reach one another, so overlapping guest ranges would
 make a guest on one indistinguishable from a guest on another. Isolated
-guests are not routed between hosts in any case.
+guests still have no path to the public internet.
 
 
 #### 1. Become root
@@ -1078,12 +1080,16 @@ nmcli con add type ethernet ifname eno1 con-name Hephaestus ipv4.method manual i
 nmcli con mod Hephaestus connection.autoconnect yes
 ```
 
-Silenus's own guests live on `192.168.24.0/24`, behind Silenus at the other end
-of this cable. A guest here needs a route to them, or its replies leave by the
-default gateway and die on the work LAN:
+Silenus's own guests live on `192.168.24.0/24` and `10.24.0.0/24`, behind
+Silenus at the other end of this cable. A guest here needs a route to them, or
+its replies leave by the default gateway and die on the work LAN:
 
 ```bash
 nmcli con mod Hephaestus +ipv4.routes "192.168.24.0/24 192.168.124.6 100"
+```
+
+```bash
+nmcli con mod Hephaestus +ipv4.routes "10.24.0.0/24 192.168.124.6 100"
 ```
 
 With the cable out, that route goes away with the profile. Silenus is still on
@@ -1093,6 +1099,10 @@ the kernel ARPs for the destination and Silenus answers for it:
 
 ```bash
 nmcli con mod wan +ipv4.routes "192.168.24.0/24 0.0.0.0 200"
+```
+
+```bash
+nmcli con mod wan +ipv4.routes "10.24.0.0/24 0.0.0.0 200"
 ```
 
 That works only because Silenus.md Step 8 turns on `proxy_arp` for its WiFi
@@ -1174,11 +1184,11 @@ Expect `net.ipv4.ip_forward = 1`.
 - `802-11-wireless.cloned-mac-address permanent` is what keeps the DHCP lease stable. NetworkManager randomizes the MAC by default, a new MAC draws a new lease, and `192.168.88.212` quietly stops being the address this host answers on. `ip link` shows the randomization while it is active: a `permaddr` next to a different current address.
 - The adapter is a Realtek RTL8822CE driven by `rtw_8822ce`, on the PCIe bus at `02:00.0` rather than Intel's CNVi, which is why it enumerates as `wlp2s0` and not `wlo1`. Its firmware ships in `firmware-realtek`, from the `non-free-firmware` component Step 3 sub-step 4 enables.
 - `rfkill` is not installed on this host. Read the blocks from sysfs instead: `for d in /sys/class/rfkill/*; do echo "$(cat $d/name) soft=$(cat $d/soft) hard=$(cat $d/hard)"; done`.
-- **Two routes to `192.168.24.0/24`, and the metric picks between them.** The cable is metric 100 and wins while it is up; with it out, the metric 200 route on `wan` carries the traffic across the work LAN instead. Both ends fall back together — Silenus's own pair is the cable first and `192.168.88.212` second — so neither takes a path the other is not using.
+- **Two routes to `192.168.24.0/24` and `10.24.0.0/24`, and the metric picks between them.** The cable is metric 100 and wins while it is up; with it out, the metric 200 route on `wan` carries the traffic across the work LAN instead. Both ends fall back together — Silenus's own pair is the cable first and `192.168.88.212` second — so neither takes a path the other is not using.
 - **The fallback names no address, deliberately.** Silenus is a laptop on a DHCP network, so any address written here is a lease — and a two-week lease is still a thing that expires while you are not looking. A gatewayless route sidesteps the question: the kernel ARPs for the guest address, Silenus answers because Step 8 gives it `proxy_arp`, and neither host ever has to know what the other's current address is. A DHCP reservation would also work, but it puts the guarantee on someone else's server rather than in configuration you hold.
 - The trade is that the fallback is now pure layer 2. It works while both machines sit on the same WiFi segment and stops the moment anything routes between them — a second AP on its own subnet, or a VLAN. The cable is unaffected either way and stays the real path.
 - **No route over a VPN.** A next hop has to be directly reachable. Over the office VPN the work network sits behind a gateway, so a route via Silenus's address there is refused with `Nexthop has invalid gateway` — the same reasoning Silenus.md Step 13 sets out for the opposite direction. Off-site, a guest is reached by logging into its own host and going on from there.
-- **The route to `192.168.24.0/24` is half of a pair.** It lets a guest here answer one on Silenus; the other half is Silenus.md Step 14, whose rules let a connection *started* here reach into that network past libvirt's `REJECT`. Either alone gives a path that works one way and reads as a routing fault.
+- **The routes to `192.168.24.0/24` and `10.24.0.0/24` are half of a pair.** They let a guest here answer one on Silenus; the other half is Silenus.md Step 14, whose rules let a connection *started* here reach into those networks past libvirt's `REJECT`. Either alone gives a path that works one way and reads as a routing fault.
 - Reaching Dionysus's guests from here is not possible and is not configured. That host is at another site with no network path to this one, and Silenus cannot bridge them: it has one spare ethernet port, its two point-to-point profiles are mutually exclusive, and it is never at both sites at once. Guest-to-guest across sites is not routed: log into the far host, then reach its guest from the shell that gives you.
 - The two point-to-point links do not overlap. Silenus reaches Dionysus on `192.168.124.0/30` — hosts `.1` and `.2` — and this machine on `192.168.124.4/30` — hosts `.5` and `.6`. Adjacent `/30`s out of the same `/29`, deliberately, so one range covers every point-to-point link in the estate without any two colliding.
 - `wan` takes its address by DHCP, which is the one place this host differs from the other two — both of those are static because their router hands out nothing. A lease can change, so the cable at `192.168.124.5` is the address to rely on, and Silenus reaches the guest network across it first for exactly that reason.
@@ -1188,8 +1198,10 @@ Expect `net.ipv4.ip_forward = 1`.
 ### Step 10 — Firewall
 
 `libvirt` writes the rules for `static_network_40` itself when the network
-starts. This step adds the one thing libvirt deliberately does not do: letting a
-machine outside the guest network open a connection into it.
+starts. Isolated `isolated_network_40` has no `<forward>`, so libvirt rejects
+forwarding in and out of `virbr2`. This step adds the one thing libvirt
+deliberately does not do: letting a machine outside the guest networks open a
+connection into them.
 
 #### 1. Read what libvirt installed
 
@@ -1197,15 +1209,18 @@ machine outside the guest network open a connection into it.
 sudo iptables -L LIBVIRT_FWI -n -v
 ```
 
-The last rule is `-o virbr1 -j REJECT`. A guest reaches the outside and the
+The last rule is `-o virbr1 -j REJECT`. A NAT guest reaches the outside and the
 replies come back through conntrack; a connection *started* from outside matches
-neither `ACCEPT` and falls to that `REJECT`. That is the gap this step closes.
+neither `ACCEPT` and falls to that `REJECT`. Isolated `virbr2` rejects both
+directions. That is the gap this step closes.
 
 #### 2. What this step adds
 
 | # | Rule | Required | Why |
 |---|------|----------|-----|
-| 1 | `FORWARD` accept, private ranges → `192.168.40.0/24` | **yes** | without it nothing on your network can reach a guest at all |
+| 1 | `FORWARD` accept, private ranges → `192.168.40.0/24` out `virbr1` | **yes** | without it nothing on your network can reach a NAT guest at all |
+| 2 | `FORWARD` accept, private ranges → `10.40.0.0/24` out `virbr2` | **yes** | isolated has no `<forward>`, so inbound is rejected the same way |
+| 3 | `FORWARD` accept, `10.40.0.0/24` in `virbr2` | **yes** | isolated also rejects outbound; replies from isolated guests need this. NAT already allows outbound itself |
 
 #### 3. Add the required rules, as a service
 
@@ -1216,19 +1231,25 @@ time it starts, so a saved ruleset comes back permanently below the `REJECT`.
 ```bash
 sudo tee /usr/local/sbin/guest-net-access >/dev/null <<'EOF'
 #!/bin/sh
-# Let private networks open connections into the libvirt guest network.
+# Let private networks open connections into the libvirt guest networks.
 #
 # These must precede the jump to LIBVIRT_FWI, whose final rule rejects anything
-# inbound to virbr1 that conntrack does not already know. libvirtd re-inserts
-# its own jumps at the head of FORWARD on every start, so this deletes and
+# inbound to virbr1 that conntrack does not already know. Isolated virbr2 has
+# no <forward>, so libvirt rejects both inbound and outbound; replies from
+# isolated guests need the outbound ACCEPT as well. libvirtd re-inserts its
+# own jumps at the head of FORWARD on every start, so this deletes and
 # re-inserts rather than assuming a position it once had.
 set -e
 for net in 192.168.0.0/16 172.16.0.0/12 10.0.0.0/8; do
     iptables -D FORWARD -s "$net" -d 192.168.40.0/24 -o virbr1 -j ACCEPT 2>/dev/null || true
+    iptables -D FORWARD -s "$net" -d 10.40.0.0/24 -o virbr2 -j ACCEPT 2>/dev/null || true
 done
+iptables -D FORWARD -s 10.40.0.0/24 -i virbr2 -j ACCEPT 2>/dev/null || true
 for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
     iptables -I FORWARD 1 -s "$net" -d 192.168.40.0/24 -o virbr1 -j ACCEPT
+    iptables -I FORWARD 1 -s "$net" -d 10.40.0.0/24 -o virbr2 -j ACCEPT
 done
+iptables -I FORWARD 1 -s 10.40.0.0/24 -i virbr2 -j ACCEPT
 EOF
 sudo chmod +x /usr/local/sbin/guest-net-access
 sudo tee /etc/systemd/system/guest-net-access.service >/dev/null <<'EOF'
@@ -1260,7 +1281,7 @@ The three `ACCEPT` rules must come out **before** `-j LIBVIRT_FWI`. Read it, the
 have the shell decide:
 
 ```bash
-ours=$(sudo iptables -S FORWARD | grep -n 'd 192.168.40.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1); libv=$(sudo iptables -S FORWARD | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1); if [ -n "$ours" ] && [ -n "$libv" ] && [ "$ours" -lt "$libv" ]; then echo "  PASS  rules precede LIBVIRT_FWI ($ours < $libv)"; else echo "  FAIL  ours=$ours libvirt=$libv"; fi
+ours=$(sudo iptables -S FORWARD | grep -n 'd 192.168.40.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1); iso=$(sudo iptables -S FORWARD | grep -n 'd 10.40.0.0/24 -o virbr2 -j ACCEPT' | tail -1 | cut -d: -f1); libv=$(sudo iptables -S FORWARD | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1); if [ -n "$ours" ] && [ -n "$iso" ] && [ -n "$libv" ] && [ "$ours" -lt "$libv" ] && [ "$iso" -lt "$libv" ]; then echo "  PASS  rules precede LIBVIRT_FWI ($ours $iso < $libv)"; else echo "  FAIL  ours=$ours iso=$iso libvirt=$libv"; fi
 ```
 
 ```bash
@@ -1345,7 +1366,7 @@ systemctl is-active guest-net-access.service
 ```
 
 ```bash
-ours=$(sudo iptables -S FORWARD | grep -n 'd 192.168.40.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1); libv=$(sudo iptables -S FORWARD | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1); if [ -n "$ours" ] && [ -n "$libv" ] && [ "$ours" -lt "$libv" ]; then echo "  PASS  $ours < $libv"; else echo "  FAIL  ours=$ours libvirt=$libv"; fi
+ours=$(sudo iptables -S FORWARD | grep -n 'd 192.168.40.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1); iso=$(sudo iptables -S FORWARD | grep -n 'd 10.40.0.0/24 -o virbr2 -j ACCEPT' | tail -1 | cut -d: -f1); libv=$(sudo iptables -S FORWARD | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1); if [ -n "$ours" ] && [ -n "$iso" ] && [ -n "$libv" ] && [ "$ours" -lt "$libv" ] && [ "$iso" -lt "$libv" ]; then echo "  PASS  $ours $iso < $libv"; else echo "  FAIL  ours=$ours iso=$iso libvirt=$libv"; fi
 ```
 
 This boot is the only thing that proves the ordering holds. `libvirtd` inserts
@@ -1403,8 +1424,8 @@ proper — run it next.
 - **Confirm the machine actually rebooted before trusting anything below.** `systemctl reboot` refuses while another user — typically a `root` shell left open from an earlier step — holds a session, and it says so rather than failing silently. Every check here then runs against the old boot and passes for the wrong reason. `uptime -p` after logging back in is the cheap way to be sure.
 - Verification is gathered here because the changes in Steps 9 and 10 only take effect on this boot. Checking them earlier reports the state before the change, which reads as a pass and is not one.
 - **No guest is built here.** Nothing in this document creates an install ISO or a directory to keep one in, so a `virt-install` line naming one could not be run by anyone following this guide. A guest left behind by a verification step is also debris on a machine that is otherwise reproducible end to end. The volume test proves what this step can honestly prove: the pool is active, libvirt allocates on it, and the space comes back.
-- When you do build the first guest, give it a static address on `192.168.40.0/24` with gateway `192.168.40.1` — nothing hands one out. An isolated NIC, if you attach one, takes an address on `10.40.0.0/24` with no default gateway. Reachability on the NAT side is then tested outward with `ping -c3 192.168.88.212` from inside the guest, and inward with `ping -c3 <guest-address>` from a machine holding a route to that subnet. `virt-install --cdrom` expects a console this host does not have, so add `--noautoconsole` and attach afterwards with `virsh console <vm-name>`. Name the pool explicitly — `--disk vol=lssd-pool/<name>.qcow2` — or libvirt puts the disk in the `default` pool on the 32 GiB root filesystem. A second `--network network=isolated_network_40` attaches the isolated NIC.
-- **Reaching a guest from off-site is a login to this host, not a route.** Silenus routes `192.168.40.0/24` across the cable when it is here, and across the work LAN when it is on that WiFi. From anywhere else: `ssh <you>@192.168.88.212`, then `ssh <guest-address>` from the shell it gives you. That works from home because the office VPN carries `192.168.88.0/24` and this host answers on that address. Not `ssh -J` — `ProxyJump` forwards only the connection, so the guest would authenticate the laptop's key rather than this host's, and this host's is the one a guest it built already trusts.
+- When you do build the first guest, give it a static address on `192.168.40.0/24` with gateway `192.168.40.1` — nothing hands one out. An isolated NIC, if you attach one, takes an address on `10.40.0.0/24` with gateway `10.40.0.1`. Dual-homed guests keep `192.168.40.1` as the default gateway. Reachability on the NAT side is then tested outward with `ping -c3 192.168.88.212` from inside the guest, and inward with `ping -c3 <guest-address>` from a machine holding a route to that subnet. `virt-install --cdrom` expects a console this host does not have, so add `--noautoconsole` and attach afterwards with `virsh console <vm-name>`. Name the pool explicitly — `--disk vol=lssd-pool/<name>.qcow2` — or libvirt puts the disk in the `default` pool on the 32 GiB root filesystem. A second `--network network=isolated_network_40` attaches the isolated NIC.
+- **Reaching a guest from off-site is a login to this host, not a route.** Silenus routes `192.168.40.0/24` and `10.40.0.0/24` across the cable when it is here, and across the work LAN when it is on that WiFi. From anywhere else: `ssh <you>@192.168.88.212`, then `ssh <guest-address>` from the shell it gives you. That works from home because the office VPN carries `192.168.88.0/24` and this host answers on that address. Not `ssh -J` — `ProxyJump` forwards only the connection, so the guest would authenticate the laptop's key rather than this host's, and this host's is the one a guest it built already trusts.
 - **A route over the VPN is deliberately not configured, and only one direction of it would even work.** This host can reach Silenus's VPN address through the office router, so `192.168.24.0/24` via that address would resolve. The reverse does not: a packet Silenus sends for `192.168.40.0/24` arrives at the VPN server, which routes by destination and has no route for this guest network. Configuring the half that works leaves traffic going out one path and replies coming back another, which breaks anything stateful and reads as packet loss rather than as a misconfiguration. Joining the two sites properly means a tunnel between them, which is a larger thing than the SSH hop it would replace.
 
 ### Step 12 — Check the whole setup

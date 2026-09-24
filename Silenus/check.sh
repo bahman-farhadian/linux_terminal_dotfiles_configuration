@@ -213,12 +213,14 @@ ck "p2p interface"    "$(nmcli -g connection.interface-name connection show Dion
 ck "p2p address"      "$(nmcli -g ipv4.addresses connection show Dionysus 2>/dev/null)" "192.168.124.2/30"
 ck "p2p never-default" "$(nmcli -g ipv4.never-default connection show Dionysus 2>/dev/null)" "yes"
 ck "guest route cable" "$(nmcli -g ipv4.routes connection show Dionysus 2>/dev/null|grep -c '192.168.32.0/24 192.168.124.1 100')" "1"
+ck "isolated route cable" "$(nmcli -g ipv4.routes connection show Dionysus 2>/dev/null|grep -c '10.32.0.0/24 192.168.124.1 100')" "1"
 # Everything above reads the stored profile, which proves the configuration
 # survives. This asks the kernel what it would actually do, which is a
 # different question and the one a reboot answers.
 _p2p_up=$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null | awk -F: '$2=="enp0s31f6"{print $1; exit}')
 if [ "$(cat /sys/class/net/enp0s31f6/carrier 2>/dev/null)" = "1" ] && [ -n "$_p2p_up" ]; then
   ck "kernel routes via cable" "$(ip -4 route get 192.168.32.10 2>/dev/null|grep -c 'via 192.168.124.1 dev enp0s31f6')" "1"
+  ck "isolated kernel via cable" "$(ip -4 route get 10.32.0.10 2>/dev/null|grep -c 'via 192.168.124.1 dev enp0s31f6')" "1"
   ck "p2p installs no default" "$(ip -4 route show default|grep -c 'dev enp0s31f6')" "0"
 elif [ "$(cat /sys/class/net/enp0s31f6/carrier 2>/dev/null)" = "1" ]; then
   # Carrier without a profile is the expected state here, not a fault: neither
@@ -227,25 +229,35 @@ elif [ "$(cat /sys/class/net/enp0s31f6/carrier 2>/dev/null)" = "1" ]; then
   # and is by now routing to an address this host has not configured.
   na "kernel routes via cable" "cable is in but no profile is up on enp0s31f6. Neither autoconnects by design; run: nmcli con up Dionysus (or Hephaestus). Until then the peer routes to an address that does not exist here"
   ck "kernel routes via LAN"  "$(ip -4 route get 192.168.32.10 2>/dev/null|grep -c 'via 192.168.8.3')" "1"
+  ck "isolated kernel via LAN" "$(ip -4 route get 10.32.0.10 2>/dev/null|grep -c 'via 192.168.8.3')" "1"
 else
   na "kernel routes via cable" "no cable in enp0s31f6. With it plugged in, ip -4 route get 192.168.32.10 must answer via 192.168.124.1"
   ck "kernel routes via LAN"  "$(ip -4 route get 192.168.32.10 2>/dev/null|grep -c 'via 192.168.8.3')" "1"
+  ck "isolated kernel via LAN" "$(ip -4 route get 10.32.0.10 2>/dev/null|grep -c 'via 192.168.8.3')" "1"
 fi
 ck "guest route fallback" "$(nmcli -t -g NAME connection show|while IFS= read -r c; do nmcli -g ipv4.routes connection show "$c" 2>/dev/null; done|grep -c '192.168.32.0/24 192.168.8.3 200')" "1"
+ck "isolated route fallback" "$(nmcli -t -g NAME connection show|while IFS= read -r c; do nmcli -g ipv4.routes connection show "$c" 2>/dev/null; done|grep -c '10.32.0.0/24 192.168.8.3 200')" "1"
 if nmcli -g connection.id connection show Hephaestus >/dev/null 2>&1; then
   ck "hephaestus profile" "$(nmcli -g connection.id connection show Hephaestus 2>/dev/null)" "Hephaestus"
   ck "hephaestus address" "$(nmcli -g ipv4.addresses connection show Hephaestus 2>/dev/null)" "192.168.124.6/30"
   ck "hephaestus route"   "$(nmcli -g ipv4.routes connection show Hephaestus 2>/dev/null|grep -c '192.168.40.0/24 192.168.124.5 100')" "1"
+  ck "hephaestus isolated route" "$(nmcli -g ipv4.routes connection show Hephaestus 2>/dev/null|grep -c '10.40.0.0/24 192.168.124.5 100')" "1"
 else
   na "hephaestus link" "profile not created. Silenus.md Step 13 sub-step 4 adds it; it is only needed once that host is built"
 fi
 # The fallback route lives on the work WiFi profile, which exists only once that
 # network has been joined. Absent, it is untestable rather than wrong.
 _hepfb=$(nmcli -t -g NAME connection show 2>/dev/null|while IFS= read -r c; do nmcli -g ipv4.routes connection show "$c" 2>/dev/null; done|grep -c '192.168.40.0/24 192.168.88.212 200')
+_hepiso=$(nmcli -t -g NAME connection show 2>/dev/null|while IFS= read -r c; do nmcli -g ipv4.routes connection show "$c" 2>/dev/null; done|grep -c '10.40.0.0/24 192.168.88.212 200')
 if [ "${_hepfb:-0}" -gt 0 ]; then
   ck "hephaestus fallback" "$_hepfb" "1"
 else
   na "hephaestus fallback" "no work WiFi profile here yet. Join that network, then: nmcli con mod <work-wifi-profile> +ipv4.routes \"192.168.40.0/24 192.168.88.212 200\""
+fi
+if [ "${_hepiso:-0}" -gt 0 ]; then
+  ck "hephaestus isolated fallback" "$_hepiso" "1"
+else
+  na "hephaestus isolated fallback" "no work WiFi profile here yet. Join that network, then: nmcli con mod <work-wifi-profile> +ipv4.routes \"10.40.0.0/24 192.168.88.212 200\""
 fi
 # Neither point-to-point profile may autoconnect. A /30 carries nothing that
 # says which peer is on the far end, so a profile coming up on its own would be
@@ -255,12 +267,16 @@ ck "neither link autoconnects" "$(for c in Dionysus Hephaestus; do nmcli -g conn
 printf '\n--- Step 14: firewall ---\n'
 for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
   ck "guests reachable from $net" "$(sudo iptables -C FORWARD -s "$net" -d 192.168.24.0/24 -o virbr1 -j ACCEPT 2>/dev/null && echo yes || echo no)" "yes"
+  ck "isolated reachable from $net" "$(sudo iptables -C FORWARD -s "$net" -d 10.24.0.0/24 -o virbr2 -j ACCEPT 2>/dev/null && echo yes || echo no)" "yes"
 done
+ck "isolated replies outbound" "$(sudo iptables -C FORWARD -s 10.24.0.0/24 -i virbr2 -j ACCEPT 2>/dev/null && echo yes || echo no)" "yes"
 # Existence is not enough: a rule below the jump to LIBVIRT_FWI, whose last rule
 # rejects anything inbound to virbr1, is never reached and still passes -C.
 _ours=$(sudo iptables -S FORWARD 2>/dev/null | grep -n 'd 192.168.24.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1)
+_iso=$(sudo iptables -S FORWARD 2>/dev/null | grep -n 'd 10.24.0.0/24 -o virbr2 -j ACCEPT' | tail -1 | cut -d: -f1)
 _libv=$(sudo iptables -S FORWARD 2>/dev/null | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1)
 ck "rules precede LIBVIRT_FWI" "$([ -n "$_ours" ] && [ -n "$_libv" ] && [ "$_ours" -lt "$_libv" ] && echo yes || echo no)" "yes"
+ck "isolated rules precede LIBVIRT_FWI" "$([ -n "$_iso" ] && [ -n "$_libv" ] && [ "$_iso" -lt "$_libv" ] && echo yes || echo no)" "yes"
 ck "guest-net-access enabled" "$(systemctl is-enabled guest-net-access.service 2>/dev/null)" "enabled"
 ck "guest-net-access active"  "$(systemctl is-active guest-net-access.service 2>/dev/null)" "active"
 hf "guest-net-access script"  /usr/local/sbin/guest-net-access
@@ -341,9 +357,15 @@ printf '  %-17s %-9s %-9s %-27s %s\n' "-----------------" "--------" "--------" 
 printf '  %-17s %-9s %-9s %-27s %s\n' "192.168.32.0/24" \
   "$(_cfg '192.168.32.0/24 192.168.124.1 100')" "$(_cfg '192.168.32.0/24 192.168.8.3 200')" \
   "$(_live 192.168.32.0/24)" "$(_ans 192.168.32.1)"
+printf '  %-17s %-9s %-9s %-27s %s\n' "10.32.0.0/24" \
+  "$(_cfg '10.32.0.0/24 192.168.124.1 100')" "$(_cfg '10.32.0.0/24 192.168.8.3 200')" \
+  "$(_live 10.32.0.0/24)" "$(_ans 10.32.0.1)"
 printf '  %-17s %-9s %-9s %-27s %s\n' "192.168.40.0/24" \
   "$(_cfg '192.168.40.0/24 192.168.124.5 100')" "$(_cfg '192.168.40.0/24 192.168.88.212 200')" \
   "$(_live 192.168.40.0/24)" "$(_ans 192.168.40.1)"
+printf '  %-17s %-9s %-9s %-27s %s\n' "10.40.0.0/24" \
+  "$(_cfg '10.40.0.0/24 192.168.124.5 100')" "$(_cfg '10.40.0.0/24 192.168.88.212 200')" \
+  "$(_live 10.40.0.0/24)" "$(_ans 10.40.0.1)"
 printf '\n  %-17s %-18s %s\n' "peer host" "address" "answers"
 printf '  %-17s %-18s %s\n' "-----------------" "------------------" "-------"
 printf '  %-17s %-18s %s\n' "Dionysus"   "192.168.8.3"    "$(_ans 192.168.8.3)"
@@ -370,7 +392,10 @@ case "$_site" in
   home)
     ck "Dionysus guests routed"    "$(_routed 192.168.32.0/24)" "yes"
     ck "Dionysus guests reachable" "$(ping -c1 -W2 192.168.32.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
+    ck "Dionysus isolated routed"    "$(_routed 10.32.0.0/24)" "yes"
+    ck "Dionysus isolated reachable" "$(ping -c1 -W2 10.32.0.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
     ck "Hephaestus guests not routed here" "$(_routed 192.168.40.0/24)" "no"
+    ck "Hephaestus isolated not routed here" "$(_routed 10.40.0.0/24)" "no"
     if [ "$_vpn" = yes ]; then
       ck "Hephaestus host over the VPN" "$(ping -c1 -W2 192.168.88.212 >/dev/null 2>&1 && echo yes || echo no)" "yes"
     else
@@ -380,7 +405,10 @@ case "$_site" in
   work)
     ck "Hephaestus guests routed"    "$(_routed 192.168.40.0/24)" "yes"
     ck "Hephaestus guests reachable" "$(ping -c1 -W2 192.168.40.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
+    ck "Hephaestus isolated routed"    "$(_routed 10.40.0.0/24)" "yes"
+    ck "Hephaestus isolated reachable" "$(ping -c1 -W2 10.40.0.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
     ck "Dionysus guests not routed here" "$(_routed 192.168.32.0/24)" "no"
+    ck "Dionysus isolated not routed here" "$(_routed 10.32.0.0/24)" "no"
     ;;
   *)
     na "reachability for this site" "no address on 192.168.8.0/24 or 192.168.88.0/24, so the expected peer cannot be derived"

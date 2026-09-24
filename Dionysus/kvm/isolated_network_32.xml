@@ -5,28 +5,32 @@
     - 10.32.0.0      -> The "network address" used to identify the entire subnet. NetID.
                         It cannot be assigned to any host or device.
     - 10.32.0.1      -> Assigned to the libvirt bridge 'virbr2' on the host.
-                        Guests reach this host here; they do not use it as a
-                        default gateway, because this network has no way out.
+                        Isolated-only guests use this as their default
+                        gateway so they can reply to Silenus. There is still
+                        no masquerade, so the public internet does not answer.
     - 10.32.0.2
       through
       10.32.0.254    -> Usable range for VM static IPs (no DHCP configured).
     - 10.32.0.255    -> The "broadcast address" for this subnet. Also not assignable to any host.
 
   Mode: isolated
-    - There is no <forward> element. Guests on this bridge reach each other
-      and this host, and nothing else: not the internet, not the NAT guests
-      on virbr1, and not the isolated networks on the other two hosts.
+    - There is no <forward> element and no masquerade. Guests on this bridge
+      reach each other and this host. They have no path to the public
+      internet. Silenus routes 10.32.0.0/24 the same way it routes
+      192.168.32.0/24; this host holds a route back to 10.24.0.0/24.
+      guest-net-access lets private networks into virbr2 and lets this subnet
+      reply.
     - The same host numbers as the NAT networks (24, 32, 40) are reused in
       10.0.0.0/8 so an address still names the machine it belongs to.
 
   No DHCP:
     - No <dhcp> section is defined, so each VM must be manually configured with a static IP
-      (e.g., 10.32.0.10, netmask=255.255.255.0, no default gateway).
+      (e.g., 10.32.0.10, netmask=255.255.255.0, gateway=10.32.0.1).
 
   Typical VM static configuration might look like:
     IP Address: 10.32.0.10
     Netmask:    255.255.255.0
-    Gateway:    (none)
+    Gateway:    10.32.0.1
     DNS:        (none)
 
   Dual-homed guests keep their default gateway on static_network_32

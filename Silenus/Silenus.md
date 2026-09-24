@@ -787,12 +787,14 @@ virsh -c qemu:///system net-autostart static_network_24
 
 #### 12. Define the isolated network
 
-`isolated_network_24` — isolated on `10.24.0.0/24`, no DHCP, no `<forward>`.
-Guests on this bridge reach each other and this host, and nothing else. The
-definition is `kvm/isolated_network_24.xml` in this repository, and its
-comment block carries the address plan. The same host numbers as the NAT
-networks — 24, 32, 40 — are reused in `10.0.0.0/8`, so an address still names
-the machine.
+`isolated_network_24` — isolated on `10.24.0.0/24`, no DHCP, no `<forward>`,
+no masquerade. Guests on this bridge have no path to the public internet.
+Silenus still routes the peers' isolated nets the same way as their NAT nets
+(Step 13), and `guest-net-access` (Step 14) lets private networks into
+`virbr2`. The definition is `kvm/isolated_network_24.xml` in this repository,
+and its comment block carries the address plan. The same host numbers as the
+NAT networks — 24, 32, 40 — are reused in `10.0.0.0/8`, so an address still
+names the machine.
 
 ```bash
 virsh -c qemu:///system net-define kvm/isolated_network_24.xml
@@ -847,11 +849,11 @@ and should be gone.
 - `/etc/security/limits.d` applies to login sessions, not to systemd services. If libvirtd itself needs a higher limit, add a `LimitNOFILE` drop-in under `/etc/systemd/system/libvirtd.service.d/`.
 - libvirt raises `net.ipv4.ip_forward` itself for its NAT network, but setting it here makes it explicit and survives for bridged or routed setups.
 - Run `net-define` from the repository directory, or give the file an absolute path. libvirt reads the file at define time and stores a copy of its own, so the repository file is not consulted again afterwards; editing it later means running `net-define` again.
-- Guests get no address by themselves. With no `<dhcp>` section there is nothing handing them one, so each guest is configured by hand. On the NAT network: address in `192.168.24.2`–`192.168.24.254`, netmask `255.255.255.0`, gateway `192.168.24.1`, DNS of your choosing. On the isolated network: address in `10.24.0.2`–`10.24.0.254`, netmask `255.255.255.0`, no default gateway. A guest left on DHCP simply comes up with no address.
+- Guests get no address by themselves. With no `<dhcp>` section there is nothing handing them one, so each guest is configured by hand. On the NAT network: address in `192.168.24.2`–`192.168.24.254`, netmask `255.255.255.0`, gateway `192.168.24.1`, DNS of your choosing. On the isolated network: address in `10.24.0.2`–`10.24.0.254`, netmask `255.255.255.0`, gateway `10.24.0.1`. A guest left on DHCP simply comes up with no address.
 - Sub-step 10 is the one part of this step that errors on a second run: `net-destroy` reports the network is not active and `net-undefine` that it does not exist. Both are harmless and mean the work is already done. `net-define` is safe to repeat — it replaces the stored definition — and `net-start` errors the same harmless way once the network is running.
 - The NAT bridge is `virbr1`, the isolated bridge is `virbr2`, and neither is `virbr0`. `virbr0` was `default`'s and disappears with it. Nothing else on this host claims those names, and they are fixed in the XML rather than left to libvirt so they stay predictable across rebuilds.
 - NAT means guests reach the outside and the outside cannot reach them. Exposing a guest service needs an explicit port forward on the host.
-- Isolated means there is no `<forward>` element. Guests on `virbr2` reach each other and this host at `10.24.0.1`, and they do not reach the internet, the NAT guests, or the isolated networks on Dionysus and Hephaestus. No route for `10.24.0.0/24`, `10.32.0.0/24` or `10.40.0.0/24` is written on any host: isolation is per-host by design. Dual-homed guests keep `192.168.24.1` as the default gateway and put `10.24.0.0/24` on a second NIC.
+- Isolated means there is no `<forward>` element and no masquerade, so guests have no path to the public internet. Silenus is the hub for these subnets the same way it is for the NAT ones: Step 13 holds a route to `10.32.0.0/24` and `10.40.0.0/24`, each peer holds a route back to `10.24.0.0/24`, and Step 14 lets private networks into `virbr2`. Isolated-only guests use `10.24.0.1` as their default gateway so they can reply. Dual-homed guests keep `192.168.24.1` as the default gateway and put `10.24.0.0/24` on a second NIC.
 
 ### Step 9 — Docker
 
@@ -1245,8 +1247,8 @@ graph TB
 
 Blue is each host's way out, purple the point-to-point links, green the NAT
 guest networks each host NATs behind itself, amber the isolated guest networks
-that stay on that host. Dotted lines are wireless or a cable that is only
-connected at one site; solid ones are permanent cable.
+(no internet; Silenus routes them like NAT). Dotted lines are wireless or a
+cable that is only connected at one site; solid ones are permanent cable.
 
 Silenus has one spare ethernet port and two peers, so it carries a profile for
 each and only one is up at a time. Neither autoconnects: the one for the site
@@ -1290,9 +1292,13 @@ kernel picks the best live path with nothing to run by hand:
 | To | Metric | Via | Lives on | Live when |
 |---|---|---|---|---|
 | `192.168.32.0/24` | 100 | `192.168.124.1` | `Dionysus` profile | at home, cable in |
+| `10.32.0.0/24` | 100 | `192.168.124.1` | `Dionysus` profile | at home, cable in |
 | `192.168.32.0/24` | 200 | `192.168.8.3` | home WiFi profile | at home, no cable |
+| `10.32.0.0/24` | 200 | `192.168.8.3` | home WiFi profile | at home, no cable |
 | `192.168.40.0/24` | 100 | `192.168.124.5` | `Hephaestus` profile | at work, cable in |
+| `10.40.0.0/24` | 100 | `192.168.124.5` | `Hephaestus` profile | at work, no cable |
 | `192.168.40.0/24` | 200 | `192.168.88.212` | work WiFi profile | at work, no cable |
+| `10.40.0.0/24` | 200 | `192.168.88.212` | work WiFi profile | at work, no cable |
 
 **There is no third tier from home, and that is a decision rather than an
 oversight.** The office VPN carries `192.168.88.0/24`, so Hephaestus itself
@@ -1348,9 +1354,10 @@ nmcli con up Dionysus
 
 #### 3. Route to Dionysus's guests, preferring this link
 
-Dionysus's guests live on `192.168.32.0/24`, behind Dionysus. There are two ways
-to reach them: across this cable, or across the LAN. Both routes are installed,
-and the metric decides which is used — lower wins.
+Dionysus's guests live on `192.168.32.0/24` (NAT) and `10.32.0.0/24`
+(isolated), behind Dionysus. There are two ways to reach them: across this
+cable, or across the LAN. Both routes are installed for each prefix, and the
+metric decides which is used — lower wins.
 
 On this link, metric 100:
 
@@ -1358,11 +1365,19 @@ On this link, metric 100:
 nmcli con mod Dionysus +ipv4.routes "192.168.32.0/24 192.168.124.1 100"
 ```
 
+```bash
+nmcli con mod Dionysus +ipv4.routes "10.32.0.0/24 192.168.124.1 100"
+```
+
 On the wireless connection, metric 200. Replace `Huawei-Router` with your own
 connection name from `nmcli connection show`:
 
 ```bash
 nmcli con mod Huawei-Router +ipv4.routes "192.168.32.0/24 192.168.8.3 200"
+```
+
+```bash
+nmcli con mod Huawei-Router +ipv4.routes "10.32.0.0/24 192.168.8.3 200"
 ```
 
 ```bash
@@ -1390,11 +1405,19 @@ nmcli con mod Hephaestus connection.autoconnect no
 nmcli con mod Hephaestus +ipv4.routes "192.168.40.0/24 192.168.124.5 100"
 ```
 
+```bash
+nmcli con mod Hephaestus +ipv4.routes "10.40.0.0/24 192.168.124.5 100"
+```
+
 The cable is first choice. The fallback is the work WiFi, and it goes on that
 profile rather than this one — replace `<work-wifi-profile>` with its name:
 
 ```bash
 nmcli con mod <work-wifi-profile> +ipv4.routes "192.168.40.0/24 192.168.88.212 200"
+```
+
+```bash
+nmcli con mod <work-wifi-profile> +ipv4.routes "10.40.0.0/24 192.168.88.212 200"
 ```
 
 That route belongs there and nowhere else, for a reason worth knowing before
@@ -1434,9 +1457,13 @@ Expect `192.168.124.2/30`.
 ip -4 route get 192.168.32.10
 ```
 
-With the cable plugged in, expect `via 192.168.124.1 dev enp0s31f6`. Unplug it
-and run the same command: the answer must become `via 192.168.8.3`, on the
-wireless interface.
+```bash
+ip -4 route get 10.32.0.10
+```
+
+With the cable plugged in, expect `via 192.168.124.1 dev enp0s31f6` for both.
+Unplug it and run the same commands: the answer must become `via 192.168.8.3`,
+on the wireless interface.
 
 ```bash
 ip -4 route
@@ -1460,16 +1487,16 @@ Needs Dionysus up on the other end.
 - This is a second route to Dionysus when its LAN side is broken, which is worth having before reconfiguring that machine's management interface.
 - Two point-to-point links share this one port, because the laptop has only one spare ethernet socket and is never at both sites at once. **Neither autoconnects.** With a `/30` there is nothing in carrier alone that says which peer is on the far end, so a profile that came up on its own would be guessing: plug the Hephaestus cable into a port set to autoconnect `Dionysus` and the link comes up with the wrong address and the wrong routes, looking connected while reaching nothing. Both are a deliberate `nmcli con up` for that reason. Activating either releases the port from the other.
 - The two subnets are adjacent `/30`s out of the same `/29`: `192.168.124.0/30` for Dionysus, hosts `.1` and `.2`, and `192.168.124.4/30` for Hephaestus, hosts `.5` and `.6`. One range covers every point-to-point link in the estate with no two colliding.
-- Hephaestus's guests are reached by cable first, `192.168.40.0/24` via `192.168.124.5` at metric 100, and by the work LAN second, via `192.168.88.212` at metric 200. Same shape as Dionysus, different second hop.
+- Hephaestus's guests are reached by cable first, `192.168.40.0/24` and `10.40.0.0/24` via `192.168.124.5` at metric 100, and by the work LAN second, via `192.168.88.212` at metric 200. Same shape as Dionysus, different second hop. The isolated prefixes use the same next hops as the NAT ones.
 - **The fallback is for the work WiFi only. There is deliberately no route to those guests over the VPN.** From home, reach them the plain way: SSH to Hephaestus, then SSH onward to the guest. One hop, nothing to configure, nothing to keep in step.
 - That is a choice, but it is also what the routing allows. A next hop has to be directly reachable. On the work WiFi `192.168.88.212` is on-link and the route installs; over the office VPN the table reads `192.168.88.0/24 via 192.168.88.1 dev tun1`, so the address sits behind a gateway and `ip route add ... via 192.168.88.212` is refused with `Nexthop has invalid gateway`. `tun1` is layer 3 point-to-point, so the `proxy_arp` trick that rescues the WiFi fallback has no broadcast domain to work in either.
 - **Forcing it past that changes nothing, and the reason is worth being precise about.** The packet would go down the tunnel with destination `192.168.40.x`, and the VPN server routes by destination, not by the next hop this end chose. It has never heard of that subnet and drops it. Only the other direction is workable — Hephaestus can route to `192.168.24.0/24` via this host's VPN address, because the office does carry the VPN pool — and configuring one direction without the other gives asymmetric routing, which breaks stateful traffic in ways that read as packet loss. Both or neither; the answer here is neither.
 - **The VPN still earns its place: it makes Hephaestus itself reachable from home.** `192.168.88.0/24 via 192.168.88.1 dev tun1` resolves, so that host answers on `192.168.88.212` from the sofa with no cable anywhere near it. Host reachability is wider than guest routing, and logging in is what spans the difference.
 - The two logins are the answer, not a workaround: `ssh <you>@192.168.88.212`, then `ssh <guest-address>` from the shell it gives you. Not `ssh -J`: `ProxyJump` forwards only the TCP connection, so the guest still authenticates *your* key rather than the host's. The host's key is the one a guest it built already trusts, and the host is the one holding a route to `192.168.40.0/24` in the first place.
 - Both routes are permanent, and NetworkManager withdraws a connection's routes when that connection goes down. Unplugging the cable therefore removes the metric-100 route on its own and the metric-200 one takes over, with no manual step. Plugging it back restores the preference.
-- The metrics are what express "prefer the cable". Same destination, two next hops, lower metric wins. `ip -4 route get 192.168.32.10` is the way to ask the kernel which it would actually use, rather than reading the table and inferring.
-- **The route alone does not make guests reachable.** A libvirt NAT network permits outbound traffic and `RELATED,ESTABLISHED` return traffic; a connection opened from outside into `192.168.32.0/24` is not in either category and is dropped on Dionysus. Dionysus.md Step 11 carries the forwarding rule that allows it. Test with `ping` to a guest, not by reading the routing table.
-- The fallback path leans on Dionysus forwarding between `enp4s0` and `virbr1`, which is what `net.ipv4.ip_forward` in Dionysus.md Step 10 enables.
+- The metrics are what express "prefer the cable". Same destination, two next hops, lower metric wins. `ip -4 route get 192.168.32.10` and `ip -4 route get 10.32.0.10` are the way to ask the kernel which it would actually use, rather than reading the table and inferring.
+- **The route alone does not make guests reachable.** A libvirt NAT network permits outbound traffic and `RELATED,ESTABLISHED` return traffic; a connection opened from outside into `192.168.32.0/24` is not in either category and is dropped on Dionysus. Isolated `virbr2` has no `<forward>`, so libvirt rejects both inbound and outbound there. Dionysus.md Step 11 carries the forwarding rules that allow both. Test with `ping` to a guest, not by reading the routing table.
+- The fallback path leans on Dionysus forwarding between `enp4s0` and `virbr1` / `virbr2`, which is what `net.ipv4.ip_forward` in Dionysus.md Step 10 enables.
 - Unplugging the cable takes the profile down with it, and the metric 200 route over the local network takes over on its own. Plugging it back in does **not** undo that: neither profile autoconnects, so the port stays idle until you run `nmcli con up`. That is the cost of never guessing which peer is on the other end.
 - **A proxy with policy routing can swallow guest traffic, and it does not look like a routing fault.** Nekoray installs a TUN interface and a table of its own, matched for the ordinary user's traffic by a rule rather than by prefix. A subnet with no route of its own falls into that catch-all and leaves by the proxy, so `ip route get` answers `dev nekoray-tun table 2022` with no gateway, and the same command as root answers normally. Put `10.0.0.0/8`, `172.16.0.0/12` and `192.168.0.0/16` in its **Direct** list and the question stops arising. This is not part of the build; it is named because it costs an evening to find.
 - **A plugged cable is not a configured one, and the peer does not know the difference.** Dionysus and Hephaestus both autoconnect their end, so the moment the cable carries a link they route to this host over it — at `192.168.124.2` or `192.168.124.6`, addresses that do not exist here until the matching profile is up. Their traffic goes nowhere and their own `check.sh` reports the guest network as unreachable while the route looks fine. The fix is always the same and always on this side: `nmcli con up Dionysus`, or `Hephaestus` at the other site.
@@ -1477,10 +1504,12 @@ Needs Dionysus up on the other end.
 ### Step 14 — Firewall
 
 `libvirt` writes the rules for `static_network_24` itself when the network
-starts. This step adds the one thing libvirt deliberately does not do: letting a
-machine outside the guest network open a connection into it. That is what makes
-this laptop a hub rather than only a client — a guest on Dionysus or Hephaestus
-can reach a guest here, not just the other way round.
+starts. Isolated `isolated_network_24` has no `<forward>`, so libvirt rejects
+forwarding in and out of `virbr2`. This step adds the one thing libvirt
+deliberately does not do: letting a machine outside the guest networks open a
+connection into them. That is what makes this laptop a hub rather than only a
+client — a guest on Dionysus or Hephaestus can reach a guest here, not just
+the other way round.
 
 #### 1. Read what libvirt installed
 
@@ -1488,15 +1517,18 @@ can reach a guest here, not just the other way round.
 sudo iptables -L LIBVIRT_FWI -n -v
 ```
 
-The last rule is `-o virbr1 -j REJECT`. A guest reaches the outside and the
+The last rule is `-o virbr1 -j REJECT`. A NAT guest reaches the outside and the
 replies come back through conntrack; a connection *started* from outside matches
-neither `ACCEPT` and falls to that `REJECT`. That is the gap this step closes.
+neither `ACCEPT` and falls to that `REJECT`. Isolated `virbr2` rejects both
+directions. That is the gap this step closes.
 
 #### 2. What this step adds
 
 | # | Rule | Required | Why |
 |---|------|----------|-----|
-| 1 | `FORWARD` accept, private ranges → `192.168.24.0/24` | **yes** | without it a guest on a peer host cannot open a connection to a guest here |
+| 1 | `FORWARD` accept, private ranges → `192.168.24.0/24` out `virbr1` | **yes** | without it a guest on a peer host cannot open a connection to a NAT guest here |
+| 2 | `FORWARD` accept, private ranges → `10.24.0.0/24` out `virbr2` | **yes** | isolated has no `<forward>`, so inbound is rejected the same way |
+| 3 | `FORWARD` accept, `10.24.0.0/24` in `virbr2` | **yes** | isolated also rejects outbound; replies from isolated guests need this. NAT already allows outbound itself |
 
 #### 3. Add the required rules, as a service
 
@@ -1507,19 +1539,25 @@ time it starts, so a saved ruleset comes back permanently below the `REJECT`.
 ```bash
 sudo tee /usr/local/sbin/guest-net-access >/dev/null <<'EOF'
 #!/bin/sh
-# Let private networks open connections into the libvirt guest network.
+# Let private networks open connections into the libvirt guest networks.
 #
 # These must precede the jump to LIBVIRT_FWI, whose final rule rejects anything
-# inbound to virbr1 that conntrack does not already know. libvirtd re-inserts
-# its own jumps at the head of FORWARD on every start, so this deletes and
+# inbound to virbr1 that conntrack does not already know. Isolated virbr2 has
+# no <forward>, so libvirt rejects both inbound and outbound; replies from
+# isolated guests need the outbound ACCEPT as well. libvirtd re-inserts its
+# own jumps at the head of FORWARD on every start, so this deletes and
 # re-inserts rather than assuming a position it once had.
 set -e
 for net in 192.168.0.0/16 172.16.0.0/12 10.0.0.0/8; do
     iptables -D FORWARD -s "$net" -d 192.168.24.0/24 -o virbr1 -j ACCEPT 2>/dev/null || true
+    iptables -D FORWARD -s "$net" -d 10.24.0.0/24 -o virbr2 -j ACCEPT 2>/dev/null || true
 done
+iptables -D FORWARD -s 10.24.0.0/24 -i virbr2 -j ACCEPT 2>/dev/null || true
 for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
     iptables -I FORWARD 1 -s "$net" -d 192.168.24.0/24 -o virbr1 -j ACCEPT
+    iptables -I FORWARD 1 -s "$net" -d 10.24.0.0/24 -o virbr2 -j ACCEPT
 done
+iptables -I FORWARD 1 -s 10.24.0.0/24 -i virbr2 -j ACCEPT
 EOF
 sudo chmod +x /usr/local/sbin/guest-net-access
 sudo tee /etc/systemd/system/guest-net-access.service >/dev/null <<'EOF'
@@ -1547,11 +1585,11 @@ sudo systemctl enable --now guest-net-access.service
 sudo iptables -S FORWARD
 ```
 
-The three `ACCEPT` rules must come out **before** `-j LIBVIRT_FWI`. Read it, then
+The `ACCEPT` rules must come out **before** `-j LIBVIRT_FWI`. Read it, then
 have the shell decide:
 
 ```bash
-ours=$(sudo iptables -S FORWARD | grep -n 'd 192.168.24.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1); libv=$(sudo iptables -S FORWARD | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1); if [ -n "$ours" ] && [ -n "$libv" ] && [ "$ours" -lt "$libv" ]; then echo "  PASS  rules precede LIBVIRT_FWI ($ours < $libv)"; else echo "  FAIL  ours=$ours libvirt=$libv"; fi
+ours=$(sudo iptables -S FORWARD | grep -n 'd 192.168.24.0/24 -o virbr1 -j ACCEPT' | tail -1 | cut -d: -f1); iso=$(sudo iptables -S FORWARD | grep -n 'd 10.24.0.0/24 -o virbr2 -j ACCEPT' | tail -1 | cut -d: -f1); libv=$(sudo iptables -S FORWARD | grep -n -- '-j LIBVIRT_FWI' | cut -d: -f1); if [ -n "$ours" ] && [ -n "$iso" ] && [ -n "$libv" ] && [ "$ours" -lt "$libv" ] && [ "$iso" -lt "$libv" ]; then echo "  PASS  rules precede LIBVIRT_FWI ($ours $iso < $libv)"; else echo "  FAIL  ours=$ours iso=$iso libvirt=$libv"; fi
 ```
 
 ```bash
@@ -1568,7 +1606,7 @@ the rule does anything.
 **Notes**
 
 - **This is what makes the hub bidirectional.** Silenus already had routes *to* both peers' guest networks and `ip_forward` on, so a guest here could reach a guest there. Nothing let a packet in the other direction past libvirt's `REJECT`, so the path only worked one way and looked like a routing fault rather than a firewall one.
-- **The peers need a route back.** These rules permit the traffic; they do not tell Dionysus or Hephaestus how to reach `192.168.24.0/24`. That route is added on each peer — Dionysus.md Step 10 and Hephaestus.md Step 9 — and without it the reply never leaves the far host.
+- **The peers need a route back.** These rules permit the traffic; they do not tell Dionysus or Hephaestus how to reach `192.168.24.0/24` or `10.24.0.0/24`. Those routes are added on each peer — Dionysus.md Step 10 and Hephaestus.md Step 9 — and without them the reply never leaves the far host.
 - `PartOf=libvirtd.service` is what makes a `libvirtd` restart carry this unit with it. Without it the rules stay where they were while libvirt re-inserts its jumps on top, and the host silently stops accepting connections into the guest network until the next boot.
 - `-I FORWARD 1` inserts at the head. Appended with `-A`, the rules end up after `LIBVIRT_FWI` has already rejected the packet, and every existence check still passes.
 - `172.16.0.0/12` includes `172.17.0.0/16`, which is `docker0`, so containers can reach guests too. Drop that range if you would rather they could not.
