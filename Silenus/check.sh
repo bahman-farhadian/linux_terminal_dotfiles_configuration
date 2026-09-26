@@ -71,18 +71,17 @@ ok "booted from"  "$(printf '%s' "$_efi"|grep -i "^Boot$_cur"|head -1|cut -c1-58
 ck "shim in use"  "$(printf '%s' "$_efi"|grep -ci shim|awk '{print ($1>0)?"yes":"no"}')" "yes"
 ok "bios version" "$(sudo dmidecode -s bios-version 2>/dev/null)"
 
-printf '\n--- Step 3/6/9: repositories ---\n'
+printf '\n--- Step 3/9: repositories ---\n'
 for s in "trixie" "trixie-security" "trixie-updates"; do
   ck "sources.list $s" "$(grep -c "^deb .* $s main contrib non-free non-free-firmware\$" /etc/apt/sources.list)" "1"
 done
 hf "docker.sources"      /etc/apt/sources.list.d/docker.sources
-hf "lens.sources"        /etc/apt/sources.list.d/lens.sources
-ck "no lens.list"        "$([ -e /etc/apt/sources.list.d/lens.list ] && echo present || echo absent)" "absent"
 hf "docker key"      /etc/apt/keyrings/docker.asc
-hf "lens key"        /etc/apt/keyrings/lens-archive-keyring.asc
-ck "lens key valid"   "$(gpg --show-keys /etc/apt/keyrings/lens-archive-keyring.asc 2>/dev/null|tr -d ' '|grep -c 958F4ED752DE9C0FE68C177A666A7D882011D3CE)" "1"
 ck "docker suite"  "$(grep -c '^Suites: trixie$' /etc/apt/sources.list.d/docker.sources)" "1"
-ck "lens signed-by"   "$(grep -c '^Signed-By: /etc/apt/keyrings/lens-archive-keyring.asc$' /etc/apt/sources.list.d/lens.sources)" "1"
+ck "no lens.sources" "$([ -e /etc/apt/sources.list.d/lens.sources ] && echo present || echo absent)" "absent"
+ck "no lens.list"    "$([ -e /etc/apt/sources.list.d/lens.list ] && echo present || echo absent)" "absent"
+ck "no lens key"     "$([ -e /etc/apt/keyrings/lens-archive-keyring.asc ] && echo present || echo absent)" "absent"
+ck "no lens package" "$(dpkg -s lens >/dev/null 2>&1 && echo present || echo absent)" "absent"
 u=$(sudo apt update 2>&1)
 ck "apt update errors"    "$(printf '%s' "$u"|grep -c '^Err:')" "0"
 ck "apt duplicate warns"  "$(printf '%s' "$u"|grep -ci 'configured multiple times')" "0"
@@ -97,7 +96,7 @@ for p in vim mokutil dmidecode efibootmgr \
   iperf3 jq keepassxc libmbim-utils lshw make mmsd-tng modemmanager nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio \
   openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv remmina remmina-plugin-rdp rsync sshuttle \
   sudo tmux traceroute tree unrar virt-top vlc wget xclip yt-dlp \
-  flatpak gnome-software-plugin-flatpak lens \
+  flatpak gnome-software-plugin-flatpak \
   qemu-system-x86 qemu-utils ovmf virtinst virt-manager libvirt-daemon-system libvirt-clients \
   libosinfo-bin osinfo-db osinfo-db-tools libguestfs-tools cloud-image-utils acl util-linux \
   ca-certificates docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; do
@@ -109,10 +108,10 @@ ck "editor is vim" "$(readlink -f /etc/alternatives/editor|grep -c vim)" "1"
 printf '\n--- Step 6: flatpak ---\n'
 ck "flathub remote" "$(flatpak remotes 2>/dev/null|grep -c flathub)" "1"
 fmiss=""
-for a in org.telegram.desktop com.belmoussaoui.Obfuscate md.obsidian.Obsidian io.gitlab.adhami3310.Impression; do
+for a in org.telegram.desktop com.belmoussaoui.Obfuscate md.obsidian.Obsidian io.gitlab.adhami3310.Impression io.kinvolk.Headlamp; do
   flatpak info "$a" >/dev/null 2>&1 || fmiss="$fmiss $a"
 done
-ck "flatpak apps" "${fmiss:-all four}" "all four"
+ck "flatpak apps" "${fmiss:-all five}" "all five"
 
 printf '\n--- Step 4: Qt ---\n'
 ck "QT_QPA_PLATFORM"      "$(grep -c '^QT_QPA_PLATFORM=wayland;xcb$' /etc/environment)" "1"
