@@ -96,7 +96,7 @@ installer will then display the **Shows as** value.
 | Field | Value |
 |---|---|
 | Interface | the onboard WiFi, `wlp2s0` — the installer asks for the network and its key |
-| Addressing | DHCP. The work network hands out addresses; `192.168.88.212` is what it has been giving this machine |
+| Addressing | DHCP for the installer. Step 9 pins `192.168.88.212/24` on `wan` |
 | Hostname | `hephaestus` |
 | Domain | leave empty |
 
@@ -1048,7 +1048,7 @@ WiFi PSK:
 ```
 
 ```bash
-nmcli connection add type wifi ifname wlp2s0 con-name wan ssid "$WIFI_SSID" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$WIFI_PSK" 802-11-wireless.cloned-mac-address permanent connection.autoconnect yes connection.autoconnect-priority 10 ipv4.method auto ipv6.method disabled
+nmcli connection add type wifi ifname wlp2s0 con-name wan ssid "$WIFI_SSID" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$WIFI_PSK" 802-11-wireless.cloned-mac-address permanent connection.autoconnect yes connection.autoconnect-priority 10 ipv4.method manual ipv4.addresses 192.168.88.212/24 ipv4.gateway 192.168.88.1 ipv4.dns "8.8.8.8" ipv6.method disabled
 ```
 
 ```bash
@@ -1063,9 +1063,7 @@ nmcli con up wan
 ip -br addr show wlp2s0
 ```
 
-Expect an address on `192.168.88.0/24`. It has been `192.168.88.212`; a DHCP
-lease is not a guarantee, so anything that has to reach this host by address
-either wants a reservation on the work DHCP server or should use the cable.
+Expect `192.168.88.212/24` on `wlp2s0`.
 
 #### 6. The point-to-point link to Silenus
 
@@ -1181,7 +1179,7 @@ Expect `net.ipv4.ip_forward = 1`.
 - The failure names the wrong device, which is the confusing part. `No suitable device found for this connection (device docker0 not available because profile is not compatible with device (mismatching interface name))` is NetworkManager reporting the last device it happened to check. `wlp2s0` is missing from that message precisely because it was never a candidate to begin with.
 - The SSID and the key go in through `read` rather than being typed into the `nmcli` line. What `read` consumes arrives on stdin and is never part of a command, so neither value is written to `~/.bash_history`, and `unset` clears both from the shell afterwards. Typed inline they would sit in the history file for every later reader. A leading space suppresses that one line — these dotfiles set `HISTCONTROL=ignoreboth`, which includes `ignorespace` — but relying on a shell setting to protect a credential is thinner than never putting it on the command line at all.
 - `-rp` for the SSID echoes what is typed; `-rsp` for the key does not. `-r` on both stops a backslash in either value being read as an escape.
-- `802-11-wireless.cloned-mac-address permanent` is what keeps the DHCP lease stable. NetworkManager randomizes the MAC by default, a new MAC draws a new lease, and `192.168.88.212` quietly stops being the address this host answers on. `ip link` shows the randomization while it is active: a `permaddr` next to a different current address.
+- `802-11-wireless.cloned-mac-address permanent` stops NetworkManager randomizing the MAC. A new MAC looks like a new station to the AP even though the IPv4 address is set on the profile. `ip link` shows the randomization while it is active: a `permaddr` next to a different current address.
 - The adapter is a Realtek RTL8822CE driven by `rtw_8822ce`, on the PCIe bus at `02:00.0` rather than Intel's CNVi, which is why it enumerates as `wlp2s0` and not `wlo1`. Its firmware ships in `firmware-realtek`, from the `non-free-firmware` component Step 3 sub-step 4 enables.
 - `rfkill` is not installed on this host. Read the blocks from sysfs instead: `for d in /sys/class/rfkill/*; do echo "$(cat $d/name) soft=$(cat $d/soft) hard=$(cat $d/hard)"; done`.
 - **Two routes to `192.168.24.0/24` and `10.24.0.0/24`, and the metric picks between them.** The cable is metric 100 and wins while it is up; with it out, the metric 200 route on `wan` carries the traffic across the work LAN instead. Both ends fall back together — Silenus's own pair is the cable first and `192.168.88.212` second — so neither takes a path the other is not using.
@@ -1191,7 +1189,7 @@ Expect `net.ipv4.ip_forward = 1`.
 - **The routes to `192.168.24.0/24` and `10.24.0.0/24` are half of a pair.** They let a guest here answer one on Silenus; the other half is Silenus.md Step 14, whose rules let a connection *started* here reach into those networks past libvirt's `REJECT`. Either alone gives a path that works one way and reads as a routing fault.
 - Reaching Dionysus's guests from here is not possible and is not configured. That host is at another site with no network path to this one, and Silenus cannot bridge them: it has one spare ethernet port, its two point-to-point profiles are mutually exclusive, and it is never at both sites at once. Guest-to-guest across sites is not routed: log into the far host, then reach its guest from the shell that gives you.
 - The two point-to-point links do not overlap. Silenus reaches Dionysus on `192.168.124.0/30` — hosts `.1` and `.2` — and this machine on `192.168.124.4/30` — hosts `.5` and `.6`. Adjacent `/30`s out of the same `/29`, deliberately, so one range covers every point-to-point link in the estate without any two colliding.
-- `wan` takes its address by DHCP, which is the one place this host differs from the other two — both of those are static because their router hands out nothing. A lease can change, so the cable at `192.168.124.5` is the address to rely on, and Silenus reaches the guest network across it first for exactly that reason.
+- `wan` holds `192.168.88.212/24` statically, gateway `192.168.88.1`, DNS `8.8.8.8`. The work network runs DHCP, but Silenus, the office VPN, and every SSH line name `.212`, so this host sets that address itself rather than taking whatever lease comes next. The installer still uses DHCP to reach the network; this is the installed system. `/etc/network/interfaces` stays loopback-only — the address lives on the NetworkManager profile, the same way Dionysus holds `192.168.8.3`.
 - The cable is the second way in when WiFi fails, which matters more here than on Dionysus: this machine is at another site and has no console you can walk to. Bring `Hephaestus` up before touching `wan`, and make any change to `wan` from a `tmux` session so a dropped connection does not leave a command half-done.
 - Silenus has one spare ethernet port and two point-to-point links to make with it, so it carries a profile per peer on the same interface and only one is up at a time. Neither autoconnects: a `/30` says nothing about which peer is on the far end, so both are brought up by hand there.
 

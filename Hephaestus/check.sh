@@ -185,7 +185,10 @@ ck "hello-world"     "$(docker run --rm hello-world 2>/dev/null|grep -c 'working
 printf '\n--- Step 9: networking ---\n'
 ck "wan profile"     "$(nmcli -g connection.id connection show wan 2>/dev/null)" "wan"
 ck "wan interface"   "$(nmcli -g connection.interface-name connection show wan 2>/dev/null)" "wlp2s0"
-ok "wan address"     "$(ip -4 -br addr show wlp2s0 2>/dev/null|awk '{print $3}')"
+ck "wan method"      "$(nmcli -g ipv4.method connection show wan 2>/dev/null)" "manual"
+ck "wan profile address" "$(nmcli -g ipv4.addresses connection show wan 2>/dev/null)" "192.168.88.212/24"
+ck "wan gateway"     "$(nmcli -g ipv4.gateway connection show wan 2>/dev/null)" "192.168.88.1"
+ck "wan address"     "$(ip -4 -br addr show wlp2s0 2>/dev/null|awk '{print $3}')" "192.168.88.212/24"
 ck "wan autoconnect" "$(nmcli -g connection.autoconnect connection show wan 2>/dev/null)" "yes"
 ck "wan mac pinned"  "$(nmcli -g 802-11-wireless.cloned-mac-address connection show wan 2>/dev/null)" "permanent"
 # Named rather than left to show up as a symptom. Installing over WiFi leaves a
