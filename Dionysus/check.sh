@@ -223,6 +223,10 @@ ck "default via wan" "$(ip -4 route show default|grep -c 'dev enp4s0')" "1"
 ck "p2p installs no default" "$(ip -4 route show default|grep -c 'dev p2plink0')" "0"
 ck "ip_forward"      "$(sysctl -n net.ipv4.ip_forward)" "1"
 ck "ip_forward conf" "$(grep -c 'net.ipv4.ip_forward = 1' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
+ck "ignore linkdown" "$(sysctl -n net.ipv4.conf.all.ignore_routes_with_linkdown 2>/dev/null)" "1"
+ck "ignore linkdown default" "$(sysctl -n net.ipv4.conf.default.ignore_routes_with_linkdown 2>/dev/null)" "1"
+ck "ignore linkdown conf" "$(grep -c 'net.ipv4.conf.all.ignore_routes_with_linkdown = 1' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
+ck "ignore linkdown default conf" "$(grep -c 'net.ipv4.conf.default.ignore_routes_with_linkdown = 1' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
 ck "gateway reachable" "$(ping -c1 -W2 192.168.8.1 >/dev/null 2>&1 && echo yes || echo no)" "yes"
 
 printf '\n--- Step 11: firewall ---\n' 

@@ -634,6 +634,8 @@ Put this in it:
 ```
 net.ipv4.ip_forward = 1
 net.ipv4.conf.wlp0s20f3.proxy_arp = 1
+net.ipv4.conf.all.ignore_routes_with_linkdown = 1
+net.ipv4.conf.default.ignore_routes_with_linkdown = 1
 ```
 
 ```bash
@@ -641,10 +643,10 @@ sysctl --system
 ```
 
 ```bash
-sysctl net.ipv4.ip_forward net.ipv4.conf.wlp0s20f3.proxy_arp
+sysctl net.ipv4.ip_forward net.ipv4.conf.wlp0s20f3.proxy_arp net.ipv4.conf.all.ignore_routes_with_linkdown net.ipv4.conf.default.ignore_routes_with_linkdown
 ```
 
-Expect `1` for both.
+Expect `1` for all four.
 
 `proxy_arp` is what lets a peer reach this host's guests over WiFi without
 knowing what address this laptop currently holds. With it on, this host answers
@@ -652,6 +654,12 @@ ARP for any address it can route out a *different* interface — which is
 `192.168.24.0/24` behind `virbr1` — so a peer can carry a gatewayless route and
 let ARP find the way. Without it, that peer has to name this machine's address,
 and on a DHCP network that address is a lease rather than a fact.
+
+`ignore_routes_with_linkdown` is what lets the metric-200 fallback actually
+win when the cable is unplugged. The kernel still prefers a lower-metric route
+that is only marked `linkdown`; with this set, lookup skips that nexthop and
+uses the WiFi or LAN path. `all` covers interfaces that already exist;
+`default` covers one that appears later.
 
 #### 7. Raise the open file limit
 
@@ -1426,11 +1434,11 @@ Needs Dionysus up on the other end.
 - **Forcing it past that changes nothing, and the reason is worth being precise about.** The packet would go down the tunnel with destination `192.168.40.x`, and the VPN server routes by destination, not by the next hop this end chose. It has never heard of that subnet and drops it. Only the other direction is workable — Hephaestus can route to `192.168.24.0/24` via this host's VPN address, because the office does carry the VPN pool — and configuring one direction without the other gives asymmetric routing, which breaks stateful traffic in ways that read as packet loss. Both or neither; the answer here is neither.
 - **The VPN still earns its place: it makes Hephaestus itself reachable from home.** `192.168.88.0/24 via 192.168.88.1 dev tun1` resolves, so that host answers on `192.168.88.212` from the sofa with no cable anywhere near it. Host reachability is wider than guest routing, and logging in is what spans the difference.
 - The two logins are the answer, not a workaround: `ssh <you>@192.168.88.212`, then `ssh <guest-address>` from the shell it gives you. Not `ssh -J`: `ProxyJump` forwards only the TCP connection, so the guest still authenticates *your* key rather than the host's. The host's key is the one a guest it built already trusts, and the host is the one holding a route to `192.168.40.0/24` in the first place.
-- Both routes are permanent, and NetworkManager withdraws a connection's routes when that connection goes down. Unplugging the cable therefore removes the metric-100 route on its own and the metric-200 one takes over, with no manual step. Plugging it back restores the preference.
-- The metrics are what express "prefer the cable". Same destination, two next hops, lower metric wins. `ip -4 route get 192.168.32.10` and `ip -4 route get 10.32.0.10` are the way to ask the kernel which it would actually use, rather than reading the table and inferring.
+- Both routes stay on their profiles. Unplugging the cable often leaves the Dionysus or Hephaestus profile up, so the metric-100 route remains in the table marked `linkdown`. Step 8 sets `ignore_routes_with_linkdown`, and lookup then skips that nexthop and uses metric 200. Carrier returning makes metric 100 usable again while the profile is still up. `nmcli con down` also withdraws the route.
+- The metrics are what express "prefer the cable". Same destination, two next hops, lower metric wins — once `linkdown` routes are ignored. `ip -4 route get 192.168.32.10` and `ip -4 route get 10.32.0.10` are the way to ask the kernel which it would actually use, rather than reading the table and inferring.
 - **The route alone does not make guests reachable.** A libvirt NAT network permits outbound traffic and `RELATED,ESTABLISHED` return traffic; a connection opened from outside into `192.168.32.0/24` is not in either category and is dropped on Dionysus. Isolated `virbr2` has no `<forward>`, so libvirt rejects both inbound and outbound there. Dionysus.md Step 11 carries the forwarding rules that allow both. Test with `ping` to a guest, not by reading the routing table.
 - The fallback path leans on Dionysus forwarding between `enp4s0` and `virbr1` / `virbr2`, which is what `net.ipv4.ip_forward` in Dionysus.md Step 10 enables.
-- Unplugging the cable takes the profile down with it, and the metric 200 route over the local network takes over on its own. Plugging it back in does **not** undo that: neither profile autoconnects, so the port stays idle until you run `nmcli con up`. That is the cost of never guessing which peer is on the other end.
+- Plugging the cable back in does **not** bring a downed profile up: neither autoconnects, so the port stays idle until you run `nmcli con up`. That is the cost of never guessing which peer is on the other end.
 - **A proxy with policy routing can swallow guest traffic, and it does not look like a routing fault.** Nekoray installs a TUN interface and a table of its own, matched for the ordinary user's traffic by a rule rather than by prefix. A subnet with no route of its own falls into that catch-all and leaves by the proxy, so `ip route get` answers `dev nekoray-tun table 2022` with no gateway, and the same command as root answers normally. Put `10.0.0.0/8`, `172.16.0.0/12` and `192.168.0.0/16` in its **Direct** list and the question stops arising. This is not part of the build; it is named because it costs an evening to find.
 - **A plugged cable is not a configured one, and the peer does not know the difference.** Dionysus and Hephaestus both autoconnect their end, so the moment the cable carries a link they route to this host over it — at `192.168.124.2` or `192.168.124.6`, addresses that do not exist here until the matching profile is up. Their traffic goes nowhere and their own `check.sh` reports the guest network as unreachable while the route looks fine. The fix is always the same and always on this side: `nmcli con up Dionysus`, or `Hephaestus` at the other site.
 

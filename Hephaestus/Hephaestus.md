@@ -1159,6 +1159,8 @@ Put this in it:
 
 ```
 net.ipv4.ip_forward = 1
+net.ipv4.conf.all.ignore_routes_with_linkdown = 1
+net.ipv4.conf.default.ignore_routes_with_linkdown = 1
 ```
 
 ```bash
@@ -1166,10 +1168,10 @@ sysctl --system
 ```
 
 ```bash
-sysctl net.ipv4.ip_forward
+sysctl net.ipv4.ip_forward net.ipv4.conf.all.ignore_routes_with_linkdown net.ipv4.conf.default.ignore_routes_with_linkdown
 ```
 
-Expect `net.ipv4.ip_forward = 1`.
+Expect `1` for all three.
 
 **Notes**
 
@@ -1182,7 +1184,7 @@ Expect `net.ipv4.ip_forward = 1`.
 - `802-11-wireless.cloned-mac-address permanent` stops NetworkManager randomizing the MAC. A new MAC looks like a new station to the AP even though the IPv4 address is set on the profile. `ip link` shows the randomization while it is active: a `permaddr` next to a different current address.
 - The adapter is a Realtek RTL8822CE driven by `rtw_8822ce`, on the PCIe bus at `02:00.0` rather than Intel's CNVi, which is why it enumerates as `wlp2s0` and not `wlo1`. Its firmware ships in `firmware-realtek`, from the `non-free-firmware` component Step 3 sub-step 4 enables.
 - `rfkill` is not installed on this host. Read the blocks from sysfs instead: `for d in /sys/class/rfkill/*; do echo "$(cat $d/name) soft=$(cat $d/soft) hard=$(cat $d/hard)"; done`.
-- **Two routes to `192.168.24.0/24` and `10.24.0.0/24`, and the metric picks between them.** The cable is metric 100 and wins while it is up; with it out, the metric 200 route on `wan` carries the traffic across the work LAN instead. Both ends fall back together — Silenus's own pair is the cable first and `192.168.88.212` second — so neither takes a path the other is not using.
+- **Two routes to `192.168.24.0/24` and `10.24.0.0/24`, and the metric picks between them.** The cable is metric 100 and wins while it has carrier. Unplugging often leaves the profile up and the route marked `linkdown`; `ignore_routes_with_linkdown` in this file makes lookup skip it, so metric 200 on `wan` is used. Both ends fall back together — Silenus's own pair is the cable first and `192.168.88.212` second — so neither takes a path the other is not using.
 - **The fallback names no address, deliberately.** Silenus is a laptop on a DHCP network, so any address written here is a lease — and a two-week lease is still a thing that expires while you are not looking. A gatewayless route sidesteps the question: the kernel ARPs for the guest address, Silenus answers because Step 8 gives it `proxy_arp`, and neither host ever has to know what the other's current address is. A DHCP reservation would also work, but it puts the guarantee on someone else's server rather than in configuration you hold.
 - The trade is that the fallback is now pure layer 2. It works while both machines sit on the same WiFi segment and stops the moment anything routes between them — a second AP on its own subnet, or a VLAN. The cable is unaffected either way and stays the real path.
 - **No route over a VPN.** A next hop has to be directly reachable. Over the office VPN the work network sits behind a gateway, so a route via Silenus's address there is refused with `Nexthop has invalid gateway` — the same reasoning Silenus.md Step 13 sets out for the opposite direction. Off-site, a guest is reached by logging into its own host and going on from there.

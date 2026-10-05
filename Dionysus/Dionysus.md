@@ -1362,6 +1362,8 @@ Put this in it:
 
 ```
 net.ipv4.ip_forward = 1
+net.ipv4.conf.all.ignore_routes_with_linkdown = 1
+net.ipv4.conf.default.ignore_routes_with_linkdown = 1
 ```
 
 ```bash
@@ -1369,10 +1371,10 @@ sysctl --system
 ```
 
 ```bash
-sysctl net.ipv4.ip_forward
+sysctl net.ipv4.ip_forward net.ipv4.conf.all.ignore_routes_with_linkdown net.ipv4.conf.default.ignore_routes_with_linkdown
 ```
 
-Expect `net.ipv4.ip_forward = 1`.
+Expect `1` for all three.
 
 **Notes**
 
@@ -1384,7 +1386,7 @@ Expect `net.ipv4.ip_forward = 1`.
 - Rename first, in sub-step 4, and only then run the block. A profile bound to `enx9405bb143cf5` stops matching the moment the rename takes effect, so the order of the two sub-steps matters.
 - The two profiles are named for what they do, not for the interface underneath. `wan` is the way out; `Dionysus` is the point-to-point link, and Silenus's end of the same cable carries that same name, so the link reads the same from either side. Connection names are local to each host, so nothing collides.
 - `wan` is the router-and-firewall convention: the side facing outward, as against the inside. Worth knowing that this one holds a private address, `192.168.8.3`, because another router sits in front of it doing the real translation. `wan` here means *this host's* way out, not a public address.
-- **Two routes to `192.168.24.0/24`, and the metric picks between them.** The cable is metric 100 and wins whenever it is up. With it unplugged that route goes away with the profile, and the metric 200 route on `wan` takes over: Silenus is still on the home LAN at `192.168.8.2` and still forwards for its own guests, so the path survives the cable being out. It mirrors Silenus's own pair — cable first, `192.168.8.3` on the LAN second — so both ends fall back together rather than one taking the cable while the other takes the LAN.
+- **Two routes to `192.168.24.0/24`, and the metric picks between them.** The cable is metric 100 and wins while it has carrier. Unplugging often leaves the profile up and the route marked `linkdown`; `ignore_routes_with_linkdown` in this file makes lookup skip it, so metric 200 on `wan` is used. Silenus is still on the home LAN at `192.168.8.2` and still forwards for its own guests, so the path survives the cable being out. It mirrors Silenus's own pair — cable first, `192.168.8.3` on the LAN second — so both ends fall back together rather than one taking the cable while the other takes the LAN.
 - Silenus holds `192.168.8.2` statically. The home router runs no DHCP, so every address on that network is configured on the host that uses it, and a next hop written here does not move.
 - **No route over a VPN.** A next hop has to be directly reachable, and from anywhere off the home LAN `192.168.8.2` sits behind a gateway — `ip route add ... via 192.168.8.2` is refused with `Nexthop has invalid gateway`. Silenus.md Step 13 works through the same problem for the work side. Off-site, a guest is reached by logging into its own host and going on from there.
 - **The route to `192.168.24.0/24` is what lets a guest here answer a guest on Silenus.** Silenus already routes to `192.168.32.0/24` across this cable and forwards for its own guests, but a reply from a guest on this host has to know the way back: without this route it leaves by the default gateway and dies on the home LAN. The other half of the pair is Silenus.md Step 14, whose rules let a connection *started* here past libvirt's `REJECT` on that side.
