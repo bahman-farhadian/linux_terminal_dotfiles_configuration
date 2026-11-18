@@ -117,6 +117,12 @@ upgrade() {
     fi
 }
 
+# Empty zram back into RAM, then enable it again at priority 100. zram is not
+# in fstab, so `swapoff -a` / `swapon -a` would leave the host with no swap.
+# Need enough free RAM to hold what is in zram. `swapoff` and `swapon` stay
+# the real commands.
+alias swapclean='sudo swapoff /dev/zram0 && sudo swapon -p 100 /dev/zram0'
+
 # Keyboard layout — replaces the GNOME input source list outright, so only the
 # named layouts remain. Takes effect immediately, no log out.
 alias DE="gsettings set org.gnome.desktop.input-sources sources \"[('xkb', 'de')]\""

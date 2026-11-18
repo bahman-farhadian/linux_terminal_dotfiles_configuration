@@ -727,6 +727,7 @@ Expect `enabled`, algorithm `zstd`, disksize `16G`, and a single swap device
 - Do not add a swap partition or a swap file. The unpartitioned space on the NVMe is over-provisioning.
 - CPU rises only while pages are moving into zram or back out.
 - GNOME System Monitor's Swap line is this device. `lsblk` shows `zram0` with `[SWAP]`. It is compressed RAM, not a partition on the NVMe or the hard disk.
+- `swapclean` empties zram back into RAM and enables `/dev/zram0` again at priority 100. zram is not in fstab, so `swapoff -a` / `swapon -a` would leave the host with no swap. Need enough free RAM to hold what is in zram. `swapoff` and `swapon` stay the real commands.
 - `systemctl restart zramswap` is not enough after rewriting the file. Stop the unit, `modprobe -r zram`, then start.
 
 #### 8. Raise the open file limit
