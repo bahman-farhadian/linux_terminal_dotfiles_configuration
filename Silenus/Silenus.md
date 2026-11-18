@@ -56,7 +56,7 @@ the **Shows as** value.
 - The installer counts in GB, `df -h` counts in GiB. Root shows as `953.5 GB` here and `888G` later. Same partition.
 - For any other size: type `GiB x 1073.741824` MB, rounded.
 - Sizes on the installed system: `lsblk` reports `1G`, `2G`, `888G`. `df -h` reports the EFI partition as `1022M`, because the FAT filesystem uses a little of it. Both are correct.
-- No swap partition. Only hibernation needs one, and hibernation does not work while Secure Boot is on.
+- No swap partition. Only hibernation needs a disk swap, and hibernation does not work while Secure Boot is on. Compressed swap is zram, added in Step 8 after the install.
 - The installer warns that no swap space is selected. Continue.
 
 ### Step 3 — After install: repositories, quota, checks
@@ -291,7 +291,7 @@ Compare with what you wrote down in Step 1.
 **Notes**
 
 - If the Secure Boot check says `SecureBoot disabled`, the `Secure Boot` toggle is Off in the BIOS. Turn it back on.
-- Hibernation does not work while Secure Boot is on. The kernel refuses to write the resume image because it cannot verify the swap on resume. Suspend works normally.
+- Hibernation does not work while Secure Boot is on. The kernel refuses to write the resume image because it cannot verify the swap on resume. zram cannot be a resume device either: it is gone at power-off. Suspend works normally.
 - The quota cannot go in `/etc/fstab`. XFS cannot enable quota at remount, and root is already mounted by then.
 - `rootflags` goes in `GRUB_CMDLINE_LINUX`, not `GRUB_CMDLINE_LINUX_DEFAULT`, so it applies to the recovery entries too.
 - The kernel renames the options. `pquota` shows as `prjquota` and `uquota` as `usrquota`.
@@ -465,7 +465,7 @@ sudo -i
 #### 2. Install the packages
 
 ```bash
-apt install -y bash-completion bridge-utils btop chatty curl default-jre duf ethtool ffmpeg filezilla foliate fonts-jetbrains-mono git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc libmbim-utils lshw make mmsd-tng modemmanager nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv remmina remmina-plugin-rdp rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip yt-dlp
+apt install -y bash-completion bridge-utils btop chatty curl default-jre duf ethtool ffmpeg filezilla foliate fonts-jetbrains-mono git gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc iperf3 jq keepassxc libmbim-utils lshw make mmsd-tng modemmanager nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv remmina remmina-plugin-rdp rsync sshuttle sudo tmux traceroute tree unrar vim virt-top vlc wget xclip yt-dlp zram-tools
 ```
 
 #### 3. Install flatpak
@@ -512,6 +512,7 @@ flatpak install -y flathub org.telegram.desktop com.belmoussaoui.Obfuscate md.ob
 - `virt-top` reads from libvirt. Until libvirt is installed and running it shows nothing.
 - `libmbim-utils` provides `mbimcli`. ModemManager does not depend on it, and the FCC unlock script in Step 15 calls it. Without this package the unlock symlink is a no-op and enable still fails with `Invalid transition`.
 - `modemmanager` is the daemon `mmcli` talks to. GNOME's NetworkManager install pulls it in; it is named here so a machine without that task still gets it. `chatty` is the desktop application **Chats** (`sm.puri.Chatty.desktop`): SMS and MMS through that daemon. `mmsd-tng` is a Recommends of `chatty` and would normally arrive with it; it is named so MMS still works when `APT::Install-Recommends` is false. SMS itself is ModemManager, not `mmsd-tng`.
+- `zram-tools` is compressed swap in RAM. The package starts `zramswap.service` on install with its own defaults (lz4, 50% of RAM). Step 8 rewrites `/etc/default/zramswap`, unloads the module, and starts the unit so this machine actually runs zstd at 16 GiB. `systemctl restart` leaves the first device in place: zram refuses a new algorithm or size while it still exists. Dionysus and Hephaestus do not get this package.
 
 ### Step 7 — Bash, tmux, and SSH configuration
 
@@ -636,6 +637,8 @@ net.ipv4.ip_forward = 1
 net.ipv4.conf.wlp0s20f3.proxy_arp = 1
 net.ipv4.conf.all.ignore_routes_with_linkdown = 1
 net.ipv4.conf.default.ignore_routes_with_linkdown = 1
+vm.swappiness = 100
+vm.page-cluster = 0
 ```
 
 ```bash
@@ -643,10 +646,10 @@ sysctl --system
 ```
 
 ```bash
-sysctl net.ipv4.ip_forward net.ipv4.conf.wlp0s20f3.proxy_arp net.ipv4.conf.all.ignore_routes_with_linkdown net.ipv4.conf.default.ignore_routes_with_linkdown
+sysctl net.ipv4.ip_forward net.ipv4.conf.wlp0s20f3.proxy_arp net.ipv4.conf.all.ignore_routes_with_linkdown net.ipv4.conf.default.ignore_routes_with_linkdown vm.swappiness vm.page-cluster
 ```
 
-Expect `1` for all four.
+Expect `1` for the first four, `100` for `vm.swappiness`, and `0` for `vm.page-cluster`.
 
 `proxy_arp` is what lets a peer reach this host's guests over WiFi without
 knowing what address this laptop currently holds. With it on, this host answers
@@ -661,7 +664,72 @@ that is only marked `linkdown`; with this set, lookup skips that nexthop and
 uses the WiFi or LAN path. `all` covers interfaces that already exist;
 `default` covers one that appears later.
 
-#### 7. Raise the open file limit
+`vm.swappiness` 100 is what moves idle anonymous pages into zram once reclaim
+has started, instead of dropping file cache first. It does not compress
+anything while RAM is still free. 200 would prefer guest-backing host memory
+and stall the VMs. `vm.page-cluster` 0 stops swap readahead, which helps a
+disk and wastes CPU on zram.
+
+#### 7. Compressed swap (zram)
+
+The package is already installed. Rewrite its defaults, then stop the unit
+and unload the module before starting it again: `apt install` starts
+`zramswap` immediately with lz4 and 50% of RAM, and zram will not accept a
+new algorithm or size on a device that already exists.
+
+```bash
+vim /etc/default/zramswap
+```
+
+Put this in it:
+
+```
+ALGO=zstd
+# PERCENT is unset: a set value overrides SIZE and becomes 50% of RAM.
+SIZE=16384
+PRIORITY=100
+```
+
+```bash
+systemctl stop zramswap
+```
+
+```bash
+modprobe -r zram
+```
+
+```bash
+systemctl start zramswap
+```
+
+```bash
+systemctl is-enabled zramswap
+```
+
+```bash
+zramctl
+```
+
+```bash
+swapon --show
+```
+
+Expect `enabled`, algorithm `zstd`, disksize `16G`, and a single swap device
+`/dev/zram0` at priority 100.
+
+**Notes**
+
+- `SIZE` is MiB. 16384 is a 16 GiB ceiling, not RAM reserved up front. Empty zram costs nothing.
+- `PERCENT` must stay unset. `zramswap` prefers it over `SIZE` whenever it is set, including `PERCENT=50` from the package.
+- zstd is compiled into this kernel (`CONFIG_ZRAM_BACKEND_ZSTD`). The kernel default compressor is lz4.
+- Leave zswap off. It is a compressed cache in front of a disk swap, and this host has none. Enabling it next to zram compresses the same pages twice.
+- Leave zram writeback off. It would write cold compressed pages to the NVMe.
+- Do not add a swap partition or a swap file. The unpartitioned space on the NVMe is over-provisioning.
+- CPU rises only while pages are moving into zram or back out.
+- GNOME System Monitor's Swap line is this device. `lsblk` shows `zram0` with `[SWAP]`. It is compressed RAM, not a partition on the NVMe or the hard disk.
+- `systemctl restart zramswap` is not enough after rewriting the file. Stop the unit, `modprobe -r zram`, then start.
+
+#### 8. Raise the open file limit
 
 ```bash
 vim /etc/security/limits.d/99-kvm.conf
@@ -674,13 +742,13 @@ Put this in it:
 *    hard    nofile    1048576
 ```
 
-#### 8. Leave the root shell
+#### 9. Leave the root shell
 
 ```bash
 exit
 ```
 
-#### 9. Add your user to the libvirt and kvm groups
+#### 10. Add your user to the libvirt and kvm groups
 
 ```bash
 sudo usermod -aG libvirt,kvm $USER
@@ -694,7 +762,7 @@ groups
 
 Expect `libvirt` and `kvm` in the list.
 
-#### 10. Remove the default network
+#### 11. Remove the default network
 
 `libvirtd` defines a `default` NAT network on `192.168.122.0/24`, with its own
 DHCP server, when the package is installed. This host uses two networks of its
@@ -708,7 +776,7 @@ virsh -c qemu:///system net-destroy default
 virsh -c qemu:///system net-undefine default
 ```
 
-#### 11. Define the NAT network
+#### 12. Define the NAT network
 
 `static_network_24` — NAT on `192.168.24.0/24`, no DHCP, guests configured
 statically. The definition is `kvm/static_network_24.xml` in this repository,
@@ -726,7 +794,7 @@ virsh -c qemu:///system net-start static_network_24
 virsh -c qemu:///system net-autostart static_network_24
 ```
 
-#### 12. Define the isolated network
+#### 13. Define the isolated network
 
 `isolated_network_24` — isolated on `10.24.0.0/24`, no DHCP, no `<forward>`,
 no masquerade. Guests on this bridge have no path to the public internet.
@@ -749,7 +817,7 @@ virsh -c qemu:///system net-start isolated_network_24
 virsh -c qemu:///system net-autostart isolated_network_24
 ```
 
-#### 13. Verify as your own user
+#### 14. Verify as your own user
 
 ```bash
 virsh -c qemu:///system list --all

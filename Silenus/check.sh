@@ -58,7 +58,7 @@ ck "boot size"    "$(lsblk -no SIZE /dev/nvme0n1p2|tr -d ' ')" "2G"
 ck "root size"    "$(lsblk -no SIZE /dev/nvme0n1p3|tr -d ' ')" "888G"
 ck "root fstype"  "$(findmnt -no FSTYPE /)" "xfs"
 ck "partitions"   "$(lsblk -no NAME /dev/nvme0n1|grep -c nvme0n1p)" "3"
-ck "no swap"      "$(swapon --show --noheadings|wc -l|tr -d ' ')" "0"
+ck "no disk swap" "$(swapon --show --noheadings 2>/dev/null|awk '$1 !~ /zram/ {c++} END{print c+0}')" "0"
 ck "prjquota"     "$(findmnt -no OPTIONS /|tr ',' '\n'|grep -c prjquota)" "1"
 ck "grub rootflags" "$(grep -c 'GRUB_CMDLINE_LINUX="rootflags=uquota,pquota"' /etc/default/grub)" "1"
 ck "cmdline live" "$(grep -c 'rootflags=uquota,pquota' /proc/cmdline)" "1"
@@ -95,7 +95,7 @@ for p in vim mokutil dmidecode efibootmgr \
   gnome-firmware gnome-shell-extension-manager gnome-shell-extensions gnome-tweaks htop ipcalc \
   iperf3 jq keepassxc libmbim-utils lshw make mmsd-tng modemmanager nano ncdu net-tools network-manager-openvpn-gnome nmap obs-studio \
   openssh-server openssl openvpn3-client progress pwgen python3 python3.13-venv remmina remmina-plugin-rdp rsync sshuttle \
-  sudo tmux traceroute tree unrar virt-top vlc wget xclip yt-dlp \
+  sudo tmux traceroute tree unrar virt-top vlc wget xclip yt-dlp zram-tools \
   flatpak gnome-software-plugin-flatpak \
   qemu-system-x86 qemu-utils ovmf virtinst virt-manager libvirt-daemon-system libvirt-clients \
   libosinfo-bin osinfo-db osinfo-db-tools libguestfs-tools cloud-image-utils acl util-linux \
@@ -138,6 +138,21 @@ ck "ignore linkdown" "$(sysctl -n net.ipv4.conf.all.ignore_routes_with_linkdown 
 ck "ignore linkdown default" "$(sysctl -n net.ipv4.conf.default.ignore_routes_with_linkdown 2>/dev/null)" "1"
 ck "ignore linkdown conf" "$(grep -c 'net.ipv4.conf.all.ignore_routes_with_linkdown = 1' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
 ck "ignore linkdown default conf" "$(grep -c 'net.ipv4.conf.default.ignore_routes_with_linkdown = 1' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
+ck "swappiness"      "$(sysctl -n vm.swappiness 2>/dev/null)" "100"
+ck "swappiness conf" "$(grep -c '^vm.swappiness = 100$' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
+ck "page-cluster"    "$(sysctl -n vm.page-cluster 2>/dev/null)" "0"
+ck "page-cluster conf" "$(grep -c '^vm.page-cluster = 0$' /etc/sysctl.d/99-kvm.conf 2>/dev/null)" "1"
+ck "zramswap enabled" "$(systemctl is-enabled zramswap 2>/dev/null)" "enabled"
+ck "zramswap active" "$(systemctl is-active zramswap 2>/dev/null)" "active"
+ck "zram algo conf"  "$(grep -c '^ALGO=zstd$' /etc/default/zramswap 2>/dev/null)" "1"
+ck "zram size conf"  "$(grep -c '^SIZE=16384$' /etc/default/zramswap 2>/dev/null)" "1"
+ck "zram prio conf"  "$(grep -c '^PRIORITY=100$' /etc/default/zramswap 2>/dev/null)" "1"
+ck "zram no percent" "$(grep -c '^PERCENT=' /etc/default/zramswap 2>/dev/null)" "0"
+ck "swap is zram0"   "$(swapon --show --noheadings 2>/dev/null|awk '{print $1}')" "/dev/zram0"
+ck "zram algo"       "$(sed -n 's/.*\[\([^]]*\)\].*/\1/p' /sys/block/zram0/comp_algorithm 2>/dev/null)" "zstd"
+ck "zram disksize"   "$(cat /sys/block/zram0/disksize 2>/dev/null)" "17179869184"
+ck "zram priority"   "$(awk '$1=="/dev/zram0"{print $5}' /proc/swaps)" "100"
+ck "zswap off"       "$(cat /sys/module/zswap/parameters/enabled 2>/dev/null)" "N"
 ck "nofile soft"     "$(grep -c 'soft.*nofile.*65536' /etc/security/limits.d/99-kvm.conf 2>/dev/null)" "1"
 ck "nofile hard"     "$(grep -c 'hard.*nofile.*1048576' /etc/security/limits.d/99-kvm.conf 2>/dev/null)" "1"
 ck "no default net"  "$(virsh -c qemu:///system net-list --all --name 2>/dev/null|grep -cx default)" "0"
