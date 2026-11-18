@@ -493,14 +493,14 @@ error.
 #### 5. Install the flatpak applications
 
 ```bash
-flatpak install -y flathub org.telegram.desktop com.belmoussaoui.Obfuscate md.obsidian.Obsidian io.gitlab.adhami3310.Impression io.kinvolk.Headlamp
+flatpak install -y flathub org.telegram.desktop com.belmoussaoui.Obfuscate md.obsidian.Obsidian io.gitlab.adhami3310.Impression io.kinvolk.Headlamp io.github.focustimerhq.FocusTimer
 ```
 
 **Notes**
 
 - `remmina` is the remote-desktop client, from Debian's own repository rather than a flatpak. The protocols live in separate plugin packages, so `remmina` on its own gives you the application with no way to open an RDP session. `remmina-plugin-rdp` is a Recommends of `remmina` and would normally arrive with it, but it is named here so the install does not depend on recommends being enabled — a machine configured with `APT::Install-Recommends "false"` would otherwise get a client that cannot speak the one protocol it was installed for.
 - Log out and back in before flatpak applications appear in GNOME Software.
-- The five flatpaks are Telegram, Obfuscate for redacting screenshots, Obsidian for notes, Impression for writing bootable USB images, and Headlamp for the Kubernetes dashboard.
+- The six flatpaks are Telegram, Obfuscate for redacting screenshots, Obsidian for notes, Impression for writing bootable USB images, Headlamp for the Kubernetes dashboard, and Focus Timer for working with regular breaks.
 - `flatpak install` takes several application IDs at once, and `-y` stops it asking to confirm each one. Installed as root, they are available to every user.
 - `No remote refs found` from `flatpak install` means the remote is missing, not that the application is. Check `flatpak remotes` first.
 - A remote added with `--user` is invisible to a `flatpak install` run as root, and the reverse. `flatpak remotes` shows which installation each belongs to.

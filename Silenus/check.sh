@@ -108,10 +108,10 @@ ck "editor is vim" "$(readlink -f /etc/alternatives/editor|grep -c vim)" "1"
 printf '\n--- Step 6: flatpak ---\n'
 ck "flathub remote" "$(flatpak remotes 2>/dev/null|grep -c flathub)" "1"
 fmiss=""
-for a in org.telegram.desktop com.belmoussaoui.Obfuscate md.obsidian.Obsidian io.gitlab.adhami3310.Impression io.kinvolk.Headlamp; do
+for a in org.telegram.desktop com.belmoussaoui.Obfuscate md.obsidian.Obsidian io.gitlab.adhami3310.Impression io.kinvolk.Headlamp io.github.focustimerhq.FocusTimer; do
   flatpak info "$a" >/dev/null 2>&1 || fmiss="$fmiss $a"
 done
-ck "flatpak apps" "${fmiss:-all five}" "all five"
+ck "flatpak apps" "${fmiss:-all six}" "all six"
 
 printf '\n--- Step 4: Qt ---\n'
 ck "QT_QPA_PLATFORM"      "$(grep -c '^QT_QPA_PLATFORM=wayland;xcb$' /etc/environment)" "1"
